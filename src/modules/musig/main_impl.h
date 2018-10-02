@@ -120,6 +120,9 @@ int secp256k1_musig_init(const secp256k1_context* ctx, secp256k1_scratch *scratc
     if (secp256k1_scratch_allocate_frame(scratch, n * sizeof(secp256k1_pubkey), 1) == 0) {
         return 0;
     }
+    if (!secp256k1_musig_compute_ell(ctx, musig_config->ell, pks, n)) {
+        return 0;
+    }
     musig_config->musig_pks = (secp256k1_pubkey *)secp256k1_scratch_alloc(scratch, n * sizeof(secp256k1_pubkey));
     if (!secp256k1_musig_pubkey_combine(ctx, musig_config->musig_pks, &musig_config->combined_pk, pks, musig_config->n)) {
         secp256k1_scratch_deallocate_frame(scratch);
@@ -183,7 +186,7 @@ int secp256k1_musig_signer_data_initialize(const secp256k1_context* ctx, secp256
     return 1;
 }
 
-int secp256k1_musig_multisig_generate_nonce(const secp256k1_context* ctx, unsigned char *secnon, secp256k1_pubkey *pubnon, unsigned char *noncommit, const secp256k1_musig_secret_key *seckey, const unsigned char *msg32, const unsigned char *rngseed) {
+int secp256k1_musig_multisig_generate_nonce(const secp256k1_context* ctx, unsigned char *secnon, secp256k1_pubkey *pubnon, unsigned char *noncommit, const unsigned char *seckey, const unsigned char *msg32, const unsigned char *rngseed) {
     unsigned char commit[33];
     size_t commit_size = sizeof(commit);
     secp256k1_sha256 sha;
@@ -200,7 +203,7 @@ int secp256k1_musig_multisig_generate_nonce(const secp256k1_context* ctx, unsign
     ARG_CHECK(rngseed != NULL);
 
     secp256k1_sha256_initialize(&sha);
-    secp256k1_sha256_write(&sha, seckey->data, 32);
+    secp256k1_sha256_write(&sha, seckey, 32);
     secp256k1_sha256_write(&sha, msg32, 32);
     secp256k1_sha256_write(&sha, rngseed, 32);
     secp256k1_sha256_finalize(&sha, secnon);
@@ -241,12 +244,7 @@ int secp256k1_musig_set_nonce(const secp256k1_context* ctx, secp256k1_musig_sign
     return 1;
 }
 
-/*
- * Aux data structure:
- * 32 bytes message hash
- * 32 bytes R.x
- */
-int secp256k1_musig_partial_sign(const secp256k1_context* ctx, secp256k1_scratch_space *scratch, secp256k1_musig_partial_signature *partial_sig, secp256k1_musig_validation_aux *aux, unsigned char *secnon, const secp256k1_musig_config *musig_config, const secp256k1_musig_secret_key *seckey, const unsigned char *msg32, const secp256k1_musig_signer_data *data, size_t my_index, const unsigned char *sec_adaptor) {
+int secp256k1_musig_partial_sign(const secp256k1_context* ctx, secp256k1_scratch_space *scratch, secp256k1_musig_partial_signature *partial_sig, secp256k1_musig_validation_aux *aux, unsigned char *secnon, const secp256k1_musig_config *musig_config, const unsigned char *seckey, const unsigned char *msg32, const secp256k1_musig_signer_data *data, size_t my_index, const unsigned char *sec_adaptor) {
     unsigned char buf[33];
     size_t bufsize = 33;
     secp256k1_gej total_rj;
@@ -255,6 +253,7 @@ int secp256k1_musig_partial_sign(const secp256k1_context* ctx, secp256k1_scratch
     size_t i;
     int overflow;
     secp256k1_scalar sk;
+    secp256k1_scalar musig_coeff;
     secp256k1_scalar e, k;
 
     VERIFY_CHECK(ctx != NULL);
@@ -273,10 +272,13 @@ int secp256k1_musig_partial_sign(const secp256k1_context* ctx, secp256k1_scratch
         return 0;
     }
 
-    secp256k1_scalar_set_b32(&sk, seckey->data, &overflow);
+    secp256k1_scalar_set_b32(&sk, seckey, &overflow);
     if (overflow) {
         return 0;
     }
+
+    secp256k1_musig_coefficient(&musig_coeff, musig_config->ell, my_index);
+    secp256k1_scalar_mul(&sk, &musig_coeff, &sk);
 
     secp256k1_scalar_set_b32(&k, secnon, &overflow);
     if (overflow || secp256k1_scalar_is_zero(&k)) {

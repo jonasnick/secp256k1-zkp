@@ -17,6 +17,7 @@
 typedef struct {
     secp256k1_scratch_space *scratch;
     size_t n;
+    unsigned char ell[32];
     secp256k1_pubkey *musig_pks;
     secp256k1_pubkey combined_pk;
 } secp256k1_musig_config;
@@ -152,26 +153,6 @@ SECP256K1_API int secp256k1_musig_pubkey(
     const secp256k1_musig_config *musig_config
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
-/** Computes a MuSig multiplier and multiplies a secret key by it.
- *
- * Returns 1 on success, 0 if any input was invalid.
- *
- *  Args:    ctx: pointer to a context object (cannot be NULL)
- *  Out:     out: tweaked MuSig secret key (cannot be NULL)
- *  In:   seckey: unmodified secret key (cannot be NULL)
- *            pk: input public keys (cannot be NULL)
- *            np: number of keys in the above array
- *      my_index: index of signer (should be consistent with 0-indexed signer data array used in other functions)
- */
-SECP256K1_API int secp256k1_musig_tweak_secret_key(
-    const secp256k1_context* ctx,
-    secp256k1_musig_secret_key *out,
-    const unsigned char *seckey,
-    const secp256k1_pubkey *pk,
-    size_t np,
-    size_t my_index
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
-
 /** Generate a uniformly random nonce for a MuSig multisignature or threshold signature
  *
  *  Returns 1 always.
@@ -188,7 +169,7 @@ SECP256K1_API int secp256k1_musig_multisig_generate_nonce(
     unsigned char *secnon,
     secp256k1_pubkey *pubnon,
     unsigned char *noncommit,
-    const secp256k1_musig_secret_key *seckey,
+    const unsigned char *seckey,
     const unsigned char *msg32,
     const unsigned char *rngseed
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6);
@@ -247,7 +228,7 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_set_nonce(
  *                nonce is used in musig_partial_sign it shall be never reused. Failure to do this
  *                will result in the secret key being leaked.
  *  In: musig_config: MuSig configuration (cannot be NULL)
- *            seckey: secret signing key to use (cannot be NULL)
+ *            seckey: 32-byte secret signing key to use (cannot be NULL)
  *             msg32: 32-byte message to be signed (cannot be NULL)
  *              data: array of public nonces and/or keyshards of all signers including this signer (cannot be NULL).
  *                    The order of signers must be the same as in combine_pubkey.
@@ -263,7 +244,7 @@ SECP256K1_API int secp256k1_musig_partial_sign(
     secp256k1_musig_validation_aux *aux,
     unsigned char *secnon,
     const secp256k1_musig_config *musig_config,
-    const secp256k1_musig_secret_key *seckey,
+    const unsigned char *seckey,
     const unsigned char *msg32,
     const secp256k1_musig_signer_data *data,
     size_t my_index,
