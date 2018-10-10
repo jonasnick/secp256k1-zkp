@@ -18,7 +18,7 @@ typedef struct {
     secp256k1_scratch_space *scratch;
     size_t n;
     unsigned char ell[32];
-    secp256k1_pubkey *musig_pks;
+    secp256k1_pubkey *pks;
     secp256k1_pubkey combined_pk;
 } secp256k1_musig_config;
 

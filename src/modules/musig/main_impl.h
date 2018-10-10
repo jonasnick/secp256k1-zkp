@@ -120,12 +120,12 @@ int secp256k1_musig_init(const secp256k1_context* ctx, secp256k1_scratch *scratc
     if (secp256k1_scratch_allocate_frame(scratch, n * sizeof(secp256k1_pubkey), 1) == 0) {
         return 0;
     }
-    if (!secp256k1_musig_compute_ell(ctx, musig_config->ell, pks, n)) {
+    musig_config->pks = (secp256k1_pubkey *)secp256k1_scratch_alloc(scratch, n * sizeof(secp256k1_pubkey));
+    if (!secp256k1_musig_pubkey_combine(ctx, NULL, &musig_config->combined_pk, pks, musig_config->n)) {
+        secp256k1_scratch_deallocate_frame(scratch);
         return 0;
     }
-    musig_config->musig_pks = (secp256k1_pubkey *)secp256k1_scratch_alloc(scratch, n * sizeof(secp256k1_pubkey));
-    if (!secp256k1_musig_pubkey_combine(ctx, musig_config->musig_pks, &musig_config->combined_pk, pks, musig_config->n)) {
-        secp256k1_scratch_deallocate_frame(scratch);
+    if (!secp256k1_musig_compute_ell(ctx, musig_config->ell, pks, n)) {
         return 0;
     }
     return 1;
@@ -181,7 +181,7 @@ int secp256k1_musig_signer_data_initialize(const secp256k1_context* ctx, secp256
     ARG_CHECK(noncommit != NULL);
     memset(data, 0, sizeof(*data));
     data->index = index;
-    memcpy(&data->pubkey, &musig_config->musig_pks[index], sizeof(secp256k1_pubkey));
+    memcpy(&data->pubkey, &musig_config->pks[index], sizeof(secp256k1_pubkey));
     memcpy(data->noncommit, noncommit, 32);
     return 1;
 }
@@ -222,6 +222,55 @@ int secp256k1_musig_multisig_generate_nonce(const secp256k1_context* ctx, unsign
     return 1;
 }
 
+/* TODO: needs scratchspace? */
+/* don't know how many pubkeys?? */
+typedef struct {
+    unsigned char msg[32];
+    secp256k1_pubkey my_pubnon;
+    unsigned char my_secnon[32];
+    unsigned char *noncommits;
+    size_t my_index;
+} secp256k1_musig_session;
+
+int secp256k1_musig_session_start(const secp256k1_context* ctx, secp256k1_musig_session *session, secp256k1_musig_secret_key *musig_seckey, unsigned char *my_noncommit, const secp256k1_musig_config *musig_config, size_t my_index, const unsigned char *seckey, const unsigned char *msg32, const unsigned char *rngseed) {
+    secp256k1_scalar sk, musig_coeff;
+    int overflow;
+
+    memcpy(session->msg, msg32, 32);
+    if (!secp256k1_musig_multisig_generate_nonce(ctx, session->my_secnon, &session->my_pubnon, my_noncommit, seckey, session->msg, rngseed)) {
+        return 0;
+    }
+    secp256k1_scalar_set_b32(&sk, seckey, &overflow);
+    if (overflow) {
+        return 0;
+    }
+    secp256k1_musig_coefficient(&musig_coeff, musig_config->ell, my_index);
+    secp256k1_scalar_mul(&sk, &musig_coeff, &sk);
+    secp256k1_scalar_get_b32(musig_seckey->data, &sk);
+
+    return 1;
+}
+
+int secp256k1_musig_session_get_nonce(const secp256k1_context* ctx, secp256k1_musig_session* session, secp256k1_pubkey *my_pubnon, const secp256k1_musig_config *musig_config, const unsigned char **noncommits) {
+    (void) ctx;
+    if (secp256k1_scratch_allocate_frame(musig_config->scratch, musig_config->n * 32, 1) == 0) {
+        return 0;
+    }
+
+    session->noncommits = (unsigned char *)secp256k1_scratch_alloc(musig_config->scratch, musig_config->n * 32);
+    memcpy(session->noncommits, noncommits, n * 32);
+    memcpy(my_pubnon, &session->my_pubnon, 33);
+    return 1;
+}
+
+
+/* TODO */
+/*
+int secp256k1_musig_set_nonces(const secp256k1_context* ctx, const secp256k1_musig_config *musig_config, secp256k1_musig_session* session, const secp256k1_pubkey *pubnons) {
+}
+*/
+/* TODO: you also want to know who did it... */
+/* TODO: delete nonce from session if it's wrong... */
 int secp256k1_musig_set_nonce(const secp256k1_context* ctx, secp256k1_musig_signer_data *data, const secp256k1_pubkey *pubnon) {
     unsigned char commit[33];
     size_t commit_size = sizeof(commit);
@@ -253,7 +302,6 @@ int secp256k1_musig_partial_sign(const secp256k1_context* ctx, secp256k1_scratch
     size_t i;
     int overflow;
     secp256k1_scalar sk;
-    secp256k1_scalar musig_coeff;
     secp256k1_scalar e, k;
 
     VERIFY_CHECK(ctx != NULL);
@@ -271,14 +319,6 @@ int secp256k1_musig_partial_sign(const secp256k1_context* ctx, secp256k1_scratch
     if (!data[my_index].present) {
         return 0;
     }
-
-    secp256k1_scalar_set_b32(&sk, seckey, &overflow);
-    if (overflow) {
-        return 0;
-    }
-
-    secp256k1_musig_coefficient(&musig_coeff, musig_config->ell, my_index);
-    secp256k1_scalar_mul(&sk, &musig_coeff, &sk);
 
     secp256k1_scalar_set_b32(&k, secnon, &overflow);
     if (overflow || secp256k1_scalar_is_zero(&k)) {

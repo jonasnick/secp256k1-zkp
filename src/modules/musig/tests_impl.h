@@ -222,6 +222,38 @@ void musig_api_tests(secp256k1_scratch_space *scratch) {
     secp256k1_context_destroy(both);
 }
 
+void musig_simple_test(secp256k1_scratch_space *scratch) {
+    unsigned char sk1[32];
+    unsigned char msg[32];
+    secp256k1_musig_signer_data signer_data[1];
+    unsigned char rngseed[32];
+    secp256k1_pubkey pk[3];
+    secp256k1_pubkey pubnon1;
+    unsigned char noncom1[32];
+    unsigned char secnon1[32];
+    const secp256k1_pubkey *pkptr = &pk[0];
+    secp256k1_musig_validation_aux aux;
+    secp256k1_musig_partial_signature partial_sig[1];
+    secp256k1_musig_config musig_config_untweaked;
+
+    secp256k1_rand256(sk1);
+    secp256k1_rand256(msg);
+    secp256k1_rand256(rngseed);
+    CHECK(secp256k1_ec_pubkey_create(ctx, &pk[0], sk1) == 1);
+
+    CHECK(secp256k1_musig_init(ctx, scratch, &musig_config_untweaked, pkptr, 1, 1, NULL, NULL, NULL) == 1);                                                                                                       
+    CHECK(secp256k1_musig_multisig_generate_nonce(ctx, secnon1, &pubnon1, noncom1, sk1, msg, rngseed) == 1);                                                                                                      
+
+
+    CHECK(secp256k1_musig_signer_data_initialize(ctx, &signer_data[0], &musig_config_untweaked.tweaked_pks[0], noncom1));                                                                                         
+    CHECK(secp256k1_musig_set_nonce(ctx, &signer_data[0], &pubnon1) == 1);
+    print_pubkey(ctx, &musig_config_untweaked.combined_pk);
+    print_pubkey(ctx, &musig_config_untweaked.combined_pk_untweaked);
+
+    CHECK(secp256k1_musig_partial_sign(ctx, scratch, &partial_sig[0], &aux, secnon1, &musig_config_untweaked, sk1, msg, signer_data, 0, NULL) == 1);                                                              
+    CHECK(secp256k1_musig_partial_sig_verify(ctx, &partial_sig[0], &signer_data[0], &aux) == 1);
+}
+
 void scriptless_atomic_swap(secp256k1_scratch_space *scratch) {
     /* Thoughout this test "a" and "b" refer to two hypothetical blockchains,
      * while the indices 0 and 1 refer to the two signers. Here signer 0 is
@@ -324,6 +356,7 @@ void run_musig_tests(void) {
     secp256k1_scratch_space *scratch = secp256k1_scratch_space_create(ctx, 1024 * 1024);
 
     musig_api_tests(scratch);
+    musig_simple_test(scratch);
     scriptless_atomic_swap(scratch);
 
     secp256k1_scratch_space_destroy(scratch);
