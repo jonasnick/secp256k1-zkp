@@ -119,6 +119,20 @@ exhaustive_tests_LDFLAGS = -static
 TESTS += exhaustive_tests
 endif
 
+if ENABLE_MODULE_BULLETPROOF
+noinst_PROGRAMS += example_bulletproof
+example_bulletproof_SOURCES = examples/bulletproof.c
+example_bulletproof_CPPFLAGS = -DSECP256K1_BUILD -I$(top_srcdir)/include $(SECP_INCLUDES)
+if !ENABLE_COVERAGE
+example_bulletproof_CPPFLAGS += -DVERIFY
+endif
+example_bulletproof_LDADD = libsecp256k1.la $(SECP_LIBS)
+example_bulletproof_LDFLAGS = -static
+if USE_TESTS
+TESTS += example_bulletproof
+endif
+endif
+
 JAVAROOT=src/java
 JAVAORG=org/bitcoin
 JAVA_GUAVA=$(srcdir)/$(JAVAROOT)/guava/guava-18.0.jar
