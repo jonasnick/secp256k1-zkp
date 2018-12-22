@@ -31,7 +31,7 @@ void test_schnorrsig_api(secp256k1_scratch_space *scratch) {
     const secp256k1_schnorrsig *sigptr = &sig;
     const unsigned char *msgptr = msg;
     const secp256k1_pubkey *pkptr = &pk[0];
-    int negated_nonce;
+    int nonce_is_negated;
 
     /** setup **/
     secp256k1_context *none = secp256k1_context_create(SECP256K1_CONTEXT_NONE);
@@ -59,19 +59,19 @@ void test_schnorrsig_api(secp256k1_scratch_space *scratch) {
 
     /** main test body **/
     ecount = 0;
-    CHECK(secp256k1_schnorrsig_sign(none, &sig, &negated_nonce, msg, sk1, NULL, NULL) == 0);
+    CHECK(secp256k1_schnorrsig_sign(none, &sig, &nonce_is_negated, msg, sk1, NULL, NULL) == 0);
     CHECK(ecount == 1);
-    CHECK(secp256k1_schnorrsig_sign(vrfy, &sig, &negated_nonce, msg, sk1, NULL, NULL) == 0);
+    CHECK(secp256k1_schnorrsig_sign(vrfy, &sig, &nonce_is_negated, msg, sk1, NULL, NULL) == 0);
     CHECK(ecount == 2);
-    CHECK(secp256k1_schnorrsig_sign(sign, &sig, &negated_nonce, msg, sk1, NULL, NULL) == 1);
+    CHECK(secp256k1_schnorrsig_sign(sign, &sig, &nonce_is_negated, msg, sk1, NULL, NULL) == 1);
     CHECK(ecount == 2);
-    CHECK(secp256k1_schnorrsig_sign(sign, NULL, &negated_nonce, msg, sk1, NULL, NULL) == 0);
+    CHECK(secp256k1_schnorrsig_sign(sign, NULL, &nonce_is_negated, msg, sk1, NULL, NULL) == 0);
     CHECK(ecount == 3);
     CHECK(secp256k1_schnorrsig_sign(sign, &sig, NULL, msg, sk1, NULL, NULL) == 1);
     CHECK(ecount == 3);
-    CHECK(secp256k1_schnorrsig_sign(sign, &sig, &negated_nonce, NULL, sk1, NULL, NULL) == 0);
+    CHECK(secp256k1_schnorrsig_sign(sign, &sig, &nonce_is_negated, NULL, sk1, NULL, NULL) == 0);
     CHECK(ecount == 4);
-    CHECK(secp256k1_schnorrsig_sign(sign, &sig, &negated_nonce, msg, NULL, NULL, NULL) == 0);
+    CHECK(secp256k1_schnorrsig_sign(sign, &sig, &nonce_is_negated, msg, NULL, NULL, NULL) == 0);
     CHECK(ecount == 5);
 
     ecount = 0;
@@ -130,14 +130,14 @@ void test_schnorrsig_api(secp256k1_scratch_space *scratch) {
 
 /* Helper function for schnorrsig_bip_vectors
  * Signs the message and checks that it's the same as expected_sig. */
-void test_schnorrsig_bip_vectors_check_signing(const unsigned char *sk, const unsigned char *pk_serialized, const unsigned char *msg, const unsigned char *expected_sig, const int expected_negated_nonce) {
+void test_schnorrsig_bip_vectors_check_signing(const unsigned char *sk, const unsigned char *pk_serialized, const unsigned char *msg, const unsigned char *expected_sig, const int expected_nonce_is_negated) {
     secp256k1_schnorrsig sig;
     unsigned char serialized_sig[64];
     secp256k1_pubkey pk;
-    int negated_nonce;
+    int nonce_is_negated;
 
-    CHECK(secp256k1_schnorrsig_sign(ctx, &sig, &negated_nonce, msg, sk, NULL, NULL));
-    CHECK(negated_nonce == expected_negated_nonce);
+    CHECK(secp256k1_schnorrsig_sign(ctx, &sig, &nonce_is_negated, msg, sk, NULL, NULL));
+    CHECK(nonce_is_negated == expected_nonce_is_negated);
     CHECK(secp256k1_schnorrsig_serialize(ctx, serialized_sig, &sig));
     CHECK(memcmp(serialized_sig, expected_sig, 64) == 0);
 

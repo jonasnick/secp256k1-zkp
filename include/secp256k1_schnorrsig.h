@@ -61,7 +61,7 @@ SECP256K1_API int secp256k1_schnorrsig_parse(
  * Returns 1 on success, 0 on failure.
  *  Args:    ctx: pointer to a context object, initialized for signing (cannot be NULL)
  *  Out:     sig: pointer to the returned signature (cannot be NULL)
- *      negated_nonce: a pointer to an integer indicates if signing algorithm negated the
+ *       nonce_is_negated: a pointer to an integer indicates if signing algorithm negated the
  *                nonce (can be NULL)
  *  In:    msg32: the 32-byte message hash being signed (cannot be NULL)
  *        seckey: pointer to a 32-byte secret key (cannot be NULL)
@@ -71,7 +71,7 @@ SECP256K1_API int secp256k1_schnorrsig_parse(
 SECP256K1_API int secp256k1_schnorrsig_sign(
     const secp256k1_context* ctx,
     secp256k1_schnorrsig *sig,
-    int *negated_nonce,
+    int *nonce_is_negated,
     const unsigned char *msg32,
     const unsigned char *seckey,
     secp256k1_nonce_function noncefp,
