@@ -100,8 +100,8 @@ int secp256k1_musig_session_initialize(const secp256k1_context* ctx, secp256k1_m
     unsigned char combined_ser[33];
     size_t combined_ser_size = sizeof(combined_ser);
     int overflow;
-    secp256k1_scalar x;
-    secp256k1_scalar y;
+    secp256k1_scalar secret;
+    secp256k1_scalar mu;
     secp256k1_sha256 sha;
     secp256k1_gej rj;
     secp256k1_ge rp;
@@ -132,13 +132,14 @@ int secp256k1_musig_session_initialize(const secp256k1_context* ctx, secp256k1_m
     session->nonce_commitments_hash_is_set = 0;
 
     /* Compute secret key */
-    secp256k1_scalar_set_b32(&x, seckey, &overflow);
+    secp256k1_scalar_set_b32(&secret, seckey, &overflow);
     if (overflow) {
+        secp256k1_scalar_clear(&secret);
         return 0;
     }
-    secp256k1_musig_coefficient(&y, pk_hash32, my_index);
-    secp256k1_scalar_mul(&x, &x, &y);
-    secp256k1_scalar_get_b32(session->seckey, &x);
+    secp256k1_musig_coefficient(&mu, pk_hash32, my_index);
+    secp256k1_scalar_mul(&secret, &secret, &mu);
+    secp256k1_scalar_get_b32(session->seckey, &secret);
 
     /* Compute secret nonce */
     secp256k1_sha256_initialize(&sha);
@@ -150,13 +151,14 @@ int secp256k1_musig_session_initialize(const secp256k1_context* ctx, secp256k1_m
     secp256k1_ec_pubkey_serialize(ctx, combined_ser, &combined_ser_size, combined_pk, SECP256K1_EC_COMPRESSED);
     secp256k1_sha256_write(&sha, combined_ser, combined_ser_size);
     secp256k1_sha256_finalize(&sha, session->secnonce);
-    secp256k1_scalar_set_b32(&x, session->secnonce, &overflow);
+    secp256k1_scalar_set_b32(&secret, session->secnonce, &overflow);
     if (overflow) {
+        secp256k1_scalar_clear(&secret);
         return 0;
     }
 
     /* Compute public nonce and commitment */
-    secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &rj, &x);
+    secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &rj, &secret);
     secp256k1_ge_set_gej(&rp, &rj);
     secp256k1_pubkey_save(&session->nonce, &rp);
 
@@ -169,9 +171,9 @@ int secp256k1_musig_session_initialize(const secp256k1_context* ctx, secp256k1_m
         secp256k1_sha256_finalize(&sha, nonce_commitment32);
     }
 
+    secp256k1_scalar_clear(&secret);
     return 1;
 }
-
 
 int secp256k1_musig_session_get_public_nonce(const secp256k1_context* ctx, secp256k1_musig_session *session, secp256k1_pubkey *nonce, secp256k1_musig_signer_data *signers, const unsigned char *const *commitments, size_t n_commitments) {
     secp256k1_sha256 sha;
@@ -388,11 +390,14 @@ int secp256k1_musig_partial_sign(const secp256k1_context* ctx, const secp256k1_m
 
     secp256k1_scalar_set_b32(&sk, session->seckey, &overflow);
     if (overflow) {
+        secp256k1_scalar_clear(&sk);
         return 0;
     }
 
     secp256k1_scalar_set_b32(&k, session->secnonce, &overflow);
     if (overflow || secp256k1_scalar_is_zero(&k)) {
+        secp256k1_scalar_clear(&sk);
+        secp256k1_scalar_clear(&k);
         return 0;
     }
     if (session->nonce_is_negated) {
@@ -401,6 +406,8 @@ int secp256k1_musig_partial_sign(const secp256k1_context* ctx, const secp256k1_m
 
     /* build message hash */
     if (!secp256k1_musig_compute_messagehash(ctx, msghash, session)) {
+        secp256k1_scalar_clear(&sk);
+        secp256k1_scalar_clear(&k);
         return 0;
     }
     secp256k1_scalar_set_b32(&e, msghash, NULL);
@@ -518,6 +525,7 @@ int secp256k1_musig_partial_sig_adapt(const secp256k1_context* ctx, secp256k1_mu
     }
     secp256k1_scalar_set_b32(&t, sec_adaptor32, &overflow);
     if (overflow) {
+        secp256k1_scalar_clear(&t);
         return 0;
     }
 
@@ -527,6 +535,7 @@ int secp256k1_musig_partial_sig_adapt(const secp256k1_context* ctx, secp256k1_mu
 
     secp256k1_scalar_add(&s, &s, &t);
     secp256k1_scalar_get_b32(adaptor_sig->data, &s);
+    secp256k1_scalar_clear(&t);
     return 1;
 }
 
@@ -551,6 +560,7 @@ int secp256k1_musig_extract_secret_adaptor(const secp256k1_context* ctx, unsigne
     for (i = 0; i < n_partial_sigs; i++) {
         secp256k1_scalar_set_b32(&s, partial_sigs[i].data, &overflow);
         if (overflow) {
+            secp256k1_scalar_clear(&t);
             return 0;
         }
         secp256k1_scalar_add(&t, &t, &s);
@@ -560,6 +570,7 @@ int secp256k1_musig_extract_secret_adaptor(const secp256k1_context* ctx, unsigne
         secp256k1_scalar_negate(&t, &t);
     }
     secp256k1_scalar_get_b32(sec_adaptor32, &t);
+    secp256k1_scalar_clear(&t);
     return 1;
 }
 
