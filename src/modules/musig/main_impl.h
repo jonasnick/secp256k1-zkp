@@ -58,7 +58,18 @@ static int secp256k1_musig_pubkey_combine_callback(secp256k1_scalar *sc, secp256
     return secp256k1_pubkey_load(ctx->ctx, pt, &ctx->pks[idx]);
 }
 
-int secp256k1_musig_pubkey_combine(const secp256k1_context* ctx, secp256k1_scratch_space *scratch, secp256k1_pubkey *combined_pk, unsigned char *pk_hash32, secp256k1_musig_signer_data *signers, const secp256k1_pubkey *pubkeys, size_t n_signers) {
+
+void secp256k1_musig_signers_init(secp256k1_musig_signer_data *signers, const secp256k1_pubkey *pubkeys, size_t n_signers) {
+    size_t i;
+    for (i = 0; i < n_signers; i++) {
+        memset(&signers[i], 0, sizeof(signers[i]));
+        memcpy(&signers[i].pubkey, &pubkeys[i], sizeof(pubkeys[i]));
+        signers[i].index = i;
+        signers[i].present = 0;
+    }
+}
+
+int secp256k1_musig_pubkey_combine(const secp256k1_context* ctx, secp256k1_scratch_space *scratch, secp256k1_pubkey *combined_pk, unsigned char *pk_hash32, const secp256k1_pubkey *pubkeys, size_t n_pubkeys) {
     secp256k1_musig_pubkey_combine_ecmult_data ecmult_data;
     secp256k1_gej pkj;
     secp256k1_ge pkp;
@@ -67,14 +78,14 @@ int secp256k1_musig_pubkey_combine(const secp256k1_context* ctx, secp256k1_scrat
     ARG_CHECK(combined_pk != NULL);
     ARG_CHECK(secp256k1_ecmult_context_is_built(&ctx->ecmult_ctx));
     ARG_CHECK(pubkeys != NULL);
-    ARG_CHECK(n_signers > 0);
+    ARG_CHECK(n_pubkeys > 0);
 
     ecmult_data.ctx = ctx;
     ecmult_data.pks = pubkeys;
-    if (!secp256k1_musig_compute_ell(ctx, ecmult_data.ell, pubkeys, n_signers)) {
+    if (!secp256k1_musig_compute_ell(ctx, ecmult_data.ell, pubkeys, n_pubkeys)) {
         return 0;
     }
-    if (!secp256k1_ecmult_multi_var(&ctx->ecmult_ctx, scratch, &pkj, NULL, secp256k1_musig_pubkey_combine_callback, (void *) &ecmult_data, n_signers)) {
+    if (!secp256k1_ecmult_multi_var(&ctx->ecmult_ctx, scratch, &pkj, NULL, secp256k1_musig_pubkey_combine_callback, (void *) &ecmult_data, n_pubkeys)) {
         return 0;
     }
     secp256k1_ge_set_gej(&pkp, &pkj);
@@ -83,20 +94,10 @@ int secp256k1_musig_pubkey_combine(const secp256k1_context* ctx, secp256k1_scrat
     if (pk_hash32 != NULL) {
         memcpy(pk_hash32, ecmult_data.ell, 32);
     }
-
-    if (signers != NULL) {
-        size_t i;
-        for (i = 0; i < n_signers; i++) {
-            memset(&signers[i], 0, sizeof(signers[i]));
-            memcpy(&signers[i].pubkey, &pubkeys[i], sizeof(pubkeys[i]));
-            signers[i].index = i;
-            signers[i].present = 0;
-        }
-    }
     return 1;
 }
 
-int secp256k1_musig_session_initialize(const secp256k1_context* ctx, secp256k1_musig_session *session, unsigned char *nonce_commitment32, const unsigned char *session_id32, const unsigned char *msg32, const secp256k1_pubkey *combined_pk, const unsigned char *pk_hash32, size_t my_index, size_t n_signers, const unsigned char *seckey) {
+int secp256k1_musig_session_initialize(const secp256k1_context* ctx, secp256k1_musig_session *session, secp256k1_musig_signer_data *signers, unsigned char *nonce_commitment32, const unsigned char *session_id32, const unsigned char *msg32, const secp256k1_pubkey *combined_pk, const unsigned char *pk_hash32, const secp256k1_pubkey *pubkeys, size_t n_signers, size_t my_index, const unsigned char *seckey) {
     unsigned char combined_ser[33];
     size_t combined_ser_size = sizeof(combined_ser);
     int overflow;
@@ -109,10 +110,12 @@ int secp256k1_musig_session_initialize(const secp256k1_context* ctx, secp256k1_m
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
     ARG_CHECK(session != NULL);
+    ARG_CHECK(signers != NULL);
     ARG_CHECK(nonce_commitment32 != NULL);
     ARG_CHECK(session_id32 != NULL);
     ARG_CHECK(combined_pk != NULL);
     ARG_CHECK(pk_hash32 != NULL);
+    ARG_CHECK(pubkeys != NULL);
     ARG_CHECK(seckey != NULL);
 
     if (msg32 != NULL) {
@@ -129,6 +132,7 @@ int secp256k1_musig_session_initialize(const secp256k1_context* ctx, secp256k1_m
         return 0;
     }
     session->n_signers = n_signers;
+    secp256k1_musig_signers_init(signers, pubkeys, n_signers);
     session->nonce_commitments_hash_is_set = 0;
 
     /* Compute secret key */
@@ -212,7 +216,7 @@ int secp256k1_musig_session_get_public_nonce(const secp256k1_context* ctx, secp2
     return 1;
 }
 
-int secp256k1_musig_session_initialize_public(const secp256k1_context* ctx, secp256k1_musig_session *session, secp256k1_musig_signer_data *signers, const unsigned char *msg32, const secp256k1_pubkey *combined_pk, const unsigned char *pk_hash32, const unsigned char *const *commitments, size_t n_commitments) {
+int secp256k1_musig_session_initialize_public(const secp256k1_context* ctx, secp256k1_musig_session *session, secp256k1_musig_signer_data *signers, const unsigned char *msg32, const secp256k1_pubkey *combined_pk, const unsigned char *pk_hash32, const secp256k1_pubkey *pubkeys, const unsigned char *const *commitments, size_t n_signers) {
     size_t i;
 
     VERIFY_CHECK(ctx != NULL);
@@ -220,17 +224,20 @@ int secp256k1_musig_session_initialize_public(const secp256k1_context* ctx, secp
     ARG_CHECK(signers != NULL);
     ARG_CHECK(combined_pk != NULL);
     ARG_CHECK(pk_hash32 != NULL);
+    ARG_CHECK(pubkeys != NULL);
     ARG_CHECK(commitments != NULL);
-    for (i = 0; i < n_commitments; i++) {
+    for (i = 0; i < n_signers; i++) {
         ARG_CHECK(commitments[i] != NULL);
     }
     (void) ctx;
 
     memcpy(&session->combined_pk, combined_pk, sizeof(*combined_pk));
-    if (n_commitments == 0) {
+    if (n_signers == 0) {
         return 0;
     }
-    session->n_signers = n_commitments;
+    session->n_signers = n_signers;
+    secp256k1_musig_signers_init(signers, pubkeys, n_signers);
+
     memcpy(session->pk_hash, pk_hash32, 32);
     session->nonce_is_set = 0;
     session->msg_is_set = 0;
@@ -240,7 +247,7 @@ int secp256k1_musig_session_initialize_public(const secp256k1_context* ctx, secp
     }
     session->has_secret_data = 0;
 
-    for (i = 0; i < n_commitments; i++) {
+    for (i = 0; i < n_signers; i++) {
         memcpy(signers[i].nonce_commitment, commitments[i], 32);
     }
     return 1;
