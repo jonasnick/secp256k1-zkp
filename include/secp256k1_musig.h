@@ -67,7 +67,7 @@ typedef struct {
     int nonce_commitments_hash_is_set;
 } secp256k1_musig_session;
 
-/** Data structure containing data on all signers in a session.
+/** Data structure containing data on all signers in a single session.
  *
  * The workflow for this structure is as follows:
  *
@@ -101,7 +101,7 @@ typedef struct {
     secp256k1_pubkey pubkey;
     secp256k1_pubkey nonce;
     unsigned char nonce_commitment[32];
-} secp256k1_musig_signer_data;
+} secp256k1_musig_session_signer_data;
 
 /** Opaque data structure that holds a MuSig partial signature.
  *
@@ -145,7 +145,8 @@ SECP256K1_API int secp256k1_musig_pubkey_combine(
  *  Args:         ctx: pointer to a context object, initialized for signing (cannot
  *                     be NULL)
  *  Out:      session: the session structure to initialize (cannot be NULL)
- *            signers: an array of signers' data to be initialized (cannot be NULL)
+ *            signers: an array of signers' data to be initialized. Array length must
+ *                     equal to `n_signers` (cannot be NULL)
  * nonce_commitment32: filled with a 32-byte commitment to the generated nonce
  *                     (cannot be NULL)
  *  In:  session_id32: a *unique* 32-byte ID to assign to this session (cannot be
@@ -158,7 +159,8 @@ SECP256K1_API int secp256k1_musig_pubkey_combine(
  *        combined_pk: the combined public key of all signers (cannot be NULL)
  *          pk_hash32: the 32-byte hash of the signers' individual keys (cannot be
  *                     NULL)
- *            pubkeys: input array of public keys
+ *            pubkeys: input array of public keys. Array length must equal to
+ *                     `n_signers`
  *          n_signers: length of signers and pubkeys array. Number of signers
  *                     participating in the MuSig
  *           my_index: index of this signer in the signers array
@@ -167,7 +169,7 @@ SECP256K1_API int secp256k1_musig_pubkey_combine(
 SECP256K1_API int secp256k1_musig_session_initialize(
     const secp256k1_context* ctx,
     secp256k1_musig_session *session,
-    secp256k1_musig_signer_data *signers,
+    secp256k1_musig_session_signer_data *signers,
     unsigned char *nonce_commitment32,
     const unsigned char *session_id32,
     const unsigned char *msg32,
@@ -186,18 +188,19 @@ SECP256K1_API int secp256k1_musig_session_initialize(
  *              for signing
  *  Args:        ctx: pointer to a context object (cannot be NULL)
  *           session: the signing session to get the nonce from (cannot be NULL)
+ *           signers: an array of signers' data initialized with
+ *                    musig_session_initialize. Array length must equal to
+ *                    `n_commitments` (cannot be NULL)
  *  Out:       nonce: the nonce (cannot be NULL)
- *  In/Out:  signers: an array of signers' data initialized with
- *                    musig_session_initialize (cannot be NULL)
  *  In:  commitments: array of 32-byte nonce commitments (cannot be NULL)
- *     n_commitments: the length of commitments array. Must be the same as the number
- *                    of signers.
+ *     n_commitments: the length of commitments and signers array. Must be the total
+ *                    number of signers participating in the MuSig.
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_session_get_public_nonce(
     const secp256k1_context* ctx,
     secp256k1_musig_session *session,
+    secp256k1_musig_session_signer_data *signers,
     secp256k1_pubkey *nonce,
-    secp256k1_musig_signer_data *signers,
     const unsigned char *const *commitments,
     size_t n_commitments
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
@@ -209,21 +212,24 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_session_get_publi
  *  Returns: 1 when session is successfully initialized, 0 otherwise
  *  Args:        ctx: pointer to a context object (cannot be NULL)
  *  Out:     session: the session structure to initialize (cannot be NULL)
- *           signers: an array of signers' data to be initialized (cannot be NULL)
+ *           signers: an array of signers' data to be initialized. Array length must
+ *                    equal to `n_signers`(cannot be NULL)
  *  In:        msg32: the 32-byte message to be signed If NULL, must be set with
  *                    `musig_session_set_msg` before using the session for signing
  *                    and verifying.
  *       combined_pk: the combined public key of all signers (cannot be NULL)
  *         pk_hash32: the 32-byte hash of the signers' individual keys (cannot be NULL)
- *           pubkeys: input array of public keys
- *       commitments: array of 32-byte nonce commitments (cannot be NULL)
- *         n_signers: length of pubkeys and commitments array. Number of signers
- *                    participating in the MuSig
+ *           pubkeys: input array of public keys. Array length must equal to
+ *                    `n_signers`
+ *       commitments: array of 32-byte nonce commitments. Array length must equal to
+ *                    `n_signers` (cannot be NULL)
+ *         n_signers: length of signers, pubkeys and commitments array. Number of
+ *                    signers participating in the MuSig
  */
 SECP256K1_API int secp256k1_musig_session_initialize_verifier(
     const secp256k1_context* ctx,
     secp256k1_musig_session *session,
-    secp256k1_musig_signer_data *signers,
+    secp256k1_musig_session_signer_data *signers,
     const unsigned char *msg32,
     const secp256k1_pubkey *combined_pk,
     const unsigned char *pk_hash32,
@@ -238,14 +244,14 @@ SECP256K1_API int secp256k1_musig_session_initialize_verifier(
  *  Returns: 1: commitment was valid, data structure updated
  *           0: commitment was invalid, nothing happened
  *  Args:      ctx: pointer to a context object (cannot be NULL)
- *  In/Out: signer: pointer to the signer data to update (cannot be NULL). Must have
- *                  been used with `musig_session_get_public_nonce` or
- *                  `musig_session_initialize_verifier`.
+ *          signer: pointer to the signer data to update (cannot be NULL). Must have
+ *                  been used with `musig_session_get_public_nonce` or initialized
+ *                  with `musig_session_initialize_verifier`.
  *  In:     nonce: signer's alleged public nonce (cannot be NULL)
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_set_nonce(
     const secp256k1_context* ctx,
-    secp256k1_musig_signer_data *signer,
+    secp256k1_musig_session_signer_data *signer,
     const secp256k1_pubkey *nonce
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
@@ -256,20 +262,21 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_set_nonce(
  *           0: a signer's nonce is missing
  *  Args:        ctx: pointer to a context object (cannot be NULL)
  *           session: session to update with the combined nonce (cannot be NULL)
+ *           signers: an array of signers' data, which must have had nonces set with
+ *                    `musig_set_nonce`. Array length must equal to `n_signers`
+ *                    (cannot be NULL)
+ *         n_signers: the length of the signers array. Must be the total number of
+ *                    signers participating in the MuSig.
  *  Out: nonce_is_negated: a pointer to an integer that indicates if the combined
  *                    nonce had to be negated.
- *  In:      signers: an array of signers' data, which must have had nonces set with
- *                    `musig_set_nonce` (cannot be NULL)
- *         n_signers: the length of the signers array. Must be the same as the total
- *                    number of signers.
  *           adaptor: point to add to the combined nonce.
  */
 SECP256K1_API int secp256k1_musig_session_combine_nonces(
     const secp256k1_context* ctx,
     secp256k1_musig_session *session,
-    int *nonce_is_negated,
-    const secp256k1_musig_signer_data *signers,
+    const secp256k1_musig_session_signer_data *signers,
     size_t n_signers,
+    int *nonce_is_negated,
     const secp256k1_pubkey *adaptor
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(4);
 
@@ -344,14 +351,14 @@ SECP256K1_API int secp256k1_musig_partial_sign(
  *  Args:         ctx: pointer to a context object (cannot be NULL)
  *            session: active session for which the combined nonce has been computed
  *                     (cannot be NULL)
- *  In:   partial_sig: signature to check (cannot be NULL)
  *             signer: data for the signer who produced this signature (cannot be NULL)
+ *  In:   partial_sig: signature to check (cannot be NULL)
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_verify(
     const secp256k1_context* ctx,
     const secp256k1_musig_session *session,
-    const secp256k1_musig_partial_signature *partial_sig,
-    const secp256k1_musig_signer_data *signer
+    const secp256k1_musig_session_signer_data *signer,
+    const secp256k1_musig_partial_signature *partial_sig
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
 /** Combines partial signatures

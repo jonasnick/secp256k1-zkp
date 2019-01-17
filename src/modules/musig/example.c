@@ -37,7 +37,7 @@ int sign(const secp256k1_context* ctx, unsigned char seckeys[][32], const secp25
     secp256k1_musig_session musig_session[3];
     unsigned char nonce_commitment[N_SIGNERS][32];
     const unsigned char *nonce_commitment_ptr[N_SIGNERS];
-    secp256k1_musig_signer_data signer_data[N_SIGNERS][N_SIGNERS];
+    secp256k1_musig_session_signer_data signer_data[N_SIGNERS][N_SIGNERS];
     secp256k1_pubkey nonce[N_SIGNERS];
     int i, j;
     secp256k1_musig_partial_signature partial_sig[N_SIGNERS];
@@ -68,7 +68,7 @@ int sign(const secp256k1_context* ctx, unsigned char seckeys[][32], const secp25
     /* Communication round 1: Exchange nonce commitments */
     for (i = 0; i < N_SIGNERS; i++) {
         /* Set nonce commitments in the signer data and get the own public nonce */
-        if (!secp256k1_musig_session_get_public_nonce(ctx, &musig_session[i], &nonce[i], signer_data[i], nonce_commitment_ptr, N_SIGNERS)) {
+        if (!secp256k1_musig_session_get_public_nonce(ctx, &musig_session[i], signer_data[i], &nonce[i], nonce_commitment_ptr, N_SIGNERS)) {
             return 0;
         }
     }
@@ -82,7 +82,7 @@ int sign(const secp256k1_context* ctx, unsigned char seckeys[][32], const secp25
                 return 0;
             }
         }
-        if (!secp256k1_musig_session_combine_nonces(ctx, &musig_session[i], NULL, signer_data[i], N_SIGNERS, NULL)) {
+        if (!secp256k1_musig_session_combine_nonces(ctx, &musig_session[i], signer_data[i], N_SIGNERS, NULL, NULL)) {
             return 0;
         }
     }
@@ -94,7 +94,7 @@ int sign(const secp256k1_context* ctx, unsigned char seckeys[][32], const secp25
     /* Communication round 3: Exchange partial signatures */
     for (i = 0; i < N_SIGNERS; i++) {
         for (j = 0; j < N_SIGNERS; j++) {
-            if (!secp256k1_musig_partial_sig_verify(ctx, &musig_session[i], &partial_sig[j], &signer_data[i][j])) {
+            if (!secp256k1_musig_partial_sig_verify(ctx, &musig_session[i], &signer_data[i][j], &partial_sig[j])) {
                 return 0;
             }
         }
