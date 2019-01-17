@@ -72,7 +72,7 @@ typedef struct {
  * The workflow for this structure is as follows:
  *
  * 1. This structure is initialized with `musig_session_initialize` or
- *    `musig_session_initialize_public`, which set the `pubkey` and `index` fields,
+ *    `musig_session_initialize_verifier`, which set the `pubkey` and `index` fields,
  *    and zero out all other fields. The public session is initialized with the
  *    signers' nonce_commitments.
  *
@@ -202,8 +202,9 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_session_get_publi
     size_t n_commitments
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
 
-/** Initializes a signing session for a non-signing verifier of nonce
- *  commitments and partial signatures.
+/** Initializes a verifier session that can be used for verifying nonce commitments
+ *  and partial signatures. It does not have secret key material and therefore can not
+ *  be used to create signatures.
  *
  *  Returns: 1 when session is successfully initialized, 0 otherwise
  *  Args:        ctx: pointer to a context object (cannot be NULL)
@@ -219,7 +220,7 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_session_get_publi
  *         n_signers: length of pubkeys and commitments array. Number of signers
  *                    participating in the MuSig
  */
-SECP256K1_API int secp256k1_musig_session_initialize_public(
+SECP256K1_API int secp256k1_musig_session_initialize_verifier(
     const secp256k1_context* ctx,
     secp256k1_musig_session *session,
     secp256k1_musig_signer_data *signers,
@@ -239,7 +240,7 @@ SECP256K1_API int secp256k1_musig_session_initialize_public(
  *  Args:      ctx: pointer to a context object (cannot be NULL)
  *  In/Out: signer: pointer to the signer data to update (cannot be NULL). Must have
  *                  been used with `musig_session_get_public_nonce` or
- *                  `musig_session_initialize_public`.
+ *                  `musig_session_initialize_verifier`.
  *  In:     nonce: signer's alleged public nonce (cannot be NULL)
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_set_nonce(

@@ -216,7 +216,7 @@ int secp256k1_musig_session_get_public_nonce(const secp256k1_context* ctx, secp2
     return 1;
 }
 
-int secp256k1_musig_session_initialize_public(const secp256k1_context* ctx, secp256k1_musig_session *session, secp256k1_musig_signer_data *signers, const unsigned char *msg32, const secp256k1_pubkey *combined_pk, const unsigned char *pk_hash32, const secp256k1_pubkey *pubkeys, const unsigned char *const *commitments, size_t n_signers) {
+int secp256k1_musig_session_initialize_verifier(const secp256k1_context* ctx, secp256k1_musig_session *session, secp256k1_musig_signer_data *signers, const unsigned char *msg32, const secp256k1_pubkey *combined_pk, const unsigned char *pk_hash32, const secp256k1_pubkey *pubkeys, const unsigned char *const *commitments, size_t n_signers) {
     size_t i;
 
     VERIFY_CHECK(ctx != NULL);
