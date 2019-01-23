@@ -305,7 +305,9 @@ int secp256k1_musig_session_combine_nonces(const secp256k1_context* ctx, secp256
             && memcmp(session->nonce_commitments_hash, nonce_commitments_hash, 32) != 0) {
         /* If the signers' commitments changed between get_public_nonce and now we
          * have to abort because in that case they may have seen our nonce before
-         * creating their commitment. */
+         * creating their commitment. That can happen if the signer_data given to
+         * this function is different to the signer_data given to get_public_nonce.
+         * */
         return 0;
     }
 
@@ -366,6 +368,9 @@ static int secp256k1_musig_compute_messagehash(const secp256k1_context *ctx, uns
     secp256k1_sha256 sha;
 
     secp256k1_sha256_initialize(&sha);
+    if (!session->nonce_is_set) {
+        return 0;
+    }
     secp256k1_pubkey_load(ctx, &rp, &session->combined_nonce);
     secp256k1_fe_get_b32(buf, &rp.x);
     secp256k1_sha256_write(&sha, buf, 32);
@@ -394,6 +399,12 @@ int secp256k1_musig_partial_sign(const secp256k1_context* ctx, const secp256k1_m
         return 0;
     }
 
+    /* build message hash */
+    if (!secp256k1_musig_compute_messagehash(ctx, msghash, session)) {
+        return 0;
+    }
+    secp256k1_scalar_set_b32(&e, msghash, NULL);
+
     secp256k1_scalar_set_b32(&sk, session->seckey, &overflow);
     if (overflow) {
         secp256k1_scalar_clear(&sk);
@@ -409,14 +420,6 @@ int secp256k1_musig_partial_sign(const secp256k1_context* ctx, const secp256k1_m
     if (session->nonce_is_negated) {
         secp256k1_scalar_negate(&k, &k);
     }
-
-    /* build message hash */
-    if (!secp256k1_musig_compute_messagehash(ctx, msghash, session)) {
-        secp256k1_scalar_clear(&sk);
-        secp256k1_scalar_clear(&k);
-        return 0;
-    }
-    secp256k1_scalar_set_b32(&e, msghash, NULL);
 
     /* Sign */
     secp256k1_scalar_mul(&e, &e, &sk);
