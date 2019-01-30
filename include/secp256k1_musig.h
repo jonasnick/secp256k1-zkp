@@ -10,10 +10,10 @@
 /** Data structure containing data related to a signing session resulting in a single
  * signature.
  *
- * This structure is not opaque, but it is strongly discouraged to copy it or read or
- * write to it directly. A signer who is online throughout the whole process and can
- * keep this structure in memory can use the provided API functions for a safe
- * standard workflow.
+ * This structure is not opaque, but it MUST NOT be copied or read or written to it
+ * directly. A signer who is online throughout the whole process and can keep this
+ * structure in memory can use the provided API functions for a safe standard
+ * workflow.
  *
  * A signer who goes offline and needs to import/export or save/load this structure
  * **must** take measures prevent replay attacks wherein an old state is loaded and
@@ -46,9 +46,8 @@
  *           seckey: If `has_secret_data`, the signer's secret key
  *         secnonce: If `has_secret_data`, the signer's secret nonce
  *            nonce: If `has_secret_data`, the signer's public nonce
- *        nonce_commitments_hash: If `has_secret_data` and
- *                   `nonce_commitments_hash_is_set`, the hash of all signers'
- *                   commitments
+ * nonce_commitments_hash: If `has_secret_data` and `nonce_commitments_hash_is_set`,
+ *                   the hash of all signers' commitments
  * nonce_commitments_hash_is_set: If `has_secret_data`, whether the
  *                   nonce_commitments_hash has been set
  */
@@ -79,9 +78,9 @@ typedef struct {
  *    signers' nonce_commitments.
  *
  * 2. In a non-public session the nonce_commitments are set with the function
- *    `musig_get_public_nonce`, which as a also returns the signer's public nonce.
- *    This ensures that the public nonce is not exposed until all commitments have
- *    been received.
+ *    `musig_get_public_nonce`, which also returns the signer's public nonce. This
+ *    ensures that the public nonce is not exposed until all commitments have been
+ *    received.
  *
  * 3. Each individual data struct should be updated with `musig_set_nonce` once a
  *    nonce is available. This function takes a single signer data struct rather than
@@ -90,7 +89,7 @@ typedef struct {
  *    nonce was inconsistent.
  *
  * Fields:
- *   present: indicates whether the signers nonce is set
+ *   present: indicates whether the signer's nonce is set
  *     index: index of the signer in the MuSig key aggregation
  *    pubkey: public key that the signer will use for partial signing
  *     nonce: public nonce, must be a valid curvepoint if the signer is `present`
@@ -120,7 +119,7 @@ typedef struct {
 
 /** Computes a combined public key and the hash of the given public keys
  *
- *  Returns: 1 when the public keys were successfully combined, 0 otherwise
+ *  Returns: 1 if the public keys were successfully combined, 0 otherwise
  *  Args:        ctx: pointer to a context object initialized for verification
  *                    (cannot be NULL)
  *           scratch: scratch space used to compute the combined pubkey by
@@ -128,7 +127,9 @@ typedef struct {
  *  Out: combined_pk: the MuSig-combined public key (cannot be NULL)
  *         pk_hash32: if non-NULL, filled with the 32-byte hash of all input public
  *                    keys in order to be used in `musig_session_initialize`.
- *   In:     pubkeys: input array of public keys to combine
+ *   In:     pubkeys: input array of public keys to combine. The order is important;
+ *                    a different order will result in a different combined public
+ *                    key.
  *         n_pubkeys: length of pubkeys array
  */
 SECP256K1_API int secp256k1_musig_pubkey_combine(
@@ -155,16 +156,17 @@ SECP256K1_API int secp256k1_musig_pubkey_combine(
  *                     NULL). If a non-unique session_id32 was given then a partial
  *                     signature will LEAK THE SECRET KEY.
  *              msg32: the 32-byte message to be signed. Shouldn't be NULL unless you
- *                     require sharing nonces before the message is known because it
- *                     reduces nonce misuse resistance. If NULL, must be set with
- *                     `musig_session_set_msg` before signing and verifying.
+ *                     require sharing public nonces before the message is known
+ *                     because it reduces nonce misuse resistance. If NULL, must be
+ *                     set with `musig_session_set_msg` before signing and verifying.
  *        combined_pk: the combined public key of all signers (cannot be NULL)
  *          pk_hash32: the 32-byte hash of the signers' individual keys (cannot be
  *                     NULL)
  *            pubkeys: input array of public keys. Array length must equal to
- *                     `n_signers`
+ *                     `n_signers`. Must be equal to the pubkeys array given to
+ *                     `musig_pubkey_combine` (cannot be NULL)
  *          n_signers: length of signers and pubkeys array. Number of signers
- *                     participating in the MuSig
+ *                     participating in the MuSig. Must be greater than 0.
  *           my_index: index of this signer in the signers array
  *             seckey: the signer's 32-byte secret key (cannot be NULL)
  */
@@ -217,12 +219,13 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_session_get_publi
  *           signers: an array of signers' data to be initialized. Array length must
  *                    equal to `n_signers`(cannot be NULL)
  *  In:        msg32: the 32-byte message to be signed If NULL, must be set with
- *                    `musig_session_set_msg` before using the session for signing
- *                    and verifying.
+ *                    `musig_session_set_msg` before using the session for verifying
+ *                    partial signatures.
  *       combined_pk: the combined public key of all signers (cannot be NULL)
  *         pk_hash32: the 32-byte hash of the signers' individual keys (cannot be NULL)
  *           pubkeys: input array of public keys. Array length must equal to
- *                    `n_signers`
+ *                    `n_signers`. Must be equal to the pubkeys array given to
+ *                    `musig_pubkey_combine` (cannot be NULL)
  *       commitments: array of 32-byte nonce commitments. Array length must equal to
  *                    `n_signers` (cannot be NULL)
  *         n_signers: length of signers, pubkeys and commitments array. Number of
@@ -257,21 +260,23 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_set_nonce(
     const secp256k1_pubkey *nonce
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
-/** Updates a session with the combined nonce of all signers. The combined nonce
- *  is the sum of every signer's nonce.
+/** Updates a session with the combined public nonce of all signers. The combined
+ * public nonce is the sum of every signer's public nonce.
  *
  *  Returns: 1: nonces are successfully combined
  *           0: a signer's nonce is missing
  *  Args:        ctx: pointer to a context object (cannot be NULL)
- *           session: session to update with the combined nonce (cannot be NULL)
- *           signers: an array of signers' data, which must have had nonces set with
- *                    `musig_set_nonce`. Array length must equal to `n_signers`
+ *           session: session to update with the combined public nonce (cannot be
+ *                    NULL)
+ *           signers: an array of signers' data, which must have had public nonces
+ *                    set with `musig_set_nonce`. Array length must equal to `n_signers`
  *                    (cannot be NULL)
  *         n_signers: the length of the signers array. Must be the total number of
  *                    signers participating in the MuSig.
  *  Out: nonce_is_negated: a pointer to an integer that indicates if the combined
- *                    nonce had to be negated.
- *           adaptor: point to add to the combined nonce.
+ *                    public nonce had to be negated.
+ *           adaptor: point to add to the combined public nonce. If NULL, nothing is
+ *                    added to the combined nonce.
  */
 SECP256K1_API int secp256k1_musig_session_combine_nonces(
     const secp256k1_context* ctx,
@@ -284,7 +289,8 @@ SECP256K1_API int secp256k1_musig_session_combine_nonces(
 
 /** Sets the message of a session if previously unset
  *
- *  Returns 1 if message is successfully set and 0 otherwise
+ *  Returns 1 if the message was not set yet and is now successfully set
+ *          0 otherwise
  *  Args:    ctx: pointer to a context object (cannot be NULL)
  *       session: the session structure to update with the message (cannot be NULL)
  *  In:    msg32: the 32-byte message to be signed (cannot be NULL)
@@ -308,7 +314,7 @@ SECP256K1_API int secp256k1_musig_partial_signature_serialize(
     const secp256k1_musig_partial_signature* sig
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
-/** Parse and validate a MuSig partial signature.
+/** Parse and verify a MuSig partial signature.
  *
  *  Returns: 1 when the signature could be parsed, 0 otherwise.
  *  Args:    ctx: a secp256k1 context object
@@ -316,7 +322,7 @@ SECP256K1_API int secp256k1_musig_partial_signature_serialize(
  *  In:     in32: pointer to the 32-byte signature to be parsed
  *
  *  After the call, sig will always be initialized. If parsing failed or the
- *  encoded numbers are out of range, signature validation with it is
+ *  encoded numbers are out of range, signature verification with it is
  *  guaranteed to fail for every message and public key.
  */
 SECP256K1_API int secp256k1_musig_partial_signature_parse(
@@ -340,15 +346,15 @@ SECP256K1_API int secp256k1_musig_partial_sign(
     secp256k1_musig_partial_signature *partial_sig
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
-/** Checks that an individual partial signature is valid
+/** Checks that an individual partial signature verifies
  *
  *  This function is essential when using protocols with adaptor signatures.
  *  However, it is not essential for regular MuSig's, in the sense that if any
- *  partial signatures are invalid, the full signature will also be invalid, so the
+ *  partial signatures does not verify, the full signature will also not verify, so the
  *  problem will be caught. But this function allows determining the specific party
  *  who produced an invalid signature, so that signing can be restarted without them.
  *
- *  Returns: 1: partial signature was valid
+ *  Returns: 1: partial signature verifies
  *           0: invalid signature or bad data
  *  Args:         ctx: pointer to a context object (cannot be NULL)
  *            session: active session for which the combined nonce has been computed
@@ -365,8 +371,8 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_verif
 
 /** Combines partial signatures
  *
- *  Returns: 1: all partial signatures had valid data. Does NOT mean the resulting
- *              signature is valid.
+ *  Returns: 1: all partial signatures have values in range. Does NOT mean the
+ *              resulting signature verifies.
  *           0: some partial signature had s/r out of range
  *  Args:         ctx: pointer to a context object (cannot be NULL)
  *            session: initialized session for which the combined nonce has been
@@ -403,10 +409,10 @@ SECP256K1_API int secp256k1_musig_partial_sig_adapt(
     int nonce_is_negated
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
-/** Extracts a secret adaptor from a MuSig, given all party's partial
+/** Extracts a secret adaptor from a MuSig, given all parties' partial
  *  signatures. This function will not fail unless given grossly invalid data; if it
- *  is merely given signatures that do not validate, the returned value will be
- *  nonsense. It is therefore important that all data be validated at earlier steps of
+ *  is merely given signatures that do not verify, the returned value will be
+ *  nonsense. It is therefore important that all data be verified at earlier steps of
  *  any protocol that uses this function.
  *
  *  Returns: 1: signatures contained valid data such that an adaptor could be extracted

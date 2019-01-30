@@ -587,7 +587,7 @@ void musig_state_machine_tests(secp256k1_scratch_space *scratch) {
 }
 
 void scriptless_atomic_swap(secp256k1_scratch_space *scratch) {
-    /* Thoughout this test "a" and "b" refer to two hypothetical blockchains,
+    /* Throughout this test "a" and "b" refer to two hypothetical blockchains,
      * while the indices 0 and 1 refer to the two signers. Here signer 0 is
      * sending a-coins to signer 1, while signer 1 is sending b-coins to signer
      * 0. Signer 0 produces the adaptor signatures. */

@@ -1,5 +1,5 @@
 /**********************************************************************
- * Copyright (c) 2018 Andrew Poelstra                                 *
+ * Copyright (c) 2018 Andrew Poelstra, Jonas Nick                     *
  * Distributed under the MIT software license, see the accompanying   *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
@@ -35,6 +35,12 @@ static void secp256k1_musig_coefficient(secp256k1_scalar *r, const unsigned char
     unsigned char buf[32];
     secp256k1_sha256_initialize(&sha);
     secp256k1_sha256_write(&sha, ell, 32);
+    /* We're hashing the index of the signer instead of its public key as specified
+     * in the MuSig paper. This reduces the total amount of data that needs to be
+     * hashed. It is equivalent to hashing the public key because with a fixed
+     * ordered list of public keys (included in ell), the index is just a different
+     * encoding of the public key because it uniquely identifies the public key in
+     * the list.*/
     while (idx > 0) {
         unsigned char c = idx;
         secp256k1_sha256_write(&sha, &c, 1);
@@ -118,6 +124,8 @@ int secp256k1_musig_session_initialize(const secp256k1_context* ctx, secp256k1_m
     ARG_CHECK(pubkeys != NULL);
     ARG_CHECK(seckey != NULL);
 
+    memset(session, 0, sizeof(*session));
+
     if (msg32 != NULL) {
         memcpy(session->msg, msg32, 32);
         session->msg_is_set = 1;
@@ -147,13 +155,13 @@ int secp256k1_musig_session_initialize(const secp256k1_context* ctx, secp256k1_m
 
     /* Compute secret nonce */
     secp256k1_sha256_initialize(&sha);
-    secp256k1_sha256_write(&sha, seckey, 32);
     secp256k1_sha256_write(&sha, session_id32, 32);
     if (session->msg_is_set) {
         secp256k1_sha256_write(&sha, msg32, 32);
     }
     secp256k1_ec_pubkey_serialize(ctx, combined_ser, &combined_ser_size, combined_pk, SECP256K1_EC_COMPRESSED);
     secp256k1_sha256_write(&sha, combined_ser, combined_ser_size);
+    secp256k1_sha256_write(&sha, seckey, 32);
     secp256k1_sha256_finalize(&sha, session->secnonce);
     secp256k1_scalar_set_b32(&secret, session->secnonce, &overflow);
     if (overflow) {
@@ -231,6 +239,8 @@ int secp256k1_musig_session_initialize_verifier(const secp256k1_context* ctx, se
     }
     (void) ctx;
 
+    memset(session, 0, sizeof(*session));
+
     memcpy(&session->combined_pk, combined_pk, sizeof(*combined_pk));
     if (n_signers == 0) {
         return 0;
@@ -246,6 +256,7 @@ int secp256k1_musig_session_initialize_verifier(const secp256k1_context* ctx, se
         session->msg_is_set = 1;
     }
     session->has_secret_data = 0;
+    session->nonce_commitments_hash_is_set = 0;
 
     for (i = 0; i < n_signers; i++) {
         memcpy(signers[i].nonce_commitment, commitments[i], 32);
@@ -301,6 +312,9 @@ int secp256k1_musig_session_combine_nonces(const secp256k1_context* ctx, secp256
         secp256k1_gej_add_ge_var(&combined_noncej, &combined_noncej, &noncep, NULL);
     }
     secp256k1_sha256_finalize(&sha, nonce_commitments_hash);
+    /* Either the session is a verifier session or or the nonce_commitments_hash has
+     * been set in `musig_session_get_public_nonce`. */
+    VERIFY_CHECK(!session->has_secret_data || session->nonce_commitments_hash_is_set);
     if (session->has_secret_data
             && memcmp(session->nonce_commitments_hash, nonce_commitments_hash, 32) != 0) {
         /* If the signers' commitments changed between get_public_nonce and now we
