@@ -21,10 +21,14 @@
 int create_key(const secp256k1_context* ctx, unsigned char* seckey, secp256k1_pubkey* pubkey) {
     int ret;
     FILE *frand = fopen("/dev/urandom", "r");
+    if (frand == NULL) {
+        return 0;
+    }
     do {
-        if (frand == NULL || !fread(seckey, 32, 1, frand)) {
-            return 0;
-        }
+         if(!fread(seckey, 32, 1, frand)) {
+             fclose(frand);
+             return 0;
+         }
     /* The probability that this not a valid secret key is approximately 2^-128 */
     } while (!secp256k1_ec_seckey_verify(ctx, seckey));
     fclose(frand);
@@ -34,7 +38,7 @@ int create_key(const secp256k1_context* ctx, unsigned char* seckey, secp256k1_pu
 
 /* Sign a message hash with the given key pairs and store the result in sig */
 int sign(const secp256k1_context* ctx, unsigned char seckeys[][32], const secp256k1_pubkey* pubkeys, const unsigned char* msg32, secp256k1_schnorrsig *sig) {
-    secp256k1_musig_session musig_session[3];
+    secp256k1_musig_session musig_session[N_SIGNERS];
     unsigned char nonce_commitment[N_SIGNERS][32];
     const unsigned char *nonce_commitment_ptr[N_SIGNERS];
     secp256k1_musig_session_signer_data signer_data[N_SIGNERS][N_SIGNERS];
@@ -53,9 +57,14 @@ int sign(const secp256k1_context* ctx, unsigned char seckeys[][32], const secp25
             return 0;
         }
         /* Create random session ID. It is absolutely necessary that the session ID
-         * is unique for every call of secp256k1_musig_session_initialize. */
+         * is unique for every call of secp256k1_musig_session_initialize. Otherwise
+         * it's trivial for an attacker to extract the secret key! */
         frand = fopen("/dev/urandom", "r");
-        if (frand == NULL || !fread(session_id32, 32, 1, frand)) {
+        if(frand == NULL) {
+            return 0;
+        }
+        if (!fread(session_id32, 32, 1, frand)) {
+            fclose(frand);
             return 0;
         }
         fclose(frand);
@@ -63,7 +72,7 @@ int sign(const secp256k1_context* ctx, unsigned char seckeys[][32], const secp25
         if (!secp256k1_musig_session_initialize(ctx, &musig_session[i], signer_data[i], nonce_commitment[i], session_id32, msg32, &combined_pk, pk_hash, pubkeys, N_SIGNERS, i, seckeys[i])) {
             return 0;
         }
-        nonce_commitment_ptr[i] = nonce_commitment[i];
+        nonce_commitment_ptr[i] = &nonce_commitment[i][0];
     }
     /* Communication round 1: Exchange nonce commitments */
     for (i = 0; i < N_SIGNERS; i++) {
@@ -108,7 +117,7 @@ int sign(const secp256k1_context* ctx, unsigned char seckeys[][32], const secp25
     unsigned char seckeys[N_SIGNERS][32];
     secp256k1_pubkey pubkeys[N_SIGNERS];
     secp256k1_pubkey combined_pk;
-    unsigned char msg[32] = "this_should_actually_be_msg_hash";
+    unsigned char msg[32] = "this_could_be_the_hash_of_a_msg!";
     secp256k1_schnorrsig sig;
 
     /* Create a context for signing and verification */
@@ -124,7 +133,7 @@ int sign(const secp256k1_context* ctx, unsigned char seckeys[][32], const secp25
     printf("Combining public keys...");
     if (!secp256k1_musig_pubkey_combine(ctx, NULL, &combined_pk, NULL, pubkeys, N_SIGNERS)) {
         printf("FAILED\n");
-        return 0;
+        return 1;
     }
     printf("ok\n");
     printf("Signing message.........");
