@@ -27,8 +27,8 @@ signature_.
 
 A _threshold signature_ is such a signature that may be produced by any
 `k` signers out of a fixed set of `n`. Production of such a signature
-requires an additional step in which each participant splits his secret
-key into `n` _key shards_, one for each participant including himself.
+requires an additional step in which each participant splits her secret
+key into `n` _key shards_, one for each participant including herself.
 
 ### Key Generation Procedure
 
