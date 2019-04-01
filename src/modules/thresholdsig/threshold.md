@@ -1,9 +1,5 @@
-Threshold and Multisignatures with the MuSig Module
+Threshold Signature Module
 ===========================
-
-This module implements Schnorr signatures, a batch verifier for Schnorr
-signatures that can also batch-verify Taproot commitments, and threshold
-signatures/multisignatures. This document focuses on threshold signatures.
 
 Multisignatures are described in the MuSig paper [1]. Threshold signatures
 are a generalization of these in which all participants distribute "shards"
@@ -12,7 +8,7 @@ without all signers present.
 
 ### Terminology
 
-A _Schnorr signature_ with public key `P` on message m is a pairs `(s, R)`,
+A _Schnorr signature_ with public key `P` on message `m` is a pair `(s, R)`,
 where `s` is a scalar, `R` is a curvepoint, which satisfies the equation
 
     sG = R + eP
@@ -21,12 +17,12 @@ where `e` is some hash of `P`, `R`, and the message. We will not worry about
 the specific curve or hash used, but see [2] for a full specification.
 
 A _multisignature_ is such a signature produced by `n` signers, labelled
-1 through `n`, who each contribute a pair `(s_i, R_i)` such that
+`1` through `n`, who each contribute a pair `(s_i, R_i)` such that
 
     sum_i R_i = R
-    sum_i s_i = s
+    sum_i s_i = s.
 
-we refer to each `R_i` as a _partial nonce_ and each `s_i` as a _partial
+We refer to each `R_i` as a _partial nonce_ and each `s_i` as a _partial
 signature_.
 
 A _threshold signature_ is such a signature that may be produced by any
@@ -36,19 +32,19 @@ key into `n` _key shards_, one for each participant including himself.
 
 ### Key Generation Procedure
 
-Let `n` signers each have a keypair `(x_i, X_i)` for `i` ranging from 0 to
+Let `n` signers each have a keypair `(x_i, X_i)` for `i` ranging from `0` to
 `n-1`. We define their _combined public key_ as
 
     P = sum_i µ_i*X_i = sum_i Y_i
 
-where `µ_i = H(L || i)`, where `H` is a collision-resistant hash function
+where `µ_i = H(L || i)`, where `H` is a cryptographic hash function
 and `L` is a hash of all public keys in some canonical order. We refer to
 the coefficient `µ_i` as the _MuSig coefficient_ of the key, and to the
 key `Y_i = µ_i*X_i` as the _tweaked public key_.
 
 Observe that the public key `P` will be the same for any `k-of-n` signature
-which begins with the same keys `X_i`. In particular, it does not depend
-on the threshold value `k`.
+with the same `n` keys `X_i`. In particular, it does not depend on the
+threshold value `k`.
 
 Key Generation works as follows.
 
