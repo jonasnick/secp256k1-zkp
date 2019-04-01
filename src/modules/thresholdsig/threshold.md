@@ -264,7 +264,7 @@ from which we concluded that the `Z_j`s were public shards of `Y`.
 
 [2] `https://github.com/sipa/bip-metas/blob/master/schnorr.mediawiki`
 
-[3] `https://www.cs.cornell.edu/courses/cs754/2001fa/129.PDF`
+[3] `https://link.springer.com/content/pdf/10.1007/3-540-46766-1_9.pdf`
 
 [4] `https://en.wikipedia.org/wiki/Lagrange_polynomial`
 
