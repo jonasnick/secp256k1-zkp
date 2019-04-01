@@ -35,14 +35,14 @@ key into `n` _key shards_, one for each participant including himself.
 Let `n` signers each have a keypair `(x_i, X_i)` for `i` ranging from `0` to
 `n-1`. We define their _combined public key_ as
 
-    P = sum_i µ_i*X_i = sum_i Y_i
+    Y = sum_i µ_i*X_i = sum_i Y_i
 
 where `µ_i = H(L || i)`, where `H` is a cryptographic hash function
 and `L` is a hash of all public keys in some canonical order. We refer to
 the coefficient `µ_i` as the _MuSig coefficient_ of the key, and to the
 key `Y_i = µ_i*X_i` as the _tweaked public key_.
 
-Observe that the public key `P` will be the same for any `k-of-n` signature
+Observe that the public key `Y` will be the same for any `k-of-n` signature
 with the same `n` keys `X_i`. In particular, it does not depend on the
 threshold value `k`.
 
@@ -51,7 +51,7 @@ Key Generation works as follows:
 1. All signers agree on their initial public keys `X_i` through some external
    procedure this API does not cover.
 2. Each signer uses `secp256k1_musig_pubkey_combine` to compute the combined
-   public key `P`. This function also outputs a list `Y_i` of tweaked public
+   public key `Y`. This function also outputs a list `Y_i` of tweaked public
    keys, which will be needed to validate partial signatures.
 3. Each participant splits her secret key with
    `secp256k1_thresholdsig_keysplit`. This function outputs an array of
@@ -150,7 +150,7 @@ of the signers' keys.
 
 In the case of threshold signatures, construction is a bit more involved. To
 recall terminology, signer `i` has tweaked secret key `y_i`, tweaked public key
-`Y_i`, and the total key is `P = sum_i Y_i` with the sum taken over all signers.
+`Y_i`, and the total key is `Y = sum_i Y_i` with the sum taken over all signers.
 
 When splitting her secret key `y_i`, signer `i` calls
 `secp256k1_thresholdsig_keysplit`, which outputs two things. First, a set of
@@ -183,7 +183,7 @@ compute the same set of points `Z_j` for all `j`. Signer `j` will find that
 the sum of her private shards is the discrete logarithm of `Z_j`, and that in
 general
 
-    P = sum_j L_j * Z_j                                  (4)
+    Y = sum_j L_j * Z_j                                  (4)
 
 That is, these public points `Z_j` satisfy the same summation equation as
 the individual shares. This can be easily derived:
@@ -192,7 +192,7 @@ the individual shares. This can be easily derived:
         = sum_j L_j * sum_i y_i,j * G
         = sum_i [sum_j L_j y_i,j] * G
         = sum_i y_i * G
-        = P
+        = Y
 
 `secp256k1_thresholdsig_session_initialize` is given the set of participating
 signers. This uniquely determines a set `L_j` of Lagrange coefficients.  After
@@ -216,7 +216,7 @@ signature that satisfies
     s*G = sum_j s_j * G
         = (sum_j k_j * G) + e * (sum_j L_j * z_j * G)
         = (sum_j R_j) + e * (sum_j L_j * Z_j)
-        = R + e * P
+        = R + e * Y
 
 #### Lagrange Coefficients
 
@@ -244,7 +244,7 @@ Now, let
 
 where the sum is taken over all signers; then
 
-    p(0) = sum_i p_i(0) = sum_i Y_i = P
+    p(0) = sum_i p_i(0) = sum_i Y_i = Y
 
 and equation (3) becomes
 
@@ -254,9 +254,9 @@ i.e. the `Z_j`s are just evaluations of the sum polynomial `p`, whose 0th
 coefficient is the total public key. Of course Lagrange interpolation applies
 to this just as it did to the `p_i`s, which gives us equation (4)
 
-    P = sum_j L_j * Z_j
+    Y = sum_j L_j * Z_j
 
-from which we concluded that the `Z_j`s were public shards of `P`.
+from which we concluded that the `Z_j`s were public shards of `Y`.
 
 
 
