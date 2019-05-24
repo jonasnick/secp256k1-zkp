@@ -49,16 +49,16 @@ typedef struct {
     uint32_t n_signers;
     unsigned char pk_hash[32];
     secp256k1_pubkey combined_nonce;
-    int nonce_is_set;
-    int nonce_is_negated;
+    unsigned char nonce_is_set;
+    unsigned char nonce_is_negated;
     unsigned char msg[32];
-    int msg_is_set;
-    int has_secret_data;
+    unsigned char msg_is_set;
+    unsigned char has_secret_data;
     unsigned char seckey[32];
     unsigned char secnonce[32];
     secp256k1_pubkey nonce;
     unsigned char nonce_commitments_hash[32];
-    int nonce_commitments_hash_is_set;
+    unsigned char nonce_commitments_hash_is_set;
 } secp256k1_musig_session;
 
 /** Data structure containing data on all signers in a single session.
@@ -89,7 +89,7 @@ typedef struct {
  *                   has not yet been set
  */
 typedef struct {
-    int present;
+    unsigned char present;
     uint32_t index;
     secp256k1_pubkey nonce;
     unsigned char nonce_commitment[32];
