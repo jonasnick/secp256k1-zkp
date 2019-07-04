@@ -29,7 +29,7 @@ int secp256k1_schnorrsig_parse(const secp256k1_context* ctx, secp256k1_schnorrsi
     return 1;
 }
 
-int secp256k1_schnorrsig_sign(const secp256k1_context* ctx, secp256k1_schnorrsig *sig, int *nonce_is_negated, const unsigned char *msg32, const unsigned char *seckey, secp256k1_nonce_function noncefp, void *ndata) {
+int secp256k1_schnorrsig_sign(const secp256k1_context* ctx, secp256k1_schnorrsig *sig, const unsigned char *msg32, const unsigned char *seckey, secp256k1_nonce_function noncefp, void *ndata) {
     secp256k1_scalar x;
     secp256k1_scalar e;
     secp256k1_scalar k;
@@ -72,14 +72,8 @@ int secp256k1_schnorrsig_sign(const secp256k1_context* ctx, secp256k1_schnorrsig
     secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &rj, &k);
     secp256k1_ge_set_gej(&r, &rj);
 
-    if (nonce_is_negated != NULL) {
-        *nonce_is_negated = 0;
-    }
     if (!secp256k1_fe_is_quad_var(&r.y)) {
         secp256k1_scalar_negate(&k, &k);
-        if (nonce_is_negated != NULL) {
-            *nonce_is_negated = 1;
-        }
     }
     secp256k1_fe_normalize(&r.x);
     secp256k1_fe_get_b32(&sig->data[0], &r.x);

@@ -31,7 +31,6 @@ void test_schnorrsig_api(secp256k1_scratch_space *scratch) {
     const secp256k1_schnorrsig *sigptr = &sig;
     const unsigned char *msgptr = msg;
     const secp256k1_pubkey *pkptr = &pk[0];
-    int nonce_is_negated;
 
     /** setup **/
     secp256k1_context *none = secp256k1_context_create(SECP256K1_CONTEXT_NONE);
@@ -59,19 +58,17 @@ void test_schnorrsig_api(secp256k1_scratch_space *scratch) {
 
     /** main test body **/
     ecount = 0;
-    CHECK(secp256k1_schnorrsig_sign(none, &sig, &nonce_is_negated, msg, sk1, NULL, NULL) == 0);
+    CHECK(secp256k1_schnorrsig_sign(none, &sig, msg, sk1, NULL, NULL) == 0);
     CHECK(ecount == 1);
-    CHECK(secp256k1_schnorrsig_sign(vrfy, &sig, &nonce_is_negated, msg, sk1, NULL, NULL) == 0);
+    CHECK(secp256k1_schnorrsig_sign(vrfy, &sig, msg, sk1, NULL, NULL) == 0);
     CHECK(ecount == 2);
-    CHECK(secp256k1_schnorrsig_sign(sign, &sig, &nonce_is_negated, msg, sk1, NULL, NULL) == 1);
+    CHECK(secp256k1_schnorrsig_sign(sign, &sig, msg, sk1, NULL, NULL) == 1);
     CHECK(ecount == 2);
-    CHECK(secp256k1_schnorrsig_sign(sign, NULL, &nonce_is_negated, msg, sk1, NULL, NULL) == 0);
+    CHECK(secp256k1_schnorrsig_sign(sign, NULL, msg, sk1, NULL, NULL) == 0);
     CHECK(ecount == 3);
-    CHECK(secp256k1_schnorrsig_sign(sign, &sig, NULL, msg, sk1, NULL, NULL) == 1);
-    CHECK(ecount == 3);
-    CHECK(secp256k1_schnorrsig_sign(sign, &sig, &nonce_is_negated, NULL, sk1, NULL, NULL) == 0);
+    CHECK(secp256k1_schnorrsig_sign(sign, &sig, NULL, sk1, NULL, NULL) == 0);
     CHECK(ecount == 4);
-    CHECK(secp256k1_schnorrsig_sign(sign, &sig, &nonce_is_negated, msg, NULL, NULL, NULL) == 0);
+    CHECK(secp256k1_schnorrsig_sign(sign, &sig, msg, NULL, NULL, NULL) == 0);
     CHECK(ecount == 5);
 
     ecount = 0;
@@ -130,14 +127,12 @@ void test_schnorrsig_api(secp256k1_scratch_space *scratch) {
 
 /* Helper function for schnorrsig_bip_vectors
  * Signs the message and checks that it's the same as expected_sig. */
-void test_schnorrsig_bip_vectors_check_signing(const unsigned char *sk, const unsigned char *pk_serialized, const unsigned char *msg, const unsigned char *expected_sig, const int expected_nonce_is_negated) {
+void test_schnorrsig_bip_vectors_check_signing(const unsigned char *sk, const unsigned char *pk_serialized, const unsigned char *msg, const unsigned char *expected_sig) {
     secp256k1_schnorrsig sig;
     unsigned char serialized_sig[64];
     secp256k1_pubkey pk;
-    int nonce_is_negated;
 
-    CHECK(secp256k1_schnorrsig_sign(ctx, &sig, &nonce_is_negated, msg, sk, NULL, NULL));
-    CHECK(nonce_is_negated == expected_nonce_is_negated);
+    CHECK(secp256k1_schnorrsig_sign(ctx, &sig, msg, sk, NULL, NULL));
     CHECK(secp256k1_schnorrsig_serialize(ctx, serialized_sig, &sig));
     CHECK(memcmp(serialized_sig, expected_sig, 64) == 0);
 
@@ -200,7 +195,7 @@ void test_schnorrsig_bip_vectors(secp256k1_scratch_space *scratch) {
             0x2C, 0xCD, 0x00, 0x79, 0xE1, 0xF9, 0x2A, 0xF1,
             0x77, 0xF7, 0xF2, 0x2C, 0xC1, 0xDC, 0xED, 0x05
         };
-        test_schnorrsig_bip_vectors_check_signing(sk1, pk1, msg1, sig1, 1);
+        test_schnorrsig_bip_vectors_check_signing(sk1, pk1, msg1, sig1);
         test_schnorrsig_bip_vectors_check_verify(scratch, pk1, msg1, sig1, 1);
     }
     {
@@ -234,7 +229,7 @@ void test_schnorrsig_bip_vectors(secp256k1_scratch_space *scratch) {
             0x5F, 0xFC, 0x2D, 0x03, 0x5A, 0x23, 0x04, 0x34,
             0xA1, 0xA6, 0x4D, 0xC5, 0x9F, 0x70, 0x13, 0xFD
         };
-        test_schnorrsig_bip_vectors_check_signing(sk2, pk2, msg2, sig2, 0);
+        test_schnorrsig_bip_vectors_check_signing(sk2, pk2, msg2, sig2);
         test_schnorrsig_bip_vectors_check_verify(scratch, pk2, msg2, sig2, 1);
     }
     {
@@ -268,7 +263,7 @@ void test_schnorrsig_bip_vectors(secp256k1_scratch_space *scratch) {
             0xA5, 0x83, 0x7E, 0xC5, 0x7F, 0xED, 0x76, 0x60,
             0x77, 0x3A, 0x05, 0xF0, 0xDE, 0x14, 0x23, 0x80
         };
-        test_schnorrsig_bip_vectors_check_signing(sk3, pk3, msg3, sig3, 0);
+        test_schnorrsig_bip_vectors_check_signing(sk3, pk3, msg3, sig3);
         test_schnorrsig_bip_vectors_check_verify(scratch, pk3, msg3, sig3, 1);
     }
     {
@@ -639,15 +634,15 @@ void test_schnorrsig_sign(void) {
     secp256k1_schnorrsig sig;
 
     memset(sk, 23, sizeof(sk));
-    CHECK(secp256k1_schnorrsig_sign(ctx, &sig, NULL, msg, sk, NULL, NULL) == 1);
+    CHECK(secp256k1_schnorrsig_sign(ctx, &sig, msg, sk, NULL, NULL) == 1);
 
     /* Overflowing secret key */
     memset(sk, 0xFF, sizeof(sk));
-    CHECK(secp256k1_schnorrsig_sign(ctx, &sig, NULL, msg, sk, NULL, NULL) == 0);
+    CHECK(secp256k1_schnorrsig_sign(ctx, &sig, msg, sk, NULL, NULL) == 0);
     memset(sk, 23, sizeof(sk));
 
-    CHECK(secp256k1_schnorrsig_sign(ctx, &sig, NULL, msg, sk, nonce_function_failing, NULL) == 0);
-    CHECK(secp256k1_schnorrsig_sign(ctx, &sig, NULL, msg, sk, nonce_function_0, NULL) == 0);
+    CHECK(secp256k1_schnorrsig_sign(ctx, &sig, msg, sk, nonce_function_failing, NULL) == 0);
+    CHECK(secp256k1_schnorrsig_sign(ctx, &sig, msg, sk, nonce_function_0, NULL) == 0);
 }
 
 #define N_SIGS  200
@@ -669,7 +664,7 @@ void test_schnorrsig_sign_verify(secp256k1_scratch_space *scratch) {
 
     for (i = 0; i < N_SIGS; i++) {
         secp256k1_rand256(msg[i]);
-        CHECK(secp256k1_schnorrsig_sign(ctx, &sig[i], NULL, msg[i], sk, NULL, NULL));
+        CHECK(secp256k1_schnorrsig_sign(ctx, &sig[i], msg[i], sk, NULL, NULL));
         CHECK(secp256k1_schnorrsig_verify(ctx, &sig[i], msg[i], &pk));
         sig_arr[i] = &sig[i];
         msg_arr[i] = msg[i];
