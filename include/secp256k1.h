@@ -708,6 +708,74 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_ec_pubkey_combine(
     size_t n
 ) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
+/** Opaque data structure that holds a parsed and valid "x-only" public key.
+ *  An x-only pubkey encodes a positive point. That is a point whose Y
+ *  coordinate is a quadratic residue. It is serialized using only its X
+ *  coordinate (32 bytes). A secp256k1_xonly_pubkey is also a secp256k1_pubkey
+ *  but the inverse is not true. Therefore, a secp256k1_pubkey must never be
+ *  interpreted as or copied into a secp256k1_xonly_pubkey.
+ *
+ *  The exact representation of data inside is implementation defined and not
+ *  guaranteed to be portable between different platforms or versions. It is
+ *  however guaranteed to be 64 bytes in size, and can be safely copied/moved.
+ *  If you need to convert to a format suitable for storage, transmission, or
+ *  comparison, use secp256k1_xonly_pubkey_serialize and
+ *  secp256k1_xonly_pubkey_parse.
+ */
+typedef struct {
+    unsigned char data[64];
+} secp256k1_xonly_pubkey;
+
+/** Parse a 32-byte public key into a xonly_pubkey object.
+ *
+ *  Returns: 1 if the public key was fully valid.
+ *           0 if the public key could not be parsed or is invalid.
+ *
+ *  Args:   ctx: a secp256k1 context object.
+ *  Out: pubkey: pointer to a pubkey object. If 1 is returned, it is set to a
+ *               parsed version of input. If not, its value is undefined.
+ *  In: input32: pointer to a serialized xonly public key
+ */
+SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_pubkey_parse(
+    const secp256k1_context* ctx,
+    secp256k1_xonly_pubkey* pubkey,
+    const unsigned char *input32
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
+/** Serialize a xonly pubkey object into a byte sequence.
+ *
+ *  Returns: 1 always.
+ *
+ *  Args:     ctx: a secp256k1 context object.
+ *  Out: output32: a pointer to a 32-byte byte array to place the
+ *                 serialized key in.
+ *  In:    pubkey: a pointer to a secp256k1_xonly_pubkey containing an
+ *                 initialized public key.
+ */
+SECP256K1_API int secp256k1_xonly_pubkey_serialize(
+    const secp256k1_context* ctx,
+    unsigned char *output32,
+    const secp256k1_xonly_pubkey* pubkey
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
+/** Compute the xonly public key for a secret key. Just as ec_pubkey_create this
+ *  function computes the point P by multiplying the seckey (interpreted as a scalar)
+ *  with the generator. The public key corresponds to P if the Y coordinate of P is a
+ *  quadratic residue or -P otherwise.
+ *
+ *  Returns: 1 if secret was valid, public key stores
+ *           0 if secret was invalid, try again
+ *
+ *  Args:   ctx: pointer to a context object, initialized for signing (cannot be NULL)
+ *  Out: pubkey: pointer to the created xonly public key (cannot be NULL)
+ *  In:  seckey: pointer to a 32-byte private key (cannot be NULL)
+ */
+SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_pubkey_create(
+    const secp256k1_context* ctx,
+    secp256k1_xonly_pubkey *pubkey,
+    const unsigned char *seckey
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
 #ifdef __cplusplus
 }
 #endif
