@@ -442,9 +442,10 @@ static void secp256k1_nonce_function_bipschnorr_sha256_tagged(secp256k1_sha256 *
  * (https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki) */
 static int nonce_function_bipschnorr(unsigned char *nonce32, const unsigned char *msg32, const unsigned char *key32, const unsigned char *algo16, void *data, unsigned int counter) {
     secp256k1_sha256 sha;
-    (void) counter;
-    VERIFY_CHECK(counter == 0);
 
+    if (counter != 0) {
+        return 0;
+    }
     /* Tag the hash with algo16 which is important to avoid nonce reuse across
      * algorithms. If the this nonce function is used in BIP-schnorr signing as
      * defined in the spec, an optimized tagging implementation is used. */

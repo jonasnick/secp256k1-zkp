@@ -537,6 +537,10 @@ void run_nonce_function_bipschnorr_tests(void) {
     CHECK(nonce_function_bipschnorr(nonces[2], msg, key, (unsigned char *) "something16chars", NULL, 0));
     CHECK(memcmp(nonces[2], nonces[0], sizeof(nonces[2])) != 0);
     CHECK(memcmp(nonces[2], nonces[1], sizeof(nonces[2])) != 0);
+
+    /* Check that counter != 0 makes nonce function fail. */
+    CHECK(nonce_function_bipschnorr(nonces[0], msg, key, NULL, NULL, 0) == 1);
+    CHECK(nonce_function_bipschnorr(nonces[0], msg, key, NULL, NULL, 1) == 0);
 }
 
 void run_hmac_sha256_tests(void) {
