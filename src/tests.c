@@ -489,6 +489,56 @@ void run_sha256_tests(void) {
     }
 }
 
+/* Tests for the equality of two sha256 structs. This function only produces a
+ * correct result if an integer multiple of 64 many bytes have been written
+ * into the hash functions. */
+void test_sha256_eq(secp256k1_sha256 *sha1, secp256k1_sha256 *sha2) {
+    unsigned char buf[32] = { 0 };
+    unsigned char buf2[32];
+
+    /* Is buffer fully consumed? */
+    CHECK((sha1->bytes & 0x3F) == 0);
+
+    /* Compare the struct excluding the the buffer, because it may be
+     * uninitialized or already included in the state. */
+    CHECK(sha1->bytes == sha2->bytes);
+    CHECK(memcmp(sha1->s, sha2->s, sizeof(sha1->s)) == 0);
+
+    /* Compare the output */
+    secp256k1_sha256_write(sha1, buf, 32);
+    secp256k1_sha256_write(sha2, buf, 32);
+    secp256k1_sha256_finalize(sha1, buf);
+    secp256k1_sha256_finalize(sha2, buf2);
+    CHECK(memcmp(buf, buf2, 32) == 0);
+}
+
+void run_nonce_function_bipschnorr_tests(void) {
+    char tag[16] = "BIPSchnorrDerive";
+    secp256k1_sha256 sha;
+    secp256k1_sha256 sha_optimized;
+    unsigned char nonces[3][32];
+    unsigned char msg[32];
+    unsigned char key[32];
+
+    /* Check that hash initialized by
+     * secp256k1_nonce_function_bipschnorr_sha256_tagged has the expected
+     * state. */
+    secp256k1_sha256_initialize_tagged(&sha, (unsigned char *) tag, sizeof(tag));
+    secp256k1_nonce_function_bipschnorr_sha256_tagged(&sha_optimized);
+    test_sha256_eq(&sha, &sha_optimized);
+
+    /* Check that different choices of the algo16 argument result in different
+     * hashes. */
+    memset(msg, 0, sizeof(msg));
+    memset(key, 1, sizeof(key));
+    CHECK(nonce_function_bipschnorr(nonces[0], msg, key, (unsigned char *) "BIPSchnorrDerive", NULL, 0));
+    CHECK(nonce_function_bipschnorr(nonces[1], msg, key, NULL, NULL, 0));
+    CHECK(memcmp(nonces[1], nonces[0], sizeof(nonces[1])) != 0);
+    CHECK(nonce_function_bipschnorr(nonces[2], msg, key, (unsigned char *) "something16chars", NULL, 0));
+    CHECK(memcmp(nonces[2], nonces[0], sizeof(nonces[2])) != 0);
+    CHECK(memcmp(nonces[2], nonces[1], sizeof(nonces[2])) != 0);
+}
+
 void run_hmac_sha256_tests(void) {
     static const char *keys[6] = {
         "\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b\x0b",
@@ -5456,6 +5506,7 @@ int main(int argc, char **argv) {
     run_ecdh_tests();
 #endif
 
+    run_nonce_function_bipschnorr_tests();
 #ifdef ENABLE_MODULE_SCHNORRSIG
     /* Schnorrsig tests */
     run_schnorrsig_tests();

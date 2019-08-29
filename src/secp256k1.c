@@ -423,6 +423,21 @@ static SECP256K1_INLINE void buffer_append(unsigned char *buf, unsigned int *off
     *offset += len;
 }
 
+/* Initializes SHA256 with fixed midstate. This midstate was computed by applying
+ * SHA256 to SHA256("BIPSchnorrDerive")||SHA256("BIPSchnorrDerive"). */
+static void secp256k1_nonce_function_bipschnorr_sha256_tagged(secp256k1_sha256 *sha) {
+    secp256k1_sha256_initialize(sha);
+    sha->s[0] = 0x1cd78ec3ul;
+    sha->s[1] = 0xc4425f87ul;
+    sha->s[2] = 0xb4f1a9f1ul;
+    sha->s[3] = 0xa16abd8dul;
+    sha->s[4] = 0x5a6dea72ul;
+    sha->s[5] = 0xd28469e3ul;
+    sha->s[6] = 0x17119b2eul;
+    sha->s[7] = 0x7bd19a16ul;
+    sha->bytes = 64;
+}
+
 /* This nonce function is described in BIP-schnorr
  * (https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki) */
 static int nonce_function_bipschnorr(unsigned char *nonce32, const unsigned char *msg32, const unsigned char *key32, const unsigned char *algo16, void *data, unsigned int counter) {
@@ -430,15 +445,24 @@ static int nonce_function_bipschnorr(unsigned char *nonce32, const unsigned char
     (void) counter;
     VERIFY_CHECK(counter == 0);
 
-    /* Hash x||msg as per the spec */
-    secp256k1_sha256_initialize(&sha);
+    /* Tag the hash with algo16 which is important to avoid nonce reuse across
+     * algorithms. If the this nonce function is used in BIP-schnorr signing as
+     * defined in the spec, an optimized tagging implementation is used. */
+    if (algo16 != NULL) {
+        if (memcmp(algo16, "BIPSchnorrDerive", 16) == 0) {
+            secp256k1_nonce_function_bipschnorr_sha256_tagged(&sha);
+        } else {
+            secp256k1_sha256_initialize_tagged(&sha, algo16, 16);
+        }
+    } else {
+        /* If algo16 is NULL use a 14-bytes tag to rule out collisions with any
+         * non-NULL algo16 */
+        secp256k1_sha256_initialize_tagged(&sha, (unsigned char *) "BIPSchnorrNULL", 14);
+    }
+
+    /* Hash x||msg using the tagged hash as per the spec */
     secp256k1_sha256_write(&sha, key32, 32);
     secp256k1_sha256_write(&sha, msg32, 32);
-    /* Hash in algorithm, which is not in the spec, but may be critical to
-     * users depending on it to avoid nonce reuse across algorithms. */
-    if (algo16 != NULL) {
-        secp256k1_sha256_write(&sha, algo16, 16);
-    }
     if (data != NULL) {
         secp256k1_sha256_write(&sha, data, 32);
     }

@@ -29,6 +29,21 @@ int secp256k1_schnorrsig_parse(const secp256k1_context* ctx, secp256k1_schnorrsi
     return 1;
 }
 
+/* Initializes SHA256 with fixed midstate. This midstate was computed by applying
+ * SHA256 to SHA256("BIPSchnorr")||SHA256("BIPSchnorr"). */
+static void secp256k1_schnorrsig_sha256_tagged(secp256k1_sha256 *sha) {
+    secp256k1_sha256_initialize(sha);
+    sha->s[0] = 0x048d9a59ul;
+    sha->s[1] = 0xfe39fb05ul;
+    sha->s[2] = 0x28479648ul;
+    sha->s[3] = 0xe4a660f9ul;
+    sha->s[4] = 0x814b9e66ul;
+    sha->s[5] = 0x0469e801ul;
+    sha->s[6] = 0x83909280ul;
+    sha->s[7] = 0xb329e454ul;
+    sha->bytes = 64;
+}
+
 int secp256k1_schnorrsig_sign(const secp256k1_context* ctx, secp256k1_schnorrsig *sig, const unsigned char *msg32, const unsigned char *seckey, secp256k1_nonce_function noncefp, void *ndata) {
     secp256k1_scalar x;
     secp256k1_scalar e;
@@ -61,7 +76,7 @@ int secp256k1_schnorrsig_sign(const secp256k1_context* ctx, secp256k1_schnorrsig
     secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &pkj, &x);
     secp256k1_ge_set_gej(&pk, &pkj);
 
-    if (!noncefp(buf, msg32, seckey, NULL, (void*)ndata, 0)) {
+    if (!noncefp(buf, msg32, seckey, (unsigned char *) "BIPSchnorrDerive", (void*)ndata, 0)) {
         return 0;
     }
     secp256k1_scalar_set_b32(&k, buf, NULL);
@@ -78,7 +93,9 @@ int secp256k1_schnorrsig_sign(const secp256k1_context* ctx, secp256k1_schnorrsig
     secp256k1_fe_normalize(&r.x);
     secp256k1_fe_get_b32(&sig->data[0], &r.x);
 
-    secp256k1_sha256_initialize(&sha);
+
+    /* tagged hash(r.x, pk, msg32) */
+    secp256k1_schnorrsig_sha256_tagged(&sha);
     secp256k1_sha256_write(&sha, &sig->data[0], 32);
     secp256k1_eckey_pubkey_serialize(&pk, buf, &buflen, 1);
     secp256k1_sha256_write(&sha, buf, buflen);
@@ -140,7 +157,7 @@ int secp256k1_schnorrsig_verify(const secp256k1_context* ctx, const secp256k1_sc
         return 0;
     }
 
-    secp256k1_sha256_initialize(&sha);
+    secp256k1_schnorrsig_sha256_tagged(&sha);
     secp256k1_sha256_write(&sha, &sig->data[0], 32);
     secp256k1_ec_pubkey_serialize(ctx, buf, &buflen, pk, SECP256K1_EC_COMPRESSED);
     secp256k1_sha256_write(&sha, buf, buflen);
@@ -203,7 +220,7 @@ static int secp256k1_schnorrsig_verify_batch_ecmult_callback(secp256k1_scalar *s
         unsigned char buf[33];
         size_t buflen = sizeof(buf);
         secp256k1_sha256 sha;
-        secp256k1_sha256_initialize(&sha);
+        secp256k1_schnorrsig_sha256_tagged(&sha);
         secp256k1_sha256_write(&sha, &ecmult_context->sig[idx / 2]->data[0], 32);
         secp256k1_ec_pubkey_serialize(ecmult_context->ctx, buf, &buflen, ecmult_context->pk[idx / 2], SECP256K1_EC_COMPRESSED);
         secp256k1_sha256_write(&sha, buf, buflen);
