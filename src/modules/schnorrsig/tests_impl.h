@@ -26,11 +26,11 @@ void test_schnorrsig_api(secp256k1_scratch_space *scratch) {
     unsigned char sk3[32];
     unsigned char msg[32];
     unsigned char sig64[64];
-    secp256k1_pubkey pk[3];
+    secp256k1_xonly_pubkey pk[3];
     secp256k1_schnorrsig sig;
     const secp256k1_schnorrsig *sigptr = &sig;
     const unsigned char *msgptr = msg;
-    const secp256k1_pubkey *pkptr = &pk[0];
+    const secp256k1_xonly_pubkey *pkptr = &pk[0];
 
     /** setup **/
     secp256k1_context *none = secp256k1_context_create(SECP256K1_CONTEXT_NONE);
@@ -52,9 +52,9 @@ void test_schnorrsig_api(secp256k1_scratch_space *scratch) {
     secp256k1_rand256(sk2);
     secp256k1_rand256(sk3);
     secp256k1_rand256(msg);
-    CHECK(secp256k1_ec_pubkey_create(ctx, &pk[0], sk1) == 1);
-    CHECK(secp256k1_ec_pubkey_create(ctx, &pk[1], sk2) == 1);
-    CHECK(secp256k1_ec_pubkey_create(ctx, &pk[2], sk3) == 1);
+    CHECK(secp256k1_xonly_pubkey_create(ctx, &pk[0], sk1) == 1);
+    CHECK(secp256k1_xonly_pubkey_create(ctx, &pk[1], sk2) == 1);
+    CHECK(secp256k1_xonly_pubkey_create(ctx, &pk[2], sk3) == 1);
 
     /** main test body **/
     ecount = 0;
@@ -142,13 +142,13 @@ void test_schnorrsig_sha256_tagged(void) {
 void test_schnorrsig_bip_vectors_check_signing(const unsigned char *sk, const unsigned char *pk_serialized, const unsigned char *msg, const unsigned char *expected_sig) {
     secp256k1_schnorrsig sig;
     unsigned char serialized_sig[64];
-    secp256k1_pubkey pk;
+    secp256k1_xonly_pubkey pk;
 
     CHECK(secp256k1_schnorrsig_sign(ctx, &sig, msg, sk, NULL, NULL));
     CHECK(secp256k1_schnorrsig_serialize(ctx, serialized_sig, &sig));
     CHECK(memcmp(serialized_sig, expected_sig, 64) == 0);
 
-    CHECK(secp256k1_ec_pubkey_parse(ctx, &pk, pk_serialized, 33));
+    CHECK(secp256k1_xonly_pubkey_parse(ctx, &pk, pk_serialized));
     CHECK(secp256k1_schnorrsig_verify(ctx, &sig, msg, &pk));
 }
 
@@ -157,11 +157,11 @@ void test_schnorrsig_bip_vectors_check_signing(const unsigned char *sk, const un
 void test_schnorrsig_bip_vectors_check_verify(secp256k1_scratch_space *scratch, const unsigned char *pk_serialized, const unsigned char *msg32, const unsigned char *sig_serialized, int expected) {
     const unsigned char *msg_arr[1];
     const secp256k1_schnorrsig *sig_arr[1];
-    const secp256k1_pubkey *pk_arr[1];
-    secp256k1_pubkey pk;
+    const secp256k1_xonly_pubkey *pk_arr[1];
+    secp256k1_xonly_pubkey pk;
     secp256k1_schnorrsig sig;
 
-    CHECK(secp256k1_ec_pubkey_parse(ctx, &pk, pk_serialized, 33));
+    CHECK(secp256k1_xonly_pubkey_parse(ctx, &pk, pk_serialized));
     CHECK(secp256k1_schnorrsig_parse(ctx, &sig, sig_serialized));
 
     sig_arr[0] = &sig;
@@ -368,9 +368,9 @@ void test_schnorrsig_bip_vectors(secp256k1_scratch_space *scratch) {
             0x87, 0x66, 0xE4, 0xFA, 0xA0, 0x4A, 0x2D, 0x4A,
             0x34
         };
-        secp256k1_pubkey pk7_parsed;
+        secp256k1_xonly_pubkey pk7_parsed;
         /* No need to check the signature of the test vector as parsing the pubkey already fails */
-        CHECK(!secp256k1_ec_pubkey_parse(ctx, &pk7_parsed, pk7, 33));
+        CHECK(!secp256k1_xonly_pubkey_parse(ctx, &pk7_parsed, pk7));
     }
     {
         /* Test vector 8 */
@@ -667,10 +667,10 @@ void test_schnorrsig_sign_verify(secp256k1_scratch_space *scratch) {
     size_t i;
     const secp256k1_schnorrsig *sig_arr[N_SIGS];
     const unsigned char *msg_arr[N_SIGS];
-    const secp256k1_pubkey *pk_arr[N_SIGS];
-    secp256k1_pubkey pk;
+    const secp256k1_xonly_pubkey *pk_arr[N_SIGS];
+    secp256k1_xonly_pubkey pk;
 
-    CHECK(secp256k1_ec_pubkey_create(ctx, &pk, sk));
+    CHECK(secp256k1_xonly_pubkey_create(ctx, &pk, sk));
 
     CHECK(secp256k1_schnorrsig_verify_batch(ctx, scratch, NULL, NULL, NULL, 0));
 

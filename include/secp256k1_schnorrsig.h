@@ -87,14 +87,14 @@ SECP256K1_API int secp256k1_schnorrsig_sign(
  *           0: incorrect or unparseable signature
  *  Args:    ctx: a secp256k1 context object, initialized for verification.
  *  In:      sig: the signature being verified (cannot be NULL)
- *         msg32: the 32-byte message hash being verified (cannot be NULL)
- *        pubkey: pointer to a public key to verify with (cannot be NULL)
+ *         msg32: the 32-byte message being verified (cannot be NULL)
+ *        pubkey: pointer to an x-only public key to verify with (cannot be NULL)
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_schnorrsig_verify(
     const secp256k1_context* ctx,
     const secp256k1_schnorrsig *sig,
     const unsigned char *msg32,
-    const secp256k1_pubkey *pubkey
+    const secp256k1_xonly_pubkey *pubkey
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
 /** Verifies a set of Schnorr signatures.
@@ -105,7 +105,7 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_schnorrsig_verify(
  *       scratch: scratch space used for the multiexponentiation
  *  In:      sig: array of signatures, or NULL if there are no signatures
  *         msg32: array of messages, or NULL if there are no signatures
- *            pk: array of public keys, or NULL if there are no signatures
+ *            pk: array of x-only public keys, or NULL if there are no signatures
  *        n_sigs: number of signatures in above arrays. Must be smaller than
  *                2^31 and smaller than half the maximum size_t value. Must be 0
  *                if above arrays are NULL.
@@ -115,7 +115,7 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_schnorrsig_verify_batch
     secp256k1_scratch_space *scratch,
     const secp256k1_schnorrsig *const *sig,
     const unsigned char *const *msg32,
-    const secp256k1_pubkey *const *pk,
+    const secp256k1_xonly_pubkey *const *pk,
     size_t n_sigs
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2);
 
