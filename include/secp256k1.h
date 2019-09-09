@@ -776,6 +776,120 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_pubkey_create(
     const unsigned char *seckey
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
+/** Converts a secp256k1_pubkey into a secp256k1_xonly_pubkey. This
+ *  function optionally outputs a sign bit that can be used to convert
+ *  the secp256k1_xonly_pubkey back into the same secp256k1_pubkey.
+ *  The sign bit is 0 if the input pubkey encodes a positive point (has a Y
+ *  coordinate that is a quadratic residue), otherwise it is 1.
+ *
+ *  Returns: 1 if the public key was successfully converted
+ *           0 otherwise
+ *
+ *  Args:         ctx: pointer to a context object
+ *  Out: xonly_pubkey: pointer to an x-only public key object for placing the
+ *                     converted public key (cannot be NULL)
+ *              sign: sign bit of the pubkey. Can be used to reconstruct a
+ *                    public key from x-only public key (can be NULL)
+ *  In:       pubkey: pointer to a public key that is converted (cannot be
+ *                    NULL)
+ */
+SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_pubkey_from_pubkey(
+    const secp256k1_context* ctx,
+    secp256k1_xonly_pubkey *xonly_pubkey,
+    int *sign,
+    const secp256k1_pubkey *pubkey
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(4);
+
+/** Convert a secp256k1_xonly_pubkey into a secp256k1_pubkey. If this
+ *  function is used to invert secp256k1_xonly_pubkey_from_pubkey, the
+ *  sign bit must be set to the output of that function. If the sign bit
+ *  is 0 the output pubkey encodes a positive point (has a Y coordinate that is a
+ *  quadratic residue), otherwise it is negative.
+ *
+ *  Returns: 1 if the public key was successfully converted
+ *           0 otherwise
+ *
+ *  Args:           ctx: pointer to a context object
+ *  Out:         pubkey: pointer to a public key object for placing the
+ *                       converted public key (cannot be NULL)
+ *  In: xonly_pubkey: pointer to an x-only public key that is converted
+ *                    (cannot be NULL)
+ *                 sign: sign bit of the resulting public key (can be NULL)
+ */
+SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_pubkey_to_pubkey(
+    const secp256k1_context* ctx,
+    secp256k1_pubkey *pubkey,
+    const secp256k1_xonly_pubkey *xonly_pubkey,
+    int sign
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
+/** Tweak the private key of an x-only pubkey by adding a tweak to it. The public
+ *  key of the resulting private key will be the same as the output of
+ *  secp256k1_xonly_pubkey_tweak_add called with the same tweak and corresponding
+ *  input public key.
+ *
+ *  If the public key corresponds to a positive point, tweak32 is added to the
+ *  seckey (modulo the group order). If the public key corresponds to a
+ *  negative point, tweak32 is added to the negation of the seckey (modulo the
+ *  group order).
+ *
+ *  Returns: 1 if the tweak was successfully added to seckey
+ *           0 if the tweak was out of range or the resulting private key would be
+ *             invalid (only when the tweak is the complement of the private key) or
+ *             seckey is 0.
+ *
+ *  Args:      ctx: pointer to a context object, initialized for signing (cannot be NULL)
+ *  In/Out: seckey: pointer to a 32-byte private key
+ *  In:    tweak32: pointer to a 32-byte tweak
+ */
+SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_privkey_tweak_add(
+    const secp256k1_context* ctx,
+    unsigned char *seckey,
+    const unsigned char *tweak32
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
+/** Tweak an x-only public key by adding tweak times the generator to it. Note that
+ *  the output is a secp256k1_pubkey and not a secp256k1_xonly_pubkey.
+ *  Returns: 1 if tweak times the generator was successfully added to pubkey
+ *           0 if the tweak was out of range or the resulting public key would be
+ *             invalid (only when the tweak is the complement of the corresponding
+ *             private key).
+ *
+ *  Args:           ctx: pointer to a context object initialized for validation
+ *                       (cannot be NULL)
+ *  Out:  output_pubkey: pointer to a public key object (cannot be NULL)
+ *  In: internal_pubkey: pointer to an x-only public key object to apply the
+ *                       tweak to (cannot be NULL)
+ *              tweak32: pointer to a 32-byte tweak (cannot be NULL)
+ */
+SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_pubkey_tweak_add(
+    const secp256k1_context* ctx,
+    secp256k1_pubkey *output_pubkey,
+    const secp256k1_xonly_pubkey *internal_pubkey,
+    const unsigned char *tweak32
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
+
+/** Verifies that output_pubkey is the result of calling
+ *  secp256k1_xonly_pubkey_tweak_add with internal_pubkey and tweak32.
+ *
+ *  Returns: 1 if output_pubkey is the result of tweaking the internal_pubkey with
+ *             tweak32
+ *           0 otherwise
+ *
+ *  Args:           ctx: pointer to a context object initialized for validation
+ *                       (cannot be NULL)
+ *  In:   output_pubkey: pointer to a public key object (cannot be NULL)
+ *      internal_pubkey: pointer to an x-only public key object to apply the
+ *                       tweak to (cannot be NULL)
+ *              tweak32: pointer to a 32-byte tweak (cannot be NULL)
+ */
+SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_pubkey_tweak_verify(
+    const secp256k1_context* ctx,
+    const secp256k1_pubkey *output_pubkey,
+    const secp256k1_xonly_pubkey *internal_pubkey,
+    const unsigned char *tweak32
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
+
 #ifdef __cplusplus
 }
 #endif

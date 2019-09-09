@@ -718,6 +718,43 @@ void test_schnorrsig_sign_verify(secp256k1_scratch_space *scratch) {
 }
 #undef N_SIGS
 
+void test_schnorrsig_taproot(void) {
+    unsigned char sk[32];
+    secp256k1_xonly_pubkey internal_pk;
+    unsigned char internal_pk_bytes[32];
+    secp256k1_pubkey output_pk;
+    secp256k1_xonly_pubkey output_pk_pos;
+    unsigned char output_pk_bytes[32];
+    unsigned char tweak[32];
+    int sign;
+    unsigned char msg[32];
+    secp256k1_schnorrsig sig;
+
+    /* Create output key */
+    secp256k1_rand256(sk);
+    CHECK(secp256k1_xonly_pubkey_create(ctx, &internal_pk, sk) == 1);
+    memset(tweak, 1, sizeof(tweak));
+    CHECK(secp256k1_xonly_pubkey_tweak_add(ctx, &output_pk, &internal_pk, tweak) == 1);
+    CHECK(secp256k1_xonly_pubkey_from_pubkey(ctx, &output_pk_pos, &sign, &output_pk) == 1);
+    CHECK(secp256k1_xonly_pubkey_serialize(ctx, output_pk_bytes, &output_pk_pos) == 1);
+
+    /* Key spend */
+    secp256k1_rand256(msg);
+    CHECK(secp256k1_xonly_privkey_tweak_add(ctx, sk, tweak) == 1);
+    CHECK(secp256k1_schnorrsig_sign(ctx, &sig, msg, sk, NULL, NULL) == 1);
+    /* Verify key spend */
+    CHECK(secp256k1_xonly_pubkey_parse(ctx, &output_pk_pos, output_pk_bytes) == 1);
+    CHECK(secp256k1_schnorrsig_verify(ctx, &sig, msg, &output_pk_pos) == 1);
+
+    /* Script spend */
+    CHECK(secp256k1_xonly_pubkey_serialize(ctx, internal_pk_bytes, &internal_pk) == 1);
+    /* Verify script spend */
+    CHECK(secp256k1_xonly_pubkey_parse(ctx, &output_pk_pos, output_pk_bytes) == 1);
+    CHECK(secp256k1_xonly_pubkey_parse(ctx, &internal_pk, internal_pk_bytes) == 1);
+    CHECK(secp256k1_xonly_pubkey_to_pubkey(ctx, &output_pk, &output_pk_pos, sign) == 1);
+    CHECK(secp256k1_xonly_pubkey_tweak_verify(ctx, &output_pk, &internal_pk, tweak) == 1);
+}
+
 void run_schnorrsig_tests(void) {
     secp256k1_scratch_space *scratch = secp256k1_scratch_space_create(ctx, 1024 * 1024);
 
@@ -728,6 +765,7 @@ void run_schnorrsig_tests(void) {
     /* test_schnorrsig_bip_vectors(scratch); */
     test_schnorrsig_sign();
     test_schnorrsig_sign_verify(scratch);
+    test_schnorrsig_taproot();
 
     secp256k1_scratch_space_destroy(ctx, scratch);
 }
