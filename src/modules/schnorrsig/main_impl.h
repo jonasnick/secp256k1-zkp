@@ -132,7 +132,7 @@ static int secp256k1_schnorrsig_real_verify(const secp256k1_context* ctx, secp25
 
     secp256k1_scalar_negate(&nege, e);
 
-    if (!secp256k1_pubkey_load(ctx, &pkp, (secp256k1_pubkey *) pk)) {
+    if (!secp256k1_pubkey_load(ctx, &pkp, (const secp256k1_pubkey *) pk)) {
         return 0;
     }
     secp256k1_gej_set_ge(&pkj, &pkp);
@@ -238,7 +238,7 @@ static int secp256k1_schnorrsig_verify_batch_ecmult_callback(secp256k1_scalar *s
         secp256k1_scalar_set_b32(sc, buf, NULL);
         secp256k1_scalar_mul(sc, sc, &ecmult_context->randomizer_cache[(idx / 2) % 2]);
 
-        if (!secp256k1_pubkey_load(ecmult_context->ctx, pt, (secp256k1_pubkey *) ecmult_context->pk[idx / 2])) {
+        if (!secp256k1_pubkey_load(ecmult_context->ctx, pt, (const secp256k1_pubkey *) ecmult_context->pk[idx / 2])) {
             return 0;
         }
     }
@@ -277,7 +277,7 @@ static int secp256k1_schnorrsig_verify_batch_init_randomizer(const secp256k1_con
          * xonly_pubkey serialization and a user would wrongly memcpy
          * normal secp256k1_pubkeys into xonly_pubkeys then the randomizer
          * would be the same for two different pubkeys. */
-        secp256k1_ec_pubkey_serialize(ctx, buf, &buflen, (secp256k1_pubkey *) pk[i], SECP256K1_EC_COMPRESSED);
+        secp256k1_ec_pubkey_serialize(ctx, buf, &buflen, (const secp256k1_pubkey *) pk[i], SECP256K1_EC_COMPRESSED);
         secp256k1_sha256_write(sha, buf, buflen);
     }
     ecmult_context->ctx = ctx;
