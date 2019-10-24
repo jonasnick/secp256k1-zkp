@@ -447,7 +447,7 @@ SECP256K1_API int secp256k1_ecdsa_signature_serialize_compact(
 /** Verify an ECDSA signature.
  *
  *  Returns: 1: correct signature
- *           0: incorrect or unparseable signature
+ *           0: incorrect signature
  *  Args:    ctx:       a secp256k1 context object, initialized for verification.
  *  In:      sig:       the signature being verified (cannot be NULL)
  *           msg32:     the 32-byte message hash being verified (cannot be NULL)
@@ -524,9 +524,14 @@ SECP256K1_API int secp256k1_ecdsa_signature_normalize(
 SECP256K1_API extern const secp256k1_nonce_function secp256k1_nonce_function_rfc6979;
 
 /** An implementation of the nonce generation function as defined in BIP-schnorr.
+ *
  * If a data pointer is passed, it is assumed to be a pointer to 32 bytes of
- * extra entropy. The attempt argument must be 0 or the function will fail and
- * return 0.
+ * extra entropy. If the data pointer is NULL and this function is used in
+ * schnorrsig_sign, it produces BIP-schnorr compliant signatures.
+ * When this function is used in ecdsa_sign, it generates a nonce using an
+ * analogue of the bip-schnorr nonce generation algorithm, but with tag
+ * "BIPSchnorrNULL" instead of "BIPSchnorrDerive".
+ * The attempt argument must be 0 or the function will fail and return 0.
  */
 SECP256K1_API extern const secp256k1_nonce_function secp256k1_nonce_function_bipschnorr;
 
@@ -710,10 +715,8 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_ec_pubkey_combine(
 
 /** Opaque data structure that holds a parsed and valid "x-only" public key.
  *  An x-only pubkey encodes a positive point. That is a point whose Y
- *  coordinate is a quadratic residue. It is serialized using only its X
- *  coordinate (32 bytes). A secp256k1_xonly_pubkey is also a secp256k1_pubkey
- *  but the inverse is not true. Therefore, a secp256k1_pubkey must never be
- *  interpreted as or copied into a secp256k1_xonly_pubkey.
+ *  coordinate is square. It is serialized using only its X coordinate (32
+ *  bytes).
  *
  *  The exact representation of data inside is implementation defined and not
  *  guaranteed to be portable between different platforms or versions. It is
@@ -758,10 +761,8 @@ SECP256K1_API int secp256k1_xonly_pubkey_serialize(
     const secp256k1_xonly_pubkey* pubkey
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
-/** Compute the xonly public key for a secret key. Just as ec_pubkey_create this
- *  function computes the point P by multiplying the seckey (interpreted as a scalar)
- *  with the generator. The public key corresponds to P if the Y coordinate of P is a
- *  quadratic residue or -P otherwise.
+/** Compute the xonly public key for a secret key. Same as ec_pubkey_create, but
+ *  for xonly public keys.
  *
  *  Returns: 1 if secret was valid, public key stores
  *           0 if secret was invalid, try again
@@ -780,7 +781,7 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_pubkey_create(
  *  function optionally outputs a sign bit that can be used to convert
  *  the secp256k1_xonly_pubkey back into the same secp256k1_pubkey.
  *  The sign bit is 0 if the input pubkey encodes a positive point (has a Y
- *  coordinate that is a quadratic residue), otherwise it is 1.
+ *  coordinate that is square), otherwise it is 1.
  *
  *  Returns: 1 if the public key was successfully converted
  *           0 otherwise
@@ -803,8 +804,8 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_pubkey_from_pubke
 /** Convert a secp256k1_xonly_pubkey into a secp256k1_pubkey. If this
  *  function is used to invert secp256k1_xonly_pubkey_from_pubkey, the
  *  sign bit must be set to the output of that function. If the sign bit
- *  is 0 the output pubkey encodes a positive point (has a Y coordinate that is a
- *  quadratic residue), otherwise it is negative.
+ *  is 0 the output pubkey encodes a positive point (has a Y coordinate that is
+ *  square), otherwise it is negative.
  *
  *  Returns: 1 if the public key was successfully converted
  *           0 otherwise

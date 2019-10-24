@@ -48,8 +48,8 @@ SECP256K1_API int secp256k1_schnorrsig_serialize(
  *  In:     in64: pointer to the 64-byte signature to be parsed
  *
  * The signature is serialized in the form R||s, where R is a 32-byte public
- * key (x-coordinate only; the y-coordinate is considered to be the unique
- * y-coordinate satisfying the curve equation that is a quadratic residue)
+ * key (X coordinate only; the Y coordinate is considered to be the unique
+ * Y coordinate satisfying the curve equation that is square)
  * and s is a 32-byte big-endian scalar.
  *
  * After the call, sig will always be initialized. If parsing failed or the
@@ -103,12 +103,11 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_schnorrsig_verify(
  *
  *  Args:    ctx: a secp256k1 context object, initialized for verification.
  *       scratch: scratch space used for the multiexponentiation
- *  In:      sig: array of signatures, or NULL if there are no signatures
- *         msg32: array of messages, or NULL if there are no signatures
- *            pk: array of x-only public keys, or NULL if there are no signatures
- *        n_sigs: number of signatures in above arrays. Must be smaller than
- *                2^31 and smaller than half the maximum size_t value. Must be 0
- *                if above arrays are NULL.
+ *  In:      sig: array of pointers to signatures, or NULL if there are no signatures
+ *         msg32: array of pointers to messages, or NULL if there are no signatures
+ *            pk: array of pointers to x-only public keys, or NULL if there are no signatures
+ *        n_sigs: number of signatures in above arrays. Must be below the
+ *                minimum of 2^31 and SIZE_MAX/2. Must be 0 if above arrays are NULL.
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_schnorrsig_verify_batch(
     const secp256k1_context* ctx,

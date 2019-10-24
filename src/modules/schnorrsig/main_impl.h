@@ -83,10 +83,14 @@ int secp256k1_schnorrsig_sign(const secp256k1_context* ctx, secp256k1_schnorrsig
     }
 
     if (!noncefp(buf, msg32, seckey, (unsigned char *) "BIPSchnorrDerive", (void*)ndata, 0)) {
+        memset(sig, 0, sizeof(*sig));
+        secp256k1_scalar_clear(&x);
         return 0;
     }
     secp256k1_scalar_set_b32(&k, buf, NULL);
     if (secp256k1_scalar_is_zero(&k)) {
+        memset(sig, 0, sizeof(*sig));
+        secp256k1_scalar_clear(&x);
         return 0;
     }
 
