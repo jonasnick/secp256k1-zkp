@@ -4316,7 +4316,8 @@ void run_eckey_edge_case_test(void) {
 
 void test_xonly_pubkey(void) {
     unsigned char sk[32] = { 0 };
-    unsigned char garbage[32];
+    unsigned char ones32[32];
+    unsigned char zeros64[64] = { 0 };
     secp256k1_pubkey xy_pk;
     secp256k1_pubkey xy_pk_tmp;
     secp256k1_xonly_pubkey xonly_pk;
@@ -4356,8 +4357,9 @@ void test_xonly_pubkey(void) {
     CHECK(memcmp(&xonly_pk, &xonly_pk_tmp, sizeof(xonly_pk)) == 0);
 
     /* Can't parse a byte string that's not a valid X coordinate */
-    memset(garbage, 0, sizeof(garbage));
-    CHECK(secp256k1_xonly_pubkey_parse(ctx, &xonly_pk_tmp, garbage) == 0);
+    memset(ones32, 0xFF, sizeof(ones32));
+    CHECK(secp256k1_xonly_pubkey_parse(ctx, &xonly_pk_tmp, ones32) == 0);
+    CHECK(memcmp(&xonly_pk_tmp, zeros64, sizeof(xonly_pk_tmp)) == 0);
 }
 
 void test_xonly_pubkey_api(void) {
