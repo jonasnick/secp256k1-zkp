@@ -813,18 +813,6 @@ int secp256k1_xonly_pubkey_from_pubkey(const secp256k1_context* ctx, secp256k1_x
     return 1;
 }
 
-int secp256k1_xonly_pubkey_to_pubkey(const secp256k1_context* ctx, secp256k1_pubkey *pubkey, const secp256k1_xonly_pubkey *xonly_pubkey, int sign) {
-    VERIFY_CHECK(ctx != NULL);
-    ARG_CHECK(pubkey != NULL);
-    ARG_CHECK(xonly_pubkey != NULL);
-
-    *pubkey = *(const secp256k1_pubkey *) xonly_pubkey;
-    if (sign) {
-        return secp256k1_ec_pubkey_negate(ctx, pubkey);
-    }
-    return 1;
-}
-
 int secp256k1_xonly_privkey_tweak_add(const secp256k1_context* ctx, unsigned char *seckey32, const unsigned char *tweak32) {
     secp256k1_ge ge;
     secp256k1_pubkey pubkey;

@@ -4319,7 +4319,6 @@ void test_xonly_pubkey(void) {
     unsigned char ones32[32];
     unsigned char zeros64[64] = { 0 };
     secp256k1_pubkey xy_pk;
-    secp256k1_pubkey xy_pk_tmp;
     secp256k1_xonly_pubkey xonly_pk;
     secp256k1_xonly_pubkey xonly_pk_tmp;
     secp256k1_ge pk1;
@@ -4343,12 +4342,10 @@ void test_xonly_pubkey(void) {
     secp256k1_fe_negate(&y, &pk2.y, 1);
     CHECK(secp256k1_fe_equal(&pk1.y, &y) == 1);
 
-    /* Check from_pubkey and to_pubkey */
+    /* Test from_pubkey */
     CHECK(secp256k1_xonly_pubkey_from_pubkey(ctx, &xonly_pk_tmp, &sign, &xy_pk) == 1);
     CHECK(memcmp(&xonly_pk_tmp, &xonly_pk, sizeof(xonly_pk)) == 0);
     CHECK(sign == 1);
-    CHECK(secp256k1_xonly_pubkey_to_pubkey(ctx, &xy_pk_tmp, &xonly_pk, sign) == 1);
-    CHECK(memcmp(&xy_pk_tmp, &xy_pk, sizeof(xy_pk)) == 0);
 
     /* Serialization and parse roundtrip */
     CHECK(secp256k1_xonly_pubkey_create(ctx, &xonly_pk, sk) == 1);
@@ -4465,15 +4462,6 @@ void test_xonly_pubkey_api(void) {
     CHECK(ecount == 1);
     CHECK(secp256k1_xonly_pubkey_from_pubkey(none, &pk, NULL, &xy_pk) == 1);
     CHECK(secp256k1_xonly_pubkey_from_pubkey(none, &pk, &pk_is_positive, NULL) == 0);
-    CHECK(ecount == 2);
-
-    ecount = 0;
-    CHECK(secp256k1_xonly_pubkey_to_pubkey(none, &xy_pk, &pk, pk_is_positive) == 1);
-    CHECK(secp256k1_xonly_pubkey_to_pubkey(sign, &xy_pk, &pk, pk_is_positive) == 1);
-    CHECK(secp256k1_xonly_pubkey_to_pubkey(vrfy, &xy_pk, &pk, pk_is_positive) == 1);
-    CHECK(secp256k1_xonly_pubkey_to_pubkey(none, NULL, &pk, pk_is_positive) == 0);
-    CHECK(ecount == 1);
-    CHECK(secp256k1_xonly_pubkey_to_pubkey(none, &xy_pk, NULL, pk_is_positive) == 0);
     CHECK(ecount == 2);
 
     secp256k1_context_destroy(none);
