@@ -846,28 +846,35 @@ int secp256k1_xonly_privkey_tweak_add(const secp256k1_context* ctx, unsigned cha
     return secp256k1_ec_privkey_tweak_add(ctx, seckey32, tweak32);
 }
 
-int secp256k1_xonly_pubkey_tweak_add(const secp256k1_context* ctx, secp256k1_pubkey *output_pubkey, const secp256k1_xonly_pubkey *internal_pubkey, const unsigned char *tweak32) {
+int secp256k1_xonly_pubkey_tweak_add(const secp256k1_context* ctx, secp256k1_xonly_pubkey *output_pubkey, int *is_positive, const secp256k1_xonly_pubkey *internal_pubkey, const unsigned char *tweak32) {
+    secp256k1_pubkey pubkey_tmp;
     VERIFY_CHECK(ctx != NULL);
-    ARG_CHECK(internal_pubkey != NULL);
     ARG_CHECK(output_pubkey != NULL);
+    ARG_CHECK(is_positive != NULL);
+    ARG_CHECK(internal_pubkey != NULL);
     ARG_CHECK(tweak32 != NULL);
 
-    *output_pubkey = *(const secp256k1_pubkey *)internal_pubkey;
-    return secp256k1_ec_pubkey_tweak_add(ctx, output_pubkey, tweak32);
+    pubkey_tmp = *(secp256k1_pubkey *)internal_pubkey;
+    if(!secp256k1_ec_pubkey_tweak_add(ctx, &pubkey_tmp, tweak32)) {
+        return 0;
+    }
+    return secp256k1_xonly_pubkey_from_pubkey(ctx, output_pubkey, is_positive, &pubkey_tmp);
 }
 
-int secp256k1_xonly_pubkey_tweak_verify(const secp256k1_context* ctx, const secp256k1_pubkey *output_pubkey, const secp256k1_xonly_pubkey *internal_pubkey, const unsigned char *tweak32) {
-    secp256k1_pubkey pk_expected;
+int secp256k1_xonly_pubkey_tweak_verify(const secp256k1_context* ctx, const secp256k1_xonly_pubkey *output_pubkey, int is_positive, const secp256k1_xonly_pubkey *internal_pubkey, const unsigned char *tweak32) {
+    secp256k1_xonly_pubkey pk_expected;
+    int is_positive_expected;
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(secp256k1_ecmult_context_is_built(&ctx->ecmult_ctx));
     ARG_CHECK(internal_pubkey != NULL);
     ARG_CHECK(output_pubkey != NULL);
     ARG_CHECK(tweak32 != NULL);
 
-    if (!secp256k1_xonly_pubkey_tweak_add(ctx, &pk_expected, internal_pubkey, tweak32)) {
+    if (!secp256k1_xonly_pubkey_tweak_add(ctx, &pk_expected, &is_positive_expected, internal_pubkey, tweak32)) {
         return 0;
     }
-    return memcmp(&pk_expected, output_pubkey, sizeof(pk_expected)) == 0;
+    return memcmp(&pk_expected, output_pubkey, sizeof(pk_expected)) == 0
+            && is_positive_expected == is_positive;
 }
 
 #ifdef ENABLE_MODULE_ECDH
