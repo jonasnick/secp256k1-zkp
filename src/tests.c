@@ -4324,7 +4324,7 @@ void test_xonly_pubkey(void) {
     secp256k1_ge pk1;
     secp256k1_ge pk2;
     secp256k1_fe y;
-    int sign;
+    int is_positive;
     unsigned char buf32[32];
 
     /* sk = 0 should fail */
@@ -4343,9 +4343,9 @@ void test_xonly_pubkey(void) {
     CHECK(secp256k1_fe_equal(&pk1.y, &y) == 1);
 
     /* Test from_pubkey */
-    CHECK(secp256k1_xonly_pubkey_from_pubkey(ctx, &xonly_pk_tmp, &sign, &xy_pk) == 1);
+    CHECK(secp256k1_xonly_pubkey_from_pubkey(ctx, &xonly_pk_tmp, &is_positive, &xy_pk) == 1);
     CHECK(memcmp(&xonly_pk_tmp, &xonly_pk, sizeof(xonly_pk)) == 0);
-    CHECK(sign == 1);
+    CHECK(is_positive == 1);
 
     /* Serialization and parse roundtrip */
     CHECK(secp256k1_xonly_pubkey_create(ctx, &xonly_pk, sk) == 1);
