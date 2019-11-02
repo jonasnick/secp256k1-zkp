@@ -55,6 +55,7 @@ int secp256k1_schnorrsig_sign(const secp256k1_context* ctx, secp256k1_schnorrsig
     secp256k1_sha256 sha;
     int overflow;
     unsigned char buf[32];
+    unsigned char seckey_tmp[32];
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
@@ -82,11 +83,15 @@ int secp256k1_schnorrsig_sign(const secp256k1_context* ctx, secp256k1_schnorrsig
         secp256k1_scalar_negate(&x, &x);
     }
 
-    if (!noncefp(buf, msg32, seckey, (unsigned char *) "BIPSchnorrDerive", (void*)ndata, 0)) {
+    secp256k1_scalar_get_b32(seckey_tmp, &x);
+    if (!noncefp(buf, msg32, seckey_tmp, (unsigned char *) "BIPSchnorrDerive", (void*)ndata, 0)) {
         memset(sig, 0, sizeof(*sig));
+        memset(seckey_tmp, 0, sizeof(seckey_tmp));
         secp256k1_scalar_clear(&x);
         return 0;
     }
+    memset(seckey_tmp, 0, sizeof(seckey_tmp));
+
     secp256k1_scalar_set_b32(&k, buf, NULL);
     if (secp256k1_scalar_is_zero(&k)) {
         memset(sig, 0, sizeof(*sig));
