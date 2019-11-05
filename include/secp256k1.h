@@ -714,9 +714,9 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_ec_pubkey_combine(
 ) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
 /** Opaque data structure that holds a parsed and valid "x-only" public key.
- *  An x-only pubkey encodes a positive point. That is a point whose Y
- *  coordinate is square. It is serialized using only its X coordinate (32
- *  bytes).
+ *  An x-only pubkey encodes a point whose Y coordinate is square. It is
+ *  serialized using only its X coordinate (32 bytes). See bip-schnorr for more
+ *  information about x-only pubkeys.
  *
  *  The exact representation of data inside is implementation defined and not
  *  guaranteed to be portable between different platforms or versions. It is
@@ -777,11 +777,7 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_pubkey_create(
     const unsigned char *seckey
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
-/** Converts a secp256k1_pubkey into a secp256k1_xonly_pubkey. This
- *  function optionally outputs a sign bit that can be used to convert
- *  the secp256k1_xonly_pubkey back into the same secp256k1_pubkey.
- *  The sign bit is 0 if the input pubkey encodes a positive point (has a Y
- *  coordinate that is square), otherwise it is 1.
+/** Converts a secp256k1_pubkey into a secp256k1_xonly_pubkey.
  *
  *  Returns: 1 if the public key was successfully converted
  *           0 otherwise
@@ -789,15 +785,16 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_pubkey_create(
  *  Args:         ctx: pointer to a context object
  *  Out: xonly_pubkey: pointer to an x-only public key object for placing the
  *                     converted public key (cannot be NULL)
- *              sign: sign bit of the pubkey. Can be used to reconstruct a
- *                    public key from x-only public key (can be NULL)
+ *      has_square_y: pointer to an integer that will be set to 1 if the pubkey
+ *                    encodes a point with a square Y coordinate, and set to 0
+ *                    otherwise. (can be NULL)
  *  In:       pubkey: pointer to a public key that is converted (cannot be
  *                    NULL)
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_pubkey_from_pubkey(
     const secp256k1_context* ctx,
     secp256k1_xonly_pubkey *xonly_pubkey,
-    int *is_positive,
+    int *has_square_y,
     const secp256k1_pubkey *pubkey
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(4);
 
@@ -806,10 +803,9 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_pubkey_from_pubke
  *  secp256k1_xonly_pubkey_tweak_add called with the same tweak and corresponding
  *  input public key.
  *
- *  If the public key corresponds to a positive point, tweak32 is added to the
- *  seckey (modulo the group order). If the public key corresponds to a
- *  negative point, tweak32 is added to the negation of the seckey (modulo the
- *  group order).
+ *  If the public key corresponds to a point with square Y, tweak32 is added to
+ *  the seckey (modulo the group order). Otherwise, tweak32 is added to the
+ *  negation of the seckey (modulo the group order).
  *
  *  Returns: 1 if the tweak was successfully added to seckey
  *           0 if the tweak was out of range or the resulting private key would be
@@ -836,8 +832,9 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_privkey_tweak_add
  *  Args:           ctx: pointer to a context object initialized for validation
  *                       (cannot be NULL)
  *  Out:  output_pubkey: pointer to a public key object (cannot be NULL)
- *          is_positive: pointer to an integer that will be set to 1 if the
- *                       output_pubkey is positive, and 0 otherwise (cannot be NULL)
+ *         has_square_y: pointer to an integer that will be set to 1 if the
+ *                       output_pubkey has a square Y coordinate, and set to 0
+ *                       otherwise (cannot be NULL)
  *  In: internal_pubkey: pointer to an x-only public key object to apply the
  *                       tweak to (cannot be NULL)
  *              tweak32: pointer to a 32-byte tweak (cannot be NULL)
@@ -845,12 +842,12 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_privkey_tweak_add
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_pubkey_tweak_add(
     const secp256k1_context* ctx,
     secp256k1_xonly_pubkey *output_pubkey,
-    int *is_positive,
+    int *has_square_y,
     const secp256k1_xonly_pubkey *internal_pubkey,
     const unsigned char *tweak32
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
 
-/** Verifies that output_pubkey and is_positive is the result of calling
+/** Verifies that output_pubkey and has_square_y is the result of calling
  *  secp256k1_xonly_pubkey_tweak_add with internal_pubkey and tweak32.
  *
  *  Returns: 1 if output_pubkey is the result of tweaking the internal_pubkey with
@@ -860,7 +857,7 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_pubkey_tweak_add(
  *  Args:           ctx: pointer to a context object initialized for validation
  *                       (cannot be NULL)
  *  In:   output_pubkey: pointer to a public key object (cannot be NULL)
- *          is_positive: 1 if output_pubkey is positive and 0 otherwise
+ *         has_square_y: 1 if output_pubkey has a square Y coordinate and 0 otherwise.
  *      internal_pubkey: pointer to an x-only public key object to apply the
  *                       tweak to (cannot be NULL)
  *              tweak32: pointer to a 32-byte tweak (cannot be NULL)
@@ -868,7 +865,7 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_pubkey_tweak_add(
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_pubkey_tweak_verify(
     const secp256k1_context* ctx,
     const secp256k1_xonly_pubkey *output_pubkey,
-    int is_positive,
+    int has_square_y,
     const secp256k1_xonly_pubkey *internal_pubkey,
     const unsigned char *tweak32
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
