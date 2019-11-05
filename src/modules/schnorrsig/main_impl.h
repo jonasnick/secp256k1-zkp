@@ -77,8 +77,8 @@ int secp256k1_schnorrsig_sign(const secp256k1_context* ctx, secp256k1_schnorrsig
     secp256k1_ge_set_gej(&pk, &pkj);
 
     /* Because we are signing for a x-only pubkey, the secret key is negated
-     * before signing if the point corresponding to the secret key is not
-     * positive. */
+     * before signing if the point corresponding to the secret key does not
+     * have a square Y. */
     if (!secp256k1_fe_is_quad_var(&pk.y)) {
         secp256k1_scalar_negate(&x, &x);
     }
