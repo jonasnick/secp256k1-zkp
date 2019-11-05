@@ -554,6 +554,18 @@ void test_schnorrsig_bip_vectors(secp256k1_scratch_space *scratch) {
         };
         test_schnorrsig_bip_vectors_check_verify(scratch, pk, msg, sig, 0);
     }
+    {
+        /* Test vector 14 */
+        const unsigned char pk[32] = {
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFE, 0xFF, 0xFF, 0xFC, 0x30
+        };
+        secp256k1_xonly_pubkey pk_parsed;
+        /* No need to check the signature of the test vector as parsing the pubkey already fails */
+        CHECK(!secp256k1_xonly_pubkey_parse(ctx, &pk_parsed, pk));
+    }
 }
 
 /* Nonce function that returns constant 0 */
