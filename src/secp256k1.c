@@ -744,7 +744,7 @@ int secp256k1_ec_pubkey_combine(const secp256k1_context* ctx, secp256k1_pubkey *
  * i.e. keeps it as is if it is has a square Y and otherwise negates it.
  * has_square_y is set to 1 in the former case and to 0 in the latter case. */
 static void secp256k1_ec_pubkey_absolute(const secp256k1_context* ctx, secp256k1_pubkey *pubkey, int *has_square_y) {
-   secp256k1_ge ge;
+    secp256k1_ge ge;
     secp256k1_pubkey_load(ctx, &ge, pubkey);
     if (has_square_y != NULL) {
         *has_square_y = 1;
