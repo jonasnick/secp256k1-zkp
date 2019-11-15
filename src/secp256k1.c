@@ -740,21 +740,13 @@ int secp256k1_ec_pubkey_combine(const secp256k1_context* ctx, secp256k1_pubkey *
     return 1;
 }
 
-/* Converts the point encoded by a secp256k1_pubkey into its "absolute" value,
- * i.e. keeps it as is if it is has a square Y and otherwise negates it.
+/* Converts the point encoded by a secp256k1_pubkey into its "absolute" value.
+ * That means it is kept as is if it has a square Y and otherwise negated.
  * has_square_y is set to 1 in the former case and to 0 in the latter case. */
 static void secp256k1_ec_pubkey_absolute(const secp256k1_context* ctx, secp256k1_pubkey *pubkey, int *has_square_y) {
     secp256k1_ge ge;
     secp256k1_pubkey_load(ctx, &ge, pubkey);
-    if (has_square_y != NULL) {
-        *has_square_y = 1;
-    }
-    if (!secp256k1_fe_is_quad_var(&ge.y)) {
-        secp256k1_ge_neg(&ge, &ge);
-        if (has_square_y != NULL) {
-            *has_square_y = 0;
-        }
-    }
+    secp256k1_ge_absolute(&ge, has_square_y);
     secp256k1_pubkey_save(pubkey, &ge);
 }
 
