@@ -181,6 +181,10 @@ typedef int (*secp256k1_nonce_function)(
 #define SECP256K1_TAG_PUBKEY_HYBRID_EVEN 0x06
 #define SECP256K1_TAG_PUBKEY_HYBRID_ODD 0x07
 
+/** Length in bytes of a secp256k1_xonly_pubkey as serialized by
+ * secp256k1_xonly_pubkey_serialize. */
+#define SECP256K1_LEN_XONLY_PUBKEY 32
+
 /** A simple secp256k1 context object with no precomputed tables. These are useful for
  *  type serialization/parsing functions which require a context object to maintain
  *  API consistency, but currently do not require expensive precomputations or dynamic
@@ -745,12 +749,13 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_pubkey_parse(
     const unsigned char *input32
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
-/** Serialize a xonly pubkey object into a byte sequence.
+/** Serialize an xonly_pubkey object into a 32-byte sequence. Use the
+ *  SECP256K1_LEN_XONLY_PUBKEY macro if your want to avoid the magic number 32.
  *
  *  Returns: 1 always.
  *
  *  Args:     ctx: a secp256k1 context object.
- *  Out: output32: a pointer to a 32-byte byte array to place the
+ *  Out: output32: a pointer to a 32-byte array to place the
  *                 serialized key in.
  *  In:    pubkey: a pointer to a secp256k1_xonly_pubkey containing an
  *                 initialized public key.

@@ -4325,7 +4325,7 @@ void test_xonly_pubkey(void) {
     secp256k1_ge pk2;
     secp256k1_fe y;
     int has_square_y;
-    unsigned char buf32[32];
+    unsigned char buf32[SECP256K1_LEN_XONLY_PUBKEY];
 
     /* sk = 0 should fail */
     CHECK(secp256k1_xonly_pubkey_create(ctx, &xonly_pk, sk) == 0);
