@@ -128,9 +128,9 @@ int secp256k1_schnorrsig_sign(const secp256k1_context* ctx, secp256k1_schnorrsig
     return 1;
 }
 
-/* Helper function for verification and batch verification.
- * Computes R = sG - eP. */
-static int secp256k1_schnorrsig_real_verify(const secp256k1_context* ctx, secp256k1_gej *rj, const secp256k1_scalar *s, const secp256k1_scalar *e, const secp256k1_xonly_pubkey *pk) {
+/* Helper function for verification and batch verification. does not verify a
+ * signature by itself. Only computes R = sG - eP. */
+static int secp256k1_schnorrsig_verify_helper(const secp256k1_context* ctx, secp256k1_gej *rj, const secp256k1_scalar *s, const secp256k1_scalar *e, const secp256k1_xonly_pubkey *pk) {
     secp256k1_scalar nege;
     secp256k1_ge pkp;
     secp256k1_gej pkj;
@@ -179,7 +179,7 @@ int secp256k1_schnorrsig_verify(const secp256k1_context* ctx, const secp256k1_sc
     secp256k1_sha256_finalize(&sha, buf);
     secp256k1_scalar_set_b32(&e, buf, NULL);
 
-    if (!secp256k1_schnorrsig_real_verify(ctx, &rj, &s, &e, pk)
+    if (!secp256k1_schnorrsig_verify_helper(ctx, &rj, &s, &e, pk)
         || !secp256k1_gej_has_quad_y_var(&rj) /* fails if rj is infinity */
         || !secp256k1_gej_eq_x_var(&rx, &rj)) {
         return 0;
