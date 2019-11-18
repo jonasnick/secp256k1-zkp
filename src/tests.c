@@ -4367,6 +4367,9 @@ void test_xonly_pubkey_api(void) {
     unsigned char xy_sk[32];
     unsigned char buf32[32];
     unsigned char tweak[32];
+    unsigned char ones32[32];
+    unsigned char zeros32[32] = { 0 };
+
     int has_square_y;
 
     /** setup **/
@@ -4386,6 +4389,7 @@ void test_xonly_pubkey_api(void) {
     secp256k1_rand256(tweak);
     secp256k1_rand256(xy_sk);
     CHECK(secp256k1_ec_pubkey_create(sign, &xy_pk, xy_sk) == 1);
+    memset(ones32, 0xFF, 32);
 
     ecount = 0;
     CHECK(secp256k1_xonly_pubkey_create(none, &pk, sk) == 0);
@@ -4407,11 +4411,17 @@ void test_xonly_pubkey_api(void) {
     CHECK(ecount == 2);
 
     ecount = 0;
-    CHECK(secp256k1_xonly_pubkey_parse(none, &pk, buf32) == 1);
     CHECK(secp256k1_xonly_pubkey_parse(none, NULL, buf32) == 0);
     CHECK(ecount == 1);
     CHECK(secp256k1_xonly_pubkey_parse(none, &pk, NULL) == 0);
     CHECK(ecount == 2);
+    /* Invalid field element */
+    CHECK(secp256k1_xonly_pubkey_parse(none, &pk, ones32) == 0);
+    CHECK(ecount == 2);
+    /* There's no point with x-coordinate 0 on secp256k1 */
+    CHECK(secp256k1_xonly_pubkey_parse(none, &pk, zeros32) == 0);
+    CHECK(ecount == 2);
+    CHECK(secp256k1_xonly_pubkey_parse(none, &pk, buf32) == 1);
 
     ecount = 0;
     CHECK(secp256k1_xonly_privkey_tweak_add(none, sk, tweak) == 0);

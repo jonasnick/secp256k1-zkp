@@ -764,18 +764,22 @@ int secp256k1_xonly_pubkey_create(const secp256k1_context* ctx, secp256k1_xonly_
 }
 
 int secp256k1_xonly_pubkey_parse(const secp256k1_context* ctx, secp256k1_xonly_pubkey* pubkey, const unsigned char *input32) {
-    /* TODO parse directly from 32 byte buffer */
-    unsigned char buf[33];
+    secp256k1_ge Q;
+    secp256k1_fe x;
+
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(pubkey != NULL);
+    memset(pubkey, 0, sizeof(*pubkey));
     ARG_CHECK(input32 != NULL);
 
-    buf[0] = SECP256K1_TAG_PUBKEY_EVEN;
-    memcpy(&buf[1], input32, 32);
-    if (!secp256k1_ec_pubkey_parse(ctx, (secp256k1_pubkey *) pubkey, buf, sizeof(buf))) {
+    if (!secp256k1_fe_set_b32(&x, input32)) {
         return 0;
     }
-    secp256k1_ec_pubkey_absolute(ctx, (secp256k1_pubkey *) pubkey, NULL);
+    if (!secp256k1_ge_set_xquad(&Q, &x)) {
+        return 0;
+    }
+    secp256k1_pubkey_save((secp256k1_pubkey *) pubkey, &Q);
+    secp256k1_ge_clear(&Q);
     return 1;
 }
 
