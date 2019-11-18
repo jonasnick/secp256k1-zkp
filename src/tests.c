@@ -4402,13 +4402,23 @@ void test_xonly_pubkey_api(void) {
     CHECK(secp256k1_xonly_pubkey_create(sign, &pk, NULL) == 0);
     CHECK(ecount == 4);
 
-    ecount = 0;
     CHECK(secp256k1_xonly_pubkey_create(sign, &pk, sk) == 1);
-    CHECK(secp256k1_xonly_pubkey_serialize(none, buf32, &pk) == 1);
+    ecount = 0;
     CHECK(secp256k1_xonly_pubkey_serialize(none, NULL, &pk) == 0);
     CHECK(ecount == 1);
     CHECK(secp256k1_xonly_pubkey_serialize(none, buf32, NULL) == 0);
+    CHECK(memcmp(buf32, zeros32, 32) == 0);
     CHECK(ecount == 2);
+    {
+        /* A pubkey filled with 0s will fail to serialize due to pubkey_load
+         * special casing. */
+        secp256k1_xonly_pubkey pk_tmp;
+        memset(&pk_tmp, 0, sizeof(pk_tmp));
+        CHECK(secp256k1_xonly_pubkey_serialize(none, buf32, &pk_tmp) == 0);
+    }
+    /* pubkey_load called illegal callback */
+    CHECK(ecount == 3);
+    CHECK(secp256k1_xonly_pubkey_serialize(none, buf32, &pk) == 1);
 
     ecount = 0;
     CHECK(secp256k1_xonly_pubkey_parse(none, NULL, buf32) == 0);
