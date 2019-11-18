@@ -846,7 +846,7 @@ int secp256k1_xonly_pubkey_tweak_add(const secp256k1_context* ctx, secp256k1_xon
     return secp256k1_xonly_pubkey_from_pubkey(ctx, output_pubkey, has_square_y, &pubkey_tmp);
 }
 
-int secp256k1_xonly_pubkey_tweak_verify(const secp256k1_context* ctx, const secp256k1_xonly_pubkey *output_pubkey, int has_square_y, const secp256k1_xonly_pubkey *internal_pubkey, const unsigned char *tweak32) {
+int secp256k1_xonly_pubkey_tweak_test(const secp256k1_context* ctx, const secp256k1_xonly_pubkey *output_pubkey, int has_square_y, const secp256k1_xonly_pubkey *internal_pubkey, const unsigned char *tweak32) {
     secp256k1_xonly_pubkey pk_expected;
     int has_square_y_expected;
     VERIFY_CHECK(ctx != NULL);

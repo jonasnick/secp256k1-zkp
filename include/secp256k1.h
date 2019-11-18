@@ -852,8 +852,11 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_pubkey_tweak_add(
     const unsigned char *tweak32
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
 
-/** Verifies that output_pubkey and has_square_y is the result of calling
- *  secp256k1_xonly_pubkey_tweak_add with internal_pubkey and tweak32.
+/** Tests that output_pubkey and has_square_y is the result of calling
+ *  secp256k1_xonly_pubkey_tweak_add with internal_pubkey and tweak32. Note
+ *  that this alone does _not_ verify anything cryptographically. If the tweak
+ *  is not chosen in a specific way, the output_pubkey can easily be the result
+ *  of a different internal_pubkey and tweak.
  *
  *  Returns: 1 if output_pubkey is the result of tweaking the internal_pubkey with
  *             tweak32

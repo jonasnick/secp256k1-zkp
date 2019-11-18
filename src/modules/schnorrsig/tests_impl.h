@@ -700,7 +700,7 @@ void test_schnorrsig_taproot(void) {
     /* Verify script spend */
     CHECK(secp256k1_xonly_pubkey_parse(ctx, &output_pk, output_pk_bytes) == 1);
     CHECK(secp256k1_xonly_pubkey_parse(ctx, &internal_pk, internal_pk_bytes) == 1);
-    CHECK(secp256k1_xonly_pubkey_tweak_verify(ctx, &output_pk, has_square_y, &internal_pk, tweak) == 1);
+    CHECK(secp256k1_xonly_pubkey_tweak_test(ctx, &output_pk, has_square_y, &internal_pk, tweak) == 1);
 }
 
 void run_schnorrsig_tests(void) {
