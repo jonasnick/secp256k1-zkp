@@ -750,6 +750,15 @@ static void secp256k1_ec_pubkey_absolute(const secp256k1_context* ctx, secp256k1
     secp256k1_pubkey_save(pubkey, &ge);
 }
 
+
+static SECP256K1_INLINE int secp256k1_xonly_pubkey_load(const secp256k1_context* ctx, secp256k1_ge* ge, const secp256k1_xonly_pubkey* pubkey) {
+    return secp256k1_pubkey_load(ctx, ge, (const secp256k1_pubkey *) pubkey);
+}
+
+static SECP256K1_INLINE void secp256k1_xonly_pubkey_save(secp256k1_xonly_pubkey* pubkey, secp256k1_ge* ge) {
+    secp256k1_pubkey_save((secp256k1_pubkey *) pubkey, ge);
+}
+
 int secp256k1_xonly_pubkey_create(const secp256k1_context* ctx, secp256k1_xonly_pubkey *pubkey, const unsigned char *seckey) {
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
@@ -778,7 +787,7 @@ int secp256k1_xonly_pubkey_parse(const secp256k1_context* ctx, secp256k1_xonly_p
     if (!secp256k1_ge_set_xquad(&Q, &x)) {
         return 0;
     }
-    secp256k1_pubkey_save((secp256k1_pubkey *) pubkey, &Q);
+    secp256k1_xonly_pubkey_save(pubkey, &Q);
     secp256k1_ge_clear(&Q);
     return 1;
 }
@@ -791,7 +800,7 @@ int secp256k1_xonly_pubkey_serialize(const secp256k1_context* ctx, unsigned char
     memset(output32, 0, 32);
     ARG_CHECK(pubkey != NULL);
 
-    if (!secp256k1_pubkey_load(ctx, &Q, (secp256k1_pubkey *) pubkey)) {
+    if (!secp256k1_xonly_pubkey_load(ctx, &Q, pubkey)) {
         return 0;
     }
     secp256k1_fe_normalize_var(&Q.x);
