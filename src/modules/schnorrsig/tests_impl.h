@@ -27,10 +27,12 @@ void test_schnorrsig_api(secp256k1_scratch_space *scratch) {
     unsigned char msg[32];
     unsigned char sig64[64];
     secp256k1_xonly_pubkey pk[3];
+    secp256k1_xonly_pubkey zero_pk;
     secp256k1_schnorrsig sig;
     const secp256k1_schnorrsig *sigptr = &sig;
     const unsigned char *msgptr = msg;
     const secp256k1_xonly_pubkey *pkptr = &pk[0];
+    const secp256k1_xonly_pubkey *zeroptr = &zero_pk;
 
     /** setup **/
     secp256k1_context *none = secp256k1_context_create(SECP256K1_CONTEXT_NONE);
@@ -55,6 +57,7 @@ void test_schnorrsig_api(secp256k1_scratch_space *scratch) {
     CHECK(secp256k1_xonly_pubkey_create(ctx, &pk[0], sk1) == 1);
     CHECK(secp256k1_xonly_pubkey_create(ctx, &pk[1], sk2) == 1);
     CHECK(secp256k1_xonly_pubkey_create(ctx, &pk[2], sk3) == 1);
+    memset(&zero_pk, 0, sizeof(zero_pk));
 
     /** main test body **/
     ecount = 0;
@@ -98,6 +101,8 @@ void test_schnorrsig_api(secp256k1_scratch_space *scratch) {
     CHECK(ecount == 4);
     CHECK(secp256k1_schnorrsig_verify(vrfy, &sig, msg, NULL) == 0);
     CHECK(ecount == 5);
+    CHECK(secp256k1_schnorrsig_verify(vrfy, &sig, msg, &zero_pk) == 0);
+    CHECK(ecount == 6);
 
     ecount = 0;
     CHECK(secp256k1_schnorrsig_verify_batch(none, scratch, &sigptr, &msgptr, &pkptr, 1) == 0);
@@ -118,6 +123,8 @@ void test_schnorrsig_api(secp256k1_scratch_space *scratch) {
     CHECK(ecount == 6);
     CHECK(secp256k1_schnorrsig_verify_batch(vrfy, scratch, &sigptr, &msgptr, &pkptr, (uint32_t)1 << 31) == 0);
     CHECK(ecount == 7);
+    CHECK(secp256k1_schnorrsig_verify_batch(vrfy, scratch, &sigptr, &msgptr, &zeroptr, 1) == 0);
+    CHECK(ecount == 8);
 
     secp256k1_context_destroy(none);
     secp256k1_context_destroy(sign);
