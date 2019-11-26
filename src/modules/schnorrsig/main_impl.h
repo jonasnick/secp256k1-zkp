@@ -223,6 +223,10 @@ static int secp256k1_schnorrsig_verify_batch_ecmult_callback(secp256k1_scalar *s
         secp256k1_sha256 sha;
 
         if (!secp256k1_xonly_pubkey_load(ecmult_context->ctx, pt, ecmult_context->pk[idx / 2])) {
+            /* Logically unreachable because verify_batch_init_randomizer calls
+             * secp256k1_ec_pubkey_serialize which only works if loading the
+             * pubkey into a group element succeeds.*/
+            VERIFY_CHECK(0);
             return 0;
         }
         secp256k1_schnorrsig_sha256_tagged(&sha);

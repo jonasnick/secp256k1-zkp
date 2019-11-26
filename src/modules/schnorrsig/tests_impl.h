@@ -111,20 +111,22 @@ void test_schnorrsig_api(secp256k1_scratch_space *scratch) {
     CHECK(ecount == 2);
     CHECK(secp256k1_schnorrsig_verify_batch(vrfy, scratch, &sigptr, &msgptr, &pkptr, 1) == 1);
     CHECK(ecount == 2);
-    CHECK(secp256k1_schnorrsig_verify_batch(vrfy, scratch, NULL, NULL, NULL, 0) == 1);
-    CHECK(ecount == 2);
-    CHECK(secp256k1_schnorrsig_verify_batch(vrfy, scratch, NULL, &msgptr, &pkptr, 1) == 0);
+    CHECK(secp256k1_schnorrsig_verify_batch(vrfy, NULL, &sigptr, &msgptr, &pkptr, 1) == 0);
     CHECK(ecount == 3);
-    CHECK(secp256k1_schnorrsig_verify_batch(vrfy, scratch, &sigptr, NULL, &pkptr, 1) == 0);
+    CHECK(secp256k1_schnorrsig_verify_batch(vrfy, scratch, NULL, NULL, NULL, 0) == 1);
+    CHECK(ecount == 3);
+    CHECK(secp256k1_schnorrsig_verify_batch(vrfy, scratch, NULL, &msgptr, &pkptr, 1) == 0);
     CHECK(ecount == 4);
-    CHECK(secp256k1_schnorrsig_verify_batch(vrfy, scratch, &sigptr, &msgptr, NULL, 1) == 0);
+    CHECK(secp256k1_schnorrsig_verify_batch(vrfy, scratch, &sigptr, NULL, &pkptr, 1) == 0);
     CHECK(ecount == 5);
-    CHECK(secp256k1_schnorrsig_verify_batch(vrfy, scratch, &sigptr, &msgptr, &pkptr, (size_t)1 << (sizeof(size_t)*8-1)) == 0);
+    CHECK(secp256k1_schnorrsig_verify_batch(vrfy, scratch, &sigptr, &msgptr, NULL, 1) == 0);
     CHECK(ecount == 6);
-    CHECK(secp256k1_schnorrsig_verify_batch(vrfy, scratch, &sigptr, &msgptr, &pkptr, (uint32_t)1 << 31) == 0);
+    CHECK(secp256k1_schnorrsig_verify_batch(vrfy, scratch, &sigptr, &msgptr, &pkptr, (size_t)1 << (sizeof(size_t)*8-1)) == 0);
     CHECK(ecount == 7);
-    CHECK(secp256k1_schnorrsig_verify_batch(vrfy, scratch, &sigptr, &msgptr, &zeroptr, 1) == 0);
+    CHECK(secp256k1_schnorrsig_verify_batch(vrfy, scratch, &sigptr, &msgptr, &pkptr, (uint32_t)1 << 31) == 0);
     CHECK(ecount == 8);
+    CHECK(secp256k1_schnorrsig_verify_batch(vrfy, scratch, &sigptr, &msgptr, &zeroptr, 1) == 0);
+    CHECK(ecount == 9);
 
     secp256k1_context_destroy(none);
     secp256k1_context_destroy(sign);
@@ -602,17 +604,31 @@ void test_schnorrsig_sign(void) {
     unsigned char sk[32];
     const unsigned char msg[32] = "this is a msg for a schnorrsig..";
     secp256k1_schnorrsig sig;
+    unsigned char zeros64[64];
+
 
     memset(sk, 23, sizeof(sk));
     CHECK(secp256k1_schnorrsig_sign(ctx, &sig, msg, sk, NULL, NULL) == 1);
 
+    memset(zeros64, 0, 64);
     /* Overflowing secret key */
     memset(sk, 0xFF, sizeof(sk));
     CHECK(secp256k1_schnorrsig_sign(ctx, &sig, msg, sk, NULL, NULL) == 0);
-    memset(sk, 23, sizeof(sk));
+    CHECK(memcmp(&sig, zeros64, sizeof(sig)) == 0);
 
+    /* Zeroed secret key */
+    memset(sk, 0, sizeof(sk));
+    memset(&sig, 1, sizeof(sig));
+    CHECK(secp256k1_schnorrsig_sign(ctx, &sig, msg, sk, NULL, NULL) == 0);
+    CHECK(memcmp(&sig, zeros64, sizeof(sig)) == 0);
+
+    memset(sk, 23, sizeof(sk));
+    memset(&sig, 1, sizeof(sig));
     CHECK(secp256k1_schnorrsig_sign(ctx, &sig, msg, sk, nonce_function_failing, NULL) == 0);
+    CHECK(memcmp(&sig, zeros64, sizeof(sig)) == 0);
+    memset(&sig, 1, sizeof(sig));
     CHECK(secp256k1_schnorrsig_sign(ctx, &sig, msg, sk, nonce_function_0, NULL) == 0);
+    CHECK(memcmp(&sig, zeros64, sizeof(sig)) == 0);
 }
 
 #define N_SIGS  200
