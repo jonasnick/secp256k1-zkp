@@ -4521,6 +4521,9 @@ void test_xonly_pubkey_tweak(void) {
     /* Wrong public key */
     CHECK(secp256k1_xonly_pubkey_tweak_test(ctx, &internal_pk, has_square_y, &internal_pk, tweak) == 0);
 
+    /* Overflowing secret key not allowed */
+    CHECK(secp256k1_xonly_privkey_tweak_add(ctx, overflows, tweak) == 0);
+
     /* Overflowing tweak not allowed */
     CHECK(secp256k1_xonly_pubkey_tweak_test(ctx, &output_pk, has_square_y, &internal_pk, overflows) == 0);
     CHECK(secp256k1_xonly_privkey_tweak_add(ctx, sk, overflows) == 0);
