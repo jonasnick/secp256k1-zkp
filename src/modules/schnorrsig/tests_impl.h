@@ -699,7 +699,7 @@ void test_schnorrsig_taproot(void) {
     secp256k1_xonly_pubkey output_pk;
     unsigned char output_pk_bytes[32];
     unsigned char tweak[32];
-    int has_square_y;
+    int is_negated;
     unsigned char msg[32];
     secp256k1_schnorrsig sig;
 
@@ -707,7 +707,7 @@ void test_schnorrsig_taproot(void) {
     secp256k1_rand256(sk);
     CHECK(secp256k1_xonly_pubkey_create(ctx, &internal_pk, sk) == 1);
     memset(tweak, 1, sizeof(tweak));
-    CHECK(secp256k1_xonly_pubkey_tweak_add(ctx, &output_pk, &has_square_y, &internal_pk, tweak) == 1);
+    CHECK(secp256k1_xonly_pubkey_tweak_add(ctx, &output_pk, &is_negated, &internal_pk, tweak) == 1);
     CHECK(secp256k1_xonly_pubkey_serialize(ctx, output_pk_bytes, &output_pk) == 1);
 
     /* Key spend */
@@ -723,7 +723,7 @@ void test_schnorrsig_taproot(void) {
     /* Verify script spend */
     CHECK(secp256k1_xonly_pubkey_parse(ctx, &output_pk, output_pk_bytes) == 1);
     CHECK(secp256k1_xonly_pubkey_parse(ctx, &internal_pk, internal_pk_bytes) == 1);
-    CHECK(secp256k1_xonly_pubkey_tweak_test(ctx, &output_pk, has_square_y, &internal_pk, tweak) == 1);
+    CHECK(secp256k1_xonly_pubkey_tweak_test(ctx, &output_pk, is_negated, &internal_pk, tweak) == 1);
 }
 
 void run_schnorrsig_tests(void) {
