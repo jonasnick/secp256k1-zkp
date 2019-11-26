@@ -750,7 +750,7 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_pubkey_parse(
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
 /** Serialize an xonly_pubkey object into a 32-byte sequence. Use the
- *  SECP256K1_LEN_XONLY_PUBKEY macro if your want to avoid the magic number 32.
+ *  SECP256K1_LEN_XONLY_PUBKEY macro if you want to avoid the magic number 32.
  *
  *  Returns: 1 always.
  *
@@ -859,9 +859,9 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_pubkey_tweak_add(
 
 /** Tests that output_pubkey and is_negated is the result of calling
  *  secp256k1_xonly_pubkey_tweak_add with internal_pubkey and tweak32. Note
- *  that this alone does _not_ verify anything cryptographically. If the tweak
- *  is not chosen in a specific way, the output_pubkey can easily be the result
- *  of a different internal_pubkey and tweak.
+ *  that this alone does _not_ verify that output_pubkey is a commitment. If the
+ *  tweak is not chosen in a specific way, the output_pubkey can easily be the
+ *  result of a different internal_pubkey and tweak.
  *
  *  Returns: 1 if output_pubkey is the result of tweaking the internal_pubkey with
  *             tweak32
