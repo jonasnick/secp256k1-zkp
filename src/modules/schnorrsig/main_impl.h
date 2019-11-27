@@ -222,11 +222,11 @@ static int secp256k1_schnorrsig_verify_batch_ecmult_callback(secp256k1_scalar *s
         unsigned char buf[32];
         secp256k1_sha256 sha;
 
-        /* Is guaranteed not to fail because verify_batch_init_randomizer calls
-         * secp256k1_ec_pubkey_serialize which only works if loading the pubkey
-         * into a group element succeeds.*/
-        int ret = secp256k1_xonly_pubkey_load(ecmult_context->ctx, pt, ecmult_context->pk[idx / 2]);
-        VERIFY_CHECK(ret);
+        /* xonly_pubkey_load is guaranteed not to fail because
+         * verify_batch_init_randomizer calls secp256k1_ec_pubkey_serialize
+         * which only works if loading the pubkey into a group element
+         * succeeds.*/
+        VERIFY_CHECK(secp256k1_xonly_pubkey_load(ecmult_context->ctx, pt, ecmult_context->pk[idx / 2]));
 
         secp256k1_schnorrsig_sha256_tagged(&sha);
         secp256k1_sha256_write(&sha, &ecmult_context->sig[idx / 2]->data[0], 32);
