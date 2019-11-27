@@ -833,6 +833,7 @@ int secp256k1_xonly_privkey_tweak_add(const secp256k1_context* ctx, unsigned cha
     }
     secp256k1_pubkey_load(ctx, &ge, &pubkey);
     if (!secp256k1_fe_is_quad_var(&ge.y)) {
+        /* Overflow can be ignored because ec_pubkey_create would already fail */
         secp256k1_scalar_set_b32(&sec, seckey32, NULL);
         secp256k1_scalar_negate(&sec, &sec);
         secp256k1_scalar_get_b32(seckey32, &sec);

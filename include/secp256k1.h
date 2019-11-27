@@ -857,7 +857,7 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_xonly_pubkey_tweak_add(
     const unsigned char *tweak32
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
 
-/** Tests that output_pubkey and is_negated is the result of calling
+/** Tests that output_pubkey and is_negated are the result of calling
  *  secp256k1_xonly_pubkey_tweak_add with internal_pubkey and tweak32. Note
  *  that this alone does _not_ verify that output_pubkey is a commitment. If the
  *  tweak is not chosen in a specific way, the output_pubkey can easily be the
