@@ -160,7 +160,6 @@ int secp256k1_schnorrsig_verify(const secp256k1_context* ctx, const secp256k1_sc
 
     secp256k1_schnorrsig_sha256_tagged(&sha);
     secp256k1_sha256_write(&sha, &sig->data[0], 32);
-    secp256k1_fe_normalize_var(&pk.x);
     secp256k1_fe_get_b32(buf, &pk.x);
     secp256k1_sha256_write(&sha, buf, sizeof(buf));
     secp256k1_sha256_write(&sha, msg32, 32);
@@ -230,7 +229,6 @@ static int secp256k1_schnorrsig_verify_batch_ecmult_callback(secp256k1_scalar *s
 
         secp256k1_schnorrsig_sha256_tagged(&sha);
         secp256k1_sha256_write(&sha, &ecmult_context->sig[idx / 2]->data[0], 32);
-        secp256k1_fe_normalize_var(&pt->x);
         secp256k1_fe_get_b32(buf, &pt->x);
         secp256k1_sha256_write(&sha, buf, sizeof(buf));
         secp256k1_sha256_write(&sha, ecmult_context->msg32[idx / 2], 32);
