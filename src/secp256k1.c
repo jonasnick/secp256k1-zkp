@@ -803,7 +803,6 @@ int secp256k1_xonly_pubkey_serialize(const secp256k1_context* ctx, unsigned char
     if (!secp256k1_xonly_pubkey_load(ctx, &Q, pubkey)) {
         return 0;
     }
-    secp256k1_fe_normalize_var(&Q.x);
     secp256k1_fe_get_b32(output32, &Q.x);
     return 1;
 }
