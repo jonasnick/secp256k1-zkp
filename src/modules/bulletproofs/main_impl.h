@@ -293,6 +293,71 @@ secp256k1_bulletproof_circuit *secp256k1_bulletproof_circuit_parse(const secp256
     return secp256k1_parse_circuit(ctx, description);
 }
 
+
+void secp256k1_bulletproof_circuit_evaluate_sum_row(secp256k1_scalar *acc, const secp256k1_bulletproof_wmatrix_row *row, const secp256k1_scalar *assn) {
+    size_t j;
+    for (j = 0; j < row->size; j++) {
+      secp256k1_scalar tmp;
+      secp256k1_fast_scalar_mul(&tmp, &row->entry[j].scal, assn);
+      secp256k1_scalar_add(&acc[row->entry[j].idx], &acc[row->entry[j].idx], &tmp);
+    }
+
+}
+
+int secp256k1_bulletproof_circuit_evaluate(const secp256k1_bulletproof_circuit *circ, const secp256k1_bulletproof_circuit_assignment *assn, const unsigned char *value) {
+  size_t i;
+  /* TODO: allow more scalars */
+  secp256k1_scalar acc[5000];
+  secp256k1_scalar val;
+
+  if (assn->n_gates != circ->n_gates) {
+    return 0;
+  }
+  if (assn->n_commits != circ->n_commits) {
+    return 0;
+  }
+  for (i = 0; i < assn->n_gates; i++) {
+    secp256k1_scalar tmp;
+    /* ao = al * ar */
+    secp256k1_scalar_mul(&tmp, &assn->al[i], &assn->ar[i]);
+    if (!secp256k1_scalar_eq(&tmp, &assn->ao[i])) {
+      return 0;
+    }
+  }
+
+  for (i = 0; i < circ->n_constraints; i++) {
+    secp256k1_scalar_set_int(&acc[i], 0);
+  }
+
+  for (i = 0; i < circ->n_gates; i++) {
+    secp256k1_bulletproof_circuit_evaluate_sum_row(acc, &circ->wl[i], &assn->al[i]);
+    secp256k1_bulletproof_circuit_evaluate_sum_row(acc, &circ->wr[i], &assn->ar[i]);
+    secp256k1_bulletproof_circuit_evaluate_sum_row(acc, &circ->wo[i], &assn->ao[i]);
+  }
+  for (i = 0; i < circ->n_commits; i++) {
+    /* W_V is on the opposite side of the equation from W_L/W_R/W_O */
+    secp256k1_scalar_negate(&val, &assn->v[i]);
+    secp256k1_bulletproof_circuit_evaluate_sum_row(acc, &circ->wv[i], &val);
+  }
+
+  for (i = 0; i < circ->n_constraints; i++) {
+    secp256k1_scalar c;
+    secp256k1_scalar one;
+    secp256k1_scalar_set_int(&one, 1);
+    secp256k1_fast_scalar_mul(&c, &circ->c[i], &one);
+    if (!secp256k1_scalar_eq(&acc[i], &c)) {
+      return 0;
+    }
+  }
+  secp256k1_scalar_set_b32(&val, value, NULL);
+  /* TODO: allow more than a single committed value */
+  if (circ->n_commits > 0 && !secp256k1_scalar_eq(&val, &assn->v[0])) {
+      return 0;
+  }
+  return 1;
+}
+
+
 int secp256k1_bulletproof_circuit_prove(const secp256k1_context* ctx, secp256k1_scratch_space *scratch, const secp256k1_bulletproof_generators *gens, const secp256k1_bulletproof_circuit *circ, unsigned char *proof, size_t *plen, const secp256k1_bulletproof_circuit_assignment *assn, const unsigned char** blind, size_t n_commits, const unsigned char *nonce, const secp256k1_generator *value_gen, const unsigned char *extra_commit, size_t extra_commit_len) {
     int ret;
     secp256k1_ge value_genp;
