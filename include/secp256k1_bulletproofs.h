@@ -325,6 +325,9 @@ SECP256K1_API int secp256k1_bulletproof_circuit_prove(
     size_t extra_commit_len
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6) SECP256K1_ARG_NONNULL(7) SECP256K1_ARG_NONNULL(10) SECP256K1_ARG_NONNULL(11);
 
+/* TODO: doc */
+int secp256k1_bulletproof_circuit_evaluate(const secp256k1_bulletproof_circuit *circ, const secp256k1_bulletproof_circuit_assignment *assn, const unsigned char *value);
+
 # ifdef __cplusplus
 }
 # endif
