@@ -1,0 +1,5 @@
+Created with https://github.com/jonasnick/purify/tree/bulletproof-format-committed Commit ID a4e1fc5c6cf090657900163f3b1d3dd0f2b8156b
+
+$ ./purify.py verifier 1234 27d2c4b0224dbdf2480c6c91096e85e7b4b285b499affb8e16b8f2a784de3bd2b6f287d29d3a084b3e322b47ed74a71ce4a81c2201e8a25b0b19d1b340251091 -b purify.circ
+
+$ ./purify.py prove 1234 1 -b purify.assn
