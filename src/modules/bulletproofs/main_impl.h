@@ -63,6 +63,50 @@ struct secp256k1_bulletproof_generators {
 #include "modules/bulletproofs/rangeproof_impl.h"
 #include "modules/bulletproofs/util.h"
 
+
+int secp256k1_bulletproof_circuit_eq_helper(secp256k1_bulletproof_wmatrix_row *row0, secp256k1_bulletproof_wmatrix_row *row1) {
+    size_t j;
+    if (row0->size != row1->size) {
+        return 0;
+    }
+    for (j = 0; j < row0->size; j++) {
+        if (row0->entry[j].idx != row1->entry[j].idx
+            || row0->entry[j].scal.special != row1->entry[j].scal.special
+            || !secp256k1_scalar_eq(&row0->entry[j].scal.scal, &row1->entry[j].scal.scal)) {
+            return 0;
+        }
+    }
+    return 1;
+}
+int secp256k1_bulletproof_circuit_eq(secp256k1_bulletproof_circuit *circ0, secp256k1_bulletproof_circuit *circ1) {
+    size_t i;
+    if (circ0->n_gates != circ1->n_gates
+        || circ0->n_commits != circ1->n_commits
+        || circ0->n_constraints != circ1->n_constraints
+        || circ0->n_bits != circ1->n_bits) {
+        return 0;
+    }
+    for (i = 0; i < circ0->n_gates; i++) {
+        if (!secp256k1_bulletproof_circuit_eq_helper(&circ0->wl[i], &circ1->wl[i])
+            || !secp256k1_bulletproof_circuit_eq_helper(&circ0->wr[i], &circ1->wr[i])
+            || !secp256k1_bulletproof_circuit_eq_helper(&circ0->wr[i], &circ1->wr[i])) {
+            return 0;
+        }
+    }
+    for (i = 0; i < circ0->n_commits; i++) {
+        if (!secp256k1_bulletproof_circuit_eq_helper(&circ0->wv[i], &circ1->wv[i])) {
+            return 0;
+        }
+    }
+    for (i = 0; i < circ0->n_constraints; i++) {
+        if (circ0->c[i].special != circ1->c[i].special
+            || !secp256k1_scalar_eq(&circ0->c[i].scal, &circ1->c[i].scal)) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 secp256k1_bulletproof_generators *secp256k1_bulletproof_generators_create(const secp256k1_context *ctx, const secp256k1_generator *blinding_gen, size_t n, size_t precomp_n) {
     secp256k1_bulletproof_generators *ret;
     secp256k1_rfc6979_hmac_sha256 rng;

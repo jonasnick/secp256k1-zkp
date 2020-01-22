@@ -346,6 +346,8 @@ SECP256K1_API int secp256k1_bulletproof_circuit_prove(
 /* TODO: doc */
 int secp256k1_bulletproof_circuit_evaluate(const secp256k1_bulletproof_circuit *circ, const secp256k1_bulletproof_circuit_assignment *assn, const unsigned char *value);
 
+int secp256k1_bulletproof_circuit_eq(secp256k1_bulletproof_circuit *circ0, secp256k1_bulletproof_circuit *circ1);
+
 # ifdef __cplusplus
 }
 # endif
