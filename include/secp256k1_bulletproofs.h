@@ -187,7 +187,7 @@ SECP256K1_API int secp256k1_bulletproof_rangeproof_prove(
 
 /* General ZKP functionality */
 
-/** Parses a circuit from an ad-hoc text string format
+/** Parses a circuit from an ad-hoc text string format. Very slow.
  *  Returns a circuit, or NULL on failure
  *  Args:         ctx: pointer to a context object (cannot be NULL)
  *  In:   description: description of the circuit
@@ -197,7 +197,25 @@ SECP256K1_API secp256k1_bulletproof_circuit *secp256k1_bulletproof_circuit_parse
     const char *description
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2);
 
-/** Decodes a circuit which is serialized in an opaque binary format
+/** Decodes a circuit which is serialized in an opaque binary format.
+ *
+ *  In the following "row_width" refers to secp256k1_bulletproofs_encoding_width(n_muls).
+ *
+ *  `version`: 4 bytes (currently 1)
+ *  `n_commitments`: 4 bytes
+ *  `n_multiplications`: 8 bytes
+ *  `n_bits`: 8 bytes (number of "implicit bit constraints)
+ *  `n_constraints`: 8 bytes
+ *  # What follows is a "matrix" which for every wire Li specifies the constraints
+ *  # (by index) the wire assignment is added to (left hand side) and the factor
+ *  # the wire is multiplied with.
+ *  for i in range(n_muls):
+ *     `n_constraints_of_Li` (row width bytes)
+ *     for j in range(n_constraints_of_Li):
+ *         index of constraint where Li is added to (LHS) || 0x20 || factor of Li in that constraint (row width + 33 bytes)
+ *  # Same loop for wires Ri and Oi
+ *  for i in range(n_constraints):  0x20 || constant part of constraint i (n_constraints * 33 bytes)
+ *
  *  Returns a circuit, or NULL on failure
  *  Args:         ctx: pointer to a context object (cannot be NULL)
  *  In:         fname: path to a file containing the circuit
