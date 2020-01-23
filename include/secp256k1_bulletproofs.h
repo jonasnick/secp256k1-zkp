@@ -302,7 +302,7 @@ SECP256K1_API int secp256k1_bulletproof_circuit_verify_multi(
  *  Out:      proof: byte-serialized rangeproof (cannot be NULL)
  *  In/Out:    plen: pointer to length of the proof, initially set to length of buffer (cannot be NULL)
  *  In:        assn: wire assignment to prove in zero knowledge (cannot be NULL)
- *            blind: array of blinding factors of the Pedersen commitments (cannot be NULL unless n_commits is 0)
+ *            blind: array of blinding factors of the Pedersen commitments (cannot be NULL unless n_commits is 0). None of the blinding factors can be 0.
  *        n_commits: number of entries in the `blind` array
  *            nonce: seed used for random number generation (cannot be NULL)
  *        value_gen: generator multiplied by value in pedersen commitments (cannot be NULL)

@@ -712,6 +712,9 @@ void test_bulletproof_circuit(const secp256k1_bulletproof_generators *gens) {
     const unsigned char *proof_ptr = proof;
     size_t plen = sizeof(proof);
     secp256k1_scalar one;
+    const unsigned char one_raw[32] = { 1 };
+    const unsigned char zeros[32] = { 0 };
+    const unsigned char *blinds[1];
     secp256k1_scalar challenge;
     secp256k1_scalar answer;
     secp256k1_scalar commitv;
@@ -784,6 +787,7 @@ void test_bulletproof_circuit(const secp256k1_bulletproof_generators *gens) {
     secp256k1_scalar_set_int(&challenge, 17);
     secp256k1_scalar_inverse(&answer, &challenge);
     secp256k1_scalar_set_int(&one, 1);
+    blinds[0] = one_raw;
 
     /* Try to prove with input 0, 1, 0 */
     assn.al[0] = assn.al[1] = challenge;
@@ -828,6 +832,13 @@ void test_bulletproof_circuit(const secp256k1_bulletproof_generators *gens) {
         gens,
         NULL, 0
     ));
+
+    /* Check that circuit_prove works as well */
+    CHECK(secp256k1_bulletproof_circuit_prove(ctx, scratch, gens, simple, proof, &plen, &assn, blinds, 1, nonce, &secp256k1_generator_const_g, NULL, 0));
+    /* It doesn't work if a blinding factor is 0 */
+    blinds[0] = zeros;
+    CHECK(!secp256k1_bulletproof_circuit_prove(ctx, scratch, gens, simple, proof, &plen, &assn, blinds, 1, nonce, &secp256k1_generator_const_g, NULL, 0));
+    blinds[0] = one_raw;
 
     plen = 2000;
     assn.al = pedersen_3_al;
