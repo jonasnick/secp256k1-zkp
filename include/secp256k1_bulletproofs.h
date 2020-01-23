@@ -298,7 +298,7 @@ SECP256K1_API int secp256k1_bulletproof_circuit_verify_multi(
  *  Args:       ctx: pointer to a context object initialized for signing and verification (cannot be NULL)
  *          scratch: scratch space with enough memory for verification (cannot be NULL)
  *             gens: generator set with at least 2*n_gates many generators (cannot be NULL)
- *             circ: circuit that the zkp is over (cannot be NULL)
+ *             circ: circuit that the zkp is over (cannot be NULL). Must have at least one constraint.
  *  Out:      proof: byte-serialized rangeproof (cannot be NULL)
  *  In/Out:    plen: pointer to length of the proof, initially set to length of buffer (cannot be NULL)
  *  In:        assn: wire assignment to prove in zero knowledge (cannot be NULL)

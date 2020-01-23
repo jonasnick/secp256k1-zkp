@@ -72,6 +72,9 @@ static int secp256k1_bulletproof_relation66_prove_impl(const secp256k1_ecmult_co
     if (assn->n_gates > circ->n_gates || assn->n_commits > circ->n_commits || nc != circ->n_commits) {
         return 0;
     }
+    if (circ->n_constraints == 0) {
+        return 0;
+    }
     if (*plen < 64 + 256 + 1) {  /* inner product argument will do a more precise check and assignment */
         return 0;
     }

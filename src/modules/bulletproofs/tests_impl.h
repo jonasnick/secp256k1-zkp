@@ -768,12 +768,15 @@ void test_bulletproof_circuit(const secp256k1_bulletproof_generators *gens) {
     };
 
     const char inv_17_19_circ[] = "2,1,0,5; L0 = 17; 2*L1 - L0 = 21; O0 = 1; O1 = 1; V0 - L0 = 100;";
+    const char inv_17_19_circ_nocons[] = "2,1,0,0;";
     secp256k1_bulletproof_circuit *simple = secp256k1_parse_circuit(ctx, inv_17_19_circ);
+    secp256k1_bulletproof_circuit *simple_nocons = secp256k1_parse_circuit(ctx, inv_17_19_circ_nocons);
     secp256k1_bulletproof_circuit *pedersen_3 = secp256k1_parse_circuit(ctx, pedersen_3_desc);
     secp256k1_bulletproof_circuit *pedersen_3_bin = secp256k1_bulletproof_circuit_decode(ctx, "src/modules/bulletproofs/bin_circuits/pedersen-192-preimage.circ");
     secp256k1_bulletproof_circuit_assignment *pedersen_3_assn = secp256k1_bulletproof_circuit_assignment_decode(ctx, "src/modules/bulletproofs/bin_circuits/pedersen-192-preimage.assn");
 
     CHECK(simple != NULL);
+    CHECK(simple_nocons != NULL);
     CHECK(pedersen_3 != NULL);
     CHECK(pedersen_3_bin != NULL);
 
@@ -845,6 +848,9 @@ void test_bulletproof_circuit(const secp256k1_bulletproof_generators *gens) {
     CHECK(!secp256k1_bulletproof_circuit_prove(ctx, scratch, gens, simple, proof, &plen, &assn, blinds, 1, nonce, &secp256k1_generator_const_g, NULL, 0));
     blinds[0] = one_raw;
 
+    /* Can't prove for a circuit without constraints */
+    CHECK(!secp256k1_bulletproof_circuit_prove(ctx, scratch, gens, simple_nocons, proof, &plen, &assn, blinds, 1, nonce, &secp256k1_generator_const_g, NULL, 0));
+
     plen = 2000;
     assn.al = pedersen_3_al;
     assn.ar = pedersen_3_ar;
@@ -904,6 +910,7 @@ void test_bulletproof_circuit(const secp256k1_bulletproof_generators *gens) {
     ));
 
     secp256k1_bulletproof_circuit_destroy(ctx, simple);
+    secp256k1_bulletproof_circuit_destroy(ctx, simple_nocons);
     secp256k1_bulletproof_circuit_destroy(ctx, pedersen_3);
     secp256k1_bulletproof_circuit_destroy(ctx, pedersen_3_bin);
     secp256k1_bulletproof_circuit_assignment_destroy(ctx, pedersen_3_assn);
