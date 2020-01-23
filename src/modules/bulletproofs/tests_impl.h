@@ -833,6 +833,11 @@ void test_bulletproof_circuit(const secp256k1_bulletproof_generators *gens) {
         NULL, 0
     ));
 
+    /* Verification does not succeed if the number of gates isn't a power of 2 */
+    simple->n_gates = simple->n_gates + 1;
+    CHECK(!secp256k1_bulletproof_relation66_verify_impl(&ctx->ecmult_ctx, scratch, &proof_ptr, 1, plen, &commitp_ptr, &simple->n_commits, &value_gen, (const secp256k1_bulletproof_circuit* const*) &simple, gens, NULL, 0));
+    simple->n_gates = simple->n_gates - 1;
+
     /* Check that circuit_prove works as well */
     CHECK(secp256k1_bulletproof_circuit_prove(ctx, scratch, gens, simple, proof, &plen, &assn, blinds, 1, nonce, &secp256k1_generator_const_g, NULL, 0));
     /* It doesn't work if a blinding factor is 0 */

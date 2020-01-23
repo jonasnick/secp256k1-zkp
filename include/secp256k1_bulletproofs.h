@@ -238,7 +238,7 @@ SECP256K1_API void secp256k1_bulletproof_circuit_assignment_destroy(
  *  Args:       ctx: pointer to a context object initialized for verification (cannot be NULL)
  *          scratch: scratch space with enough memory for verification (cannot be NULL)
  *             gens: generator set with at least 2*n_gates many generators (cannot be NULL)
- *             circ: circuit that the zkp is over (cannot be NULL)
+ *             circ: circuit that the zkp is over. Number of gates must be a power of 2. (cannot be NULL)
  *  In:       proof: byte-serialized proof (cannot be NULL)
  *             plen: length of the proof
  *           commit: array of pedersen commitment that this rangeproof is over (cannot be NULL unless n_commits is 0)
@@ -267,7 +267,7 @@ SECP256K1_API int secp256k1_bulletproof_circuit_verify(
  *  Args:       ctx: pointer to a context object initialized for verification (cannot be NULL)
  *          scratch: scratch space with enough memory for verification (cannot be NULL)
  *             gens: generator set with at least 2*n_gates many generators (cannot be NULL)
- *            circs: array of circuits, one per proof
+ *            circs: array of circuits, one per proof. Number of gates must be a power of 2.
  *  In:       proof: array of byte-serialized proofs (cannot be NULL)
  *         n_proofs: number of proofs in above array
  *             plen: length of the all proofs

@@ -418,6 +418,13 @@ static int secp256k1_bulletproof_relation66_verify_impl(const secp256k1_ecmult_c
         secp256k1_scalar y;
         int overflow;
 
+        /* it's assumed that n_gates is a power of two */
+        if (circ[i]->n_gates == 0 || ((circ[i]->n_gates & (circ[i]->n_gates - 1)) != 0)) {
+            secp256k1_scratch_deallocate_frame(scratch);
+            secp256k1_scratch_deallocate_frame(scratch);
+            return 0;
+        }
+
         /* Commit to all input data: pedersen commit, asset generator, extra_commit */
         if (nc != NULL) {
             secp256k1_bulletproof_update_commit_n(commit, commitp[i], nc[i]);
