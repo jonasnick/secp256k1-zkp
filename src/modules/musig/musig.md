@@ -79,6 +79,7 @@ signature process, which is also a supported mode) acts as follows.
    - an initialized session state in the out-pointer `session`
    - an array of initialized signer data in the out-pointer `signers`
    - a commitment `H(R_i)` to a nonce in the out-pointer `nonce_commitment32`
+   
    It takes as input
    - a unique session ID `session_id32`
    - (optionally) a message to be signed `msg32`
