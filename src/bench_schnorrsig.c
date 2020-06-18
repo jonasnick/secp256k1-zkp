@@ -12,25 +12,23 @@
 #include "util.h"
 #include "bench.h"
 
-#define MAX_SIGS	(32768)
-
 typedef struct {
     secp256k1_context *ctx;
     secp256k1_scratch_space *scratch;
-    size_t n;
+    int n;
     const unsigned char **pk;
     const secp256k1_schnorrsig **sigs;
     const unsigned char **msgs;
 } bench_schnorrsig_data;
 
-void bench_schnorrsig_sign(void* arg) {
+void bench_schnorrsig_sign(void* arg, int iters) {
     bench_schnorrsig_data *data = (bench_schnorrsig_data *)arg;
-    size_t i;
+    int i;
     unsigned char sk[32] = "benchmarkexample secrettemplate";
     unsigned char msg[32] = "benchmarkexamplemessagetemplate";
     secp256k1_schnorrsig sig;
 
-    for (i = 0; i < 1000; i++) {
+    for (i = 0; i < iters; i++) {
         msg[0] = i;
         msg[1] = i >> 8;
         sk[0] = i;
@@ -39,24 +37,24 @@ void bench_schnorrsig_sign(void* arg) {
     }
 }
 
-void bench_schnorrsig_verify(void* arg) {
+void bench_schnorrsig_verify(void* arg, int iters) {
     bench_schnorrsig_data *data = (bench_schnorrsig_data *)arg;
-    size_t i;
+    int i;
 
-    for (i = 0; i < 1000; i++) {
+    for (i = 0; i < iters; i++) {
         secp256k1_pubkey pk;
         CHECK(secp256k1_ec_pubkey_parse(data->ctx, &pk, data->pk[i], 33) == 1);
         CHECK(secp256k1_schnorrsig_verify(data->ctx, data->sigs[i], data->msgs[i], &pk));
     }
 }
 
-void bench_schnorrsig_verify_n(void* arg) {
+void bench_schnorrsig_verify_n(void* arg, int iters) {
     bench_schnorrsig_data *data = (bench_schnorrsig_data *)arg;
-    size_t i, j;
+    int i, j;
     const secp256k1_pubkey **pk = (const secp256k1_pubkey **)malloc(data->n * sizeof(*pk));
 
     CHECK(pk != NULL);
-    for (j = 0; j < MAX_SIGS/data->n; j++) {
+    for (j = 0; j < iters/data->n; j++) {
         for (i = 0; i < data->n; i++) {
             secp256k1_pubkey *pk_nonconst = (secp256k1_pubkey *)malloc(sizeof(*pk_nonconst));
             CHECK(secp256k1_ec_pubkey_parse(data->ctx, pk_nonconst, data->pk[i], 33) == 1);
@@ -71,16 +69,17 @@ void bench_schnorrsig_verify_n(void* arg) {
 }
 
 int main(void) {
-    size_t i;
+    int i;
     bench_schnorrsig_data data;
+    int iters = get_iters(1000);
 
     data.ctx = secp256k1_context_create(SECP256K1_CONTEXT_VERIFY | SECP256K1_CONTEXT_SIGN);
     data.scratch = secp256k1_scratch_space_create(data.ctx, 1024 * 1024 * 1024);
-    data.pk = (const unsigned char **)malloc(MAX_SIGS * sizeof(unsigned char *));
-    data.msgs = (const unsigned char **)malloc(MAX_SIGS * sizeof(unsigned char *));
-    data.sigs = (const secp256k1_schnorrsig **)malloc(MAX_SIGS * sizeof(secp256k1_schnorrsig *));
+    data.pk = (const unsigned char **)malloc(iters * sizeof(unsigned char *));
+    data.msgs = (const unsigned char **)malloc(iters * sizeof(unsigned char *));
+    data.sigs = (const secp256k1_schnorrsig **)malloc(iters * sizeof(secp256k1_schnorrsig *));
 
-    for (i = 0; i < MAX_SIGS; i++) {
+    for (i = 0; i < iters; i++) {
         unsigned char sk[32];
         unsigned char *msg = (unsigned char *)malloc(32);
         secp256k1_schnorrsig *sig = (secp256k1_schnorrsig *)malloc(sizeof(*sig));
@@ -103,17 +102,19 @@ int main(void) {
         CHECK(secp256k1_schnorrsig_sign(data.ctx, sig, NULL, msg, sk, NULL, NULL));
     }
 
-    run_benchmark("schnorrsig_sign", bench_schnorrsig_sign, NULL, NULL, (void *) &data, 10, 1000);
-    run_benchmark("schnorrsig_verify", bench_schnorrsig_verify, NULL, NULL, (void *) &data, 10, 1000);
-    for (i = 1; i <= MAX_SIGS; i *= 2) {
+    run_benchmark("schnorrsig_sign", bench_schnorrsig_sign, NULL, NULL, (void *) &data, 10, iters);
+    run_benchmark("schnorrsig_verify", bench_schnorrsig_verify, NULL, NULL, (void *) &data, 10, iters);
+    for (i = 1; i <= iters; i *= 2) {
         char name[64];
+        int divisible_iters;
         sprintf(name, "schnorrsig_batch_verify_%d", (int) i);
 
         data.n = i;
-        run_benchmark(name, bench_schnorrsig_verify_n, NULL, NULL, (void *) &data, 3, MAX_SIGS);
+        divisible_iters = iters - (iters % data.n);
+        run_benchmark(name, bench_schnorrsig_verify_n, NULL, NULL, (void *) &data, 3, divisible_iters);
     }
 
-    for (i = 0; i < MAX_SIGS; i++) {
+    for (i = 0; i < iters; i++) {
         free((void *)data.pk[i]);
         free((void *)data.msgs[i]);
         free((void *)data.sigs[i]);
