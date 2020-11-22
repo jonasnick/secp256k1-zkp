@@ -317,6 +317,26 @@ int secp256k1_ec_pubkey_serialize(const secp256k1_context* ctx, unsigned char *o
     return ret;
 }
 
+int secp256k1_ec_pubkey_cmp(const secp256k1_context* ctx, const secp256k1_pubkey* pubkey1, const secp256k1_pubkey* pubkey2) {
+    unsigned char out1[33];
+    unsigned char out2[33];
+    size_t out_size = sizeof(out1);
+    int check;
+
+    VERIFY_CHECK(ctx != NULL);
+    ARG_CHECK(pubkey1 != NULL);
+    ARG_CHECK(pubkey2 != NULL);
+
+    check = secp256k1_ec_pubkey_serialize(ctx, out1, &out_size, pubkey1, SECP256K1_EC_COMPRESSED);
+    VERIFY_CHECK(check == 1);
+    VERIFY_CHECK(out_size == sizeof(out1));
+    check = secp256k1_ec_pubkey_serialize(ctx, out2, &out_size, pubkey2, SECP256K1_EC_COMPRESSED);
+    VERIFY_CHECK(check == 1);
+    VERIFY_CHECK(out_size == sizeof(out1));
+
+    return secp256k1_memcmp_var(out1, out2, sizeof(out1));
+}
+
 static void secp256k1_ecdsa_signature_load(const secp256k1_context* ctx, secp256k1_scalar* r, secp256k1_scalar* s, const secp256k1_ecdsa_signature* sig) {
     (void)ctx;
     if (sizeof(secp256k1_scalar) == 32) {
