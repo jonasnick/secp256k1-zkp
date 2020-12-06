@@ -154,6 +154,7 @@ int secp256k1_ecdsa_anti_klepto_signer_commit(const secp256k1_context* ctx, secp
     secp256k1_gej rj;
     secp256k1_ge r;
     unsigned int count = 0;
+    int is_nonce_valid = 0;
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
@@ -163,9 +164,12 @@ int secp256k1_ecdsa_anti_klepto_signer_commit(const secp256k1_context* ctx, secp
     ARG_CHECK(rand_commitment32 != NULL);
 
     memset(nonce32, 0, 32);
-    while (!secp256k1_scalar_set_b32_seckey(&k, nonce32)) {
+    while (!is_nonce_valid) {
         /* cast to void* removes const qualifier, but secp256k1_nonce_function_default does not modify it */
         CHECK(secp256k1_nonce_function_default(nonce32, msg32, seckey32, NULL, (void*)rand_commitment32, count));
+        is_nonce_valid = secp256k1_scalar_set_b32_seckey(&k, nonce32);
+        /* The nonce is still secret here, but it being invalid is is less likely than 1:2^255. */
+        secp256k1_declassify(ctx, &is_nonce_valid, sizeof(is_nonce_valid));
         count++;
     }
 

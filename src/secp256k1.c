@@ -548,6 +548,7 @@ static int secp256k1_ecdsa_sign_inner(const secp256k1_context* ctx, secp256k1_sc
 
                 /* Tweak nonce with s2c commitment. */
                 ret = secp256k1_ec_commit_seckey(&non, &nonce_p, s2c_sha, s2c_data32, 32);
+                secp256k1_declassify(ctx, &ret, sizeof(ret)); /* may be secret that the tweak falied, but happens with negligible probability */
                 if (!ret) {
                     break;
                 }
