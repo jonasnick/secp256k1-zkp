@@ -87,6 +87,78 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_ecdsa_s2c_verify_commit
     const secp256k1_ecdsa_s2c_opening *opening
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
+
+/**** ECDSA Anti-Klepto Protocol ****
+ *
+ *  The ecdsa_anti_klepto_* functions can be used to prevent a signing device from
+ *  exfiltrating the secret signing keys through biased signature nonces. The general
+ *  idea is that a host provides additional randomness to the signing device client
+ *  and the client commits to the randomness in the nonce using sign-to-contract.
+ *
+ *  In order to ensure the host cannot trick the signing device into revealing its
+ *  keys, or the signing device to bias the nonce despite the host's contributions,
+ *  the host and client must engage in a commit-reveal protocol as follows:
+ *  1. The host draws randomness `rho` and computes a sha256 commitment to it using
+ *     `secp256k1_ecdsa_anti_klepto_host_commit`. It sends this to the signing device.
+ *  2. The signing device computes a public nonce `R` using the host's commitment
+ *     as auxiliary randomness, using `secp256k1_ecdsa_anti_klepto_signer_commit`.
+ *     The signing device sends the resulting `R` to the host as a s2c_opening.
+ *  3. The host replies with `rho` generated in step 1.
+ *  4. The device signs with `secp256k1_ecdsa_s2c_sign`, using `rho` as `s2c_data`,
+ *     and sends the signature to the host. (It can drop the `s2c_opening` that this
+ *     outputs since it will match the public nonce from step 2.)
+ *  5. The host verifies that the signature's public nonce matches the opening from
+ *     step 2 and its original randomness `rho`, using `secp256k1_ecdsa_s2c_verify_commit`.
+ *     If this fails, the protocol has failed and may be restarted with a fresh `rho`.
+ *
+ *  Rationale:
+ *      - The reason for having a host commitment is to allow the signing device to
+ *        deterministically derive a unique nonce even if the host restarts the protocol
+ *        using the same message and keys. Otherwise the signer might reuse the original
+ *        nonce in two iterations of the protocol with different `rho`, which leaks the
+ *        the secret key.
+ *      - The signer does not need to check that the host commitment matches the host's
+ *        claimed `rho`. Instead it re-derives the commitment (and its original `R`) from
+ *        the provided `rho`. If this differs from the original commitment, the result
+ *        will be an invalid `s2c_opening`, but since `R` was unique there is no risk to
+ *        the signer's secret keys. Because of this, the signing device does not need to
+ *        maintain any state about the progress of the protocol.
+ */
+
+/** Create the initial host commitment to `rho`. Part of the ECDSA Anti-Klepto Protocol.
+ *
+ *  Returns 1 on success, 0 on failure.
+ *  Args:              ctx: pointer to a context object (cannot be NULL)
+ *  Out: rand_commitment32: pointer to 32-byte array to store the returned commitment (cannot be NULL)
+ *  In:             rand32: the 32-byte randomness to commit to (cannot be NULL). It must come from
+ *                          a cryptographically secure RNG. As per the protocol, this value must not
+ *                          be revealed to the client until after the host has received the client
+ *                          commitment.
+ */
+SECP256K1_API int secp256k1_ecdsa_anti_klepto_host_commit(
+    secp256k1_context* ctx,
+    unsigned char* rand_commitment32,
+    const unsigned char* rand32
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
+/** Compute signer's original nonce. Part of the ECDSA Anti-Klepto Protocol.
+ *
+ *  Returns 1 on success, 0 on failure.
+ *  Args:           ctx: pointer to a context object, initialized for signing (cannot be NULL)
+ *  Out:    s2c_opening: pointer to an s2c_opening where the signer's public nonce will be
+ *                       placed. (cannot be NULL)
+ *  In:           msg32: the 32-byte message hash to be signed (cannot be NULL)
+ *             seckey32: the 32-byte secret key used for signing (cannot be NULL)
+ *    rand_commitment32: the 32-byte randomness commitment from the host (cannot be NULL)
+ */
+SECP256K1_API int secp256k1_ecdsa_anti_klepto_signer_commit(
+    const secp256k1_context* ctx,
+    secp256k1_ecdsa_s2c_opening* s2c_opening,
+    const unsigned char* msg32,
+    const unsigned char* seckey32,
+    const unsigned char* rand_commitment32
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
+
 #ifdef __cplusplus
 }
 #endif
