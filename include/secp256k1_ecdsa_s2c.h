@@ -3,6 +3,14 @@
 
 #include "secp256k1.h"
 
+/** This module implements the sign-to-contract scheme for ECDSA signatures, as
+ *  well as the "ECDSA Anti-Klepto Protocol" that is based on sign-to-contract
+ *  and is specified further down. The sign-to-contract scheme allows creating a
+ *  signature that also commits to some data. This works by offsetting the public
+ *  nonce point of the signature R by hash(R, data)*G where G is the secp256k1
+ *  group generator.
+ */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -88,12 +96,17 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_ecdsa_s2c_verify_commit
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
 
-/**** ECDSA Anti-Klepto Protocol ****
+/** ECDSA Anti-Klepto Protocol
  *
  *  The ecdsa_anti_klepto_* functions can be used to prevent a signing device from
  *  exfiltrating the secret signing keys through biased signature nonces. The general
  *  idea is that a host provides additional randomness to the signing device client
  *  and the client commits to the randomness in the nonce using sign-to-contract.
+ *
+ *  The following scheme is described by Stepan Snirigiv here:
+ *    https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2020-February/017655.html
+ *  and by Pieter Wuille (as "Scheme 6") here:
+ *    https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2020-March/017667.html
  *
  *  In order to ensure the host cannot trick the signing device into revealing its
  *  keys, or the signing device to bias the nonce despite the host's contributions,
@@ -109,7 +122,8 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_ecdsa_s2c_verify_commit
  *     outputs since it will match the public nonce from step 2.)
  *  5. The host verifies that the signature's public nonce matches the opening from
  *     step 2 and its original randomness `rho`, using `secp256k1_ecdsa_s2c_verify_commit`.
- *     If this fails, the protocol has failed and may be restarted with a fresh `rho`.
+ *     If this fails, it indicates a potentially serious problem with the hardware device,
+ *     and we strongly discourage its continued use.
  *
  *  Rationale:
  *      - The reason for having a host commitment is to allow the signing device to
