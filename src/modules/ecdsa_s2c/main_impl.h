@@ -130,7 +130,13 @@ int secp256k1_ecdsa_s2c_verify_commit(const secp256k1_context* ctx, const secp25
 
     secp256k1_fe_normalize(&commitment_ge.x);
     secp256k1_fe_get_b32(x_bytes, &commitment_ge.x);
-    secp256k1_scalar_set_b32(&x_scalar, x_bytes, NULL); /* If this were to overflow, the siganture would be invalid */
+    /* Do not check overflow; overflowing a scalar does not affect whether
+     * or not the R value is a cryptographic commitment, only whether it
+     * is a valid R value for an ECDSA signature. If users care about that
+     * they should use `ecdsa_verify` or `anti_klepto_host_verify`. In other
+     * words, this check would be (at best) unnecessary, and (at worst)
+     * insufficient. */
+    secp256k1_scalar_set_b32(&x_scalar, x_bytes, NULL);
     return secp256k1_scalar_eq(&sigr, &x_scalar);
 }
 
