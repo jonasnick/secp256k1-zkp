@@ -175,8 +175,39 @@ static void test_ecdsa_s2c_api(void) {
     CHECK(secp256k1_ecdsa_anti_klepto_signer_commit(sign, &s2c_opening, msg, sec, hostrand_commitment) == 1);
     CHECK(ecount == 6);
 
-    CHECK(secp256k1_ecdsa_s2c_sign(sign, &sig, &s2c_opening, msg, sec, hostrand) == 1);
-    CHECK(secp256k1_ecdsa_s2c_verify_commit(vrfy, &sig, hostrand, &s2c_opening) == 1);
+    ecount = 0;
+    CHECK(secp256k1_anti_klepto_sign(both, NULL, msg, sec, hostrand) == 0);
+    CHECK(ecount == 1);
+    CHECK(secp256k1_anti_klepto_sign(both, &sig, NULL, sec, hostrand) == 0);
+    CHECK(ecount == 2);
+    CHECK(secp256k1_anti_klepto_sign(both, &sig, msg, NULL, hostrand) == 0);
+    CHECK(ecount == 3);
+    CHECK(secp256k1_anti_klepto_sign(both, &sig, msg, sec, NULL) == 0);
+    CHECK(ecount == 4);
+    CHECK(secp256k1_anti_klepto_sign(none, &sig, msg, sec, hostrand) == 0);
+    CHECK(ecount == 5);
+    CHECK(secp256k1_anti_klepto_sign(vrfy, &sig, msg, sec, hostrand) == 0);
+    CHECK(ecount == 6);
+    CHECK(secp256k1_anti_klepto_sign(both, &sig, msg, sec, hostrand) == 1);
+    CHECK(ecount == 6);
+
+    ecount = 0;
+    CHECK(secp256k1_anti_klepto_host_verify(both, NULL, msg, &pk, hostrand, &s2c_opening) == 0);
+    CHECK(ecount == 1);
+    CHECK(secp256k1_anti_klepto_host_verify(both, &sig, NULL, &pk, hostrand, &s2c_opening) == 0);
+    CHECK(ecount == 2);
+    CHECK(secp256k1_anti_klepto_host_verify(both, &sig, msg, NULL, hostrand, &s2c_opening) == 0);
+    CHECK(ecount == 3);
+    CHECK(secp256k1_anti_klepto_host_verify(both, &sig, msg, &pk, NULL, &s2c_opening) == 0);
+    CHECK(ecount == 4);
+    CHECK(secp256k1_anti_klepto_host_verify(both, &sig, msg, &pk, hostrand, NULL) == 0);
+    CHECK(ecount == 5);
+    CHECK(secp256k1_anti_klepto_host_verify(none, &sig, msg, &pk, hostrand, &s2c_opening) == 0);
+    CHECK(ecount == 6);
+    CHECK(secp256k1_anti_klepto_host_verify(sign, &sig, msg, &pk, hostrand, &s2c_opening) == 0);
+    CHECK(ecount == 7);
+    CHECK(secp256k1_anti_klepto_host_verify(vrfy, &sig, msg, &pk, hostrand, &s2c_opening) == 1);
+    CHECK(ecount == 7);
 
     secp256k1_context_destroy(both);
     secp256k1_context_destroy(vrfy);
@@ -331,8 +362,10 @@ static void test_ecdsa_anti_klepto(void) {
     CHECK(secp256k1_ecdsa_anti_klepto_signer_commit(ctx, &s2c_opening, host_msg, signer_privkey, host_commitment) == 1);
     /* Protocol step 3: host_nonce_contribution send to signer to be used in step 4. */
     /* Protocol step 4. */
-    CHECK(secp256k1_ecdsa_s2c_sign(ctx, &signature, NULL, host_msg, signer_privkey, host_nonce_contribution) == 1);
+    CHECK(secp256k1_anti_klepto_sign(ctx, &signature, host_msg, signer_privkey, host_nonce_contribution) == 1);
     /* Protocol step 5. */
+    CHECK(secp256k1_anti_klepto_host_verify(ctx, &signature, host_msg, &signer_pubkey, host_nonce_contribution, &s2c_opening) == 1);
+    /* Protocol step 5 (explicitly) */
     CHECK(secp256k1_ecdsa_s2c_verify_commit(ctx, &signature, host_nonce_contribution, &s2c_opening) == 1);
     CHECK(secp256k1_ecdsa_verify(ctx, &signature, host_msg, &signer_pubkey) == 1);
 
@@ -345,10 +378,17 @@ static void test_ecdsa_anti_klepto(void) {
             sigbytes[i] += 1;
             CHECK(secp256k1_ecdsa_signature_parse_compact(ctx, &signature, sigbytes) == 1);
             CHECK(secp256k1_ecdsa_s2c_verify_commit(ctx, &signature, host_nonce_contribution, &s2c_opening) == 0);
+            CHECK(secp256k1_anti_klepto_host_verify(ctx, &signature, host_msg, &signer_pubkey, host_nonce_contribution, &s2c_opening) == 0);
             /* revert */
             sigbytes[i] -= 1;
         }
         CHECK(secp256k1_ecdsa_signature_parse_compact(ctx, &signature, sigbytes) == 1);
+    }
+    { /* host_verify: message does not match */
+        unsigned char bad_msg[32];
+        secp256k1_testrand256_test(bad_msg);
+        CHECK(secp256k1_anti_klepto_host_verify(ctx, &signature, host_msg, &signer_pubkey, host_nonce_contribution, &s2c_opening) == 1);
+        CHECK(secp256k1_anti_klepto_host_verify(ctx, &signature, bad_msg, &signer_pubkey, host_nonce_contribution, &s2c_opening) == 0);
     }
     { /* s2c_sign: host provided data that didn't match commitment */
         secp256k1_ecdsa_s2c_opening orig_opening = s2c_opening;
@@ -356,8 +396,8 @@ static void test_ecdsa_anti_klepto(void) {
         CHECK(secp256k1_ecdsa_s2c_sign(ctx, &signature, &s2c_opening, host_msg, signer_privkey, bad_nonce_contribution) == 1);
         /* good signature but the opening (original public nonce does not match the original */
         CHECK(secp256k1_ecdsa_verify(ctx, &signature, host_msg, &signer_pubkey) == 1);
-        CHECK(secp256k1_ecdsa_s2c_verify_commit(ctx, &signature, host_nonce_contribution, &s2c_opening) == 0);
-        CHECK(secp256k1_ecdsa_s2c_verify_commit(ctx, &signature, bad_nonce_contribution, &s2c_opening) == 1);
+        CHECK(secp256k1_anti_klepto_host_verify(ctx, &signature, host_msg, &signer_pubkey, host_nonce_contribution, &s2c_opening) == 0);
+        CHECK(secp256k1_anti_klepto_host_verify(ctx, &signature, host_msg, &signer_pubkey, bad_nonce_contribution, &s2c_opening) == 1);
         CHECK(memcmp(&s2c_opening, &orig_opening, sizeof(s2c_opening)) != 0);
     }
 }

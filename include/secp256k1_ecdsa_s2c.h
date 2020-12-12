@@ -117,11 +117,10 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_ecdsa_s2c_verify_commit
  *     as auxiliary randomness, using `secp256k1_ecdsa_anti_klepto_signer_commit`.
  *     The signing device sends the resulting `R` to the host as a s2c_opening.
  *  3. The host replies with `rho` generated in step 1.
- *  4. The device signs with `secp256k1_ecdsa_s2c_sign`, using `rho` as `s2c_data`,
- *     and sends the signature to the host. (It can drop the `s2c_opening` that this
- *     outputs since it will match the public nonce from step 2.)
+ *  4. The device signs with `secp256k1_anti_klepto_sign`, using `rho` as `host_data32`,
+ *     and sends the signature to the host.
  *  5. The host verifies that the signature's public nonce matches the opening from
- *     step 2 and its original randomness `rho`, using `secp256k1_ecdsa_s2c_verify_commit`.
+ *     step 2 and its original randomness `rho`, using `secp256k1_anti_klepto_host_verify`.
  *     End users should be advised that if this fails a noticeable proportion of the time
  *     (say, more than a few times in the device's lifetime, absent obvious connectivity
  *     problems), it indicates a serious problem with the device, which should probably
@@ -174,6 +173,45 @@ SECP256K1_API int secp256k1_ecdsa_anti_klepto_signer_commit(
     const unsigned char* seckey32,
     const unsigned char* rand_commitment32
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
+
+/** Same as secp256k1_ecdsa_sign, but commits to host randomness in the nonce. Part of the
+ *  ECDSA Anti-Klepto Protocol.
+ *
+ *  Returns: 1: signature created
+ *           0: the nonce generation function failed, or the private key was invalid.
+ *  Args:    ctx:  pointer to a context object, initialized for signing (cannot be NULL)
+ *  Out:     sig:  pointer to an array where the signature will be placed (cannot be NULL)
+ *  In:    msg32: the 32-byte message hash being signed (cannot be NULL)
+ *        seckey: pointer to a 32-byte secret key (cannot be NULL)
+ *   host_data32: pointer to 32-byte host-provided randomness (cannot be NULL)
+ */
+SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_anti_klepto_sign(
+    const secp256k1_context* ctx,
+    secp256k1_ecdsa_signature* sig,
+    const unsigned char* msg32,
+    const unsigned char* seckey,
+    const unsigned char* host_data32
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
+
+/** Verify a signature was correctly constructed using the ECDSA Anti-Klepto Protocol.
+ *
+ *  Returns: 1: the signature is valid and contains a commitment to host_data32
+ *           0: incorrect opening
+ *  Args:    ctx: a secp256k1 context object, initialized for verification.
+ *  In:      sig: the signature produced by the signer (cannot be NULL)
+ *     msghash32: the 32-byte message hash being verified (cannot be NULL)
+ *        pubkey: pointer to the signer's public key (cannot be NULL)
+ *   host_data32: the 32-byte data provided by the host (cannot be NULL)
+ *       opening: the s2c opening provided by the signer (cannot be NULL)
+ */
+SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_anti_klepto_host_verify(
+    const secp256k1_context* ctx,
+    const secp256k1_ecdsa_signature *sig,
+    const unsigned char *msg32,
+    const secp256k1_pubkey *pubkey,
+    const unsigned char *host_data32,
+    const secp256k1_ecdsa_s2c_opening *opening
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6);
 
 #ifdef __cplusplus
 }

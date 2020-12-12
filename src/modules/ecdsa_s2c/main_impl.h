@@ -181,4 +181,13 @@ int secp256k1_ecdsa_anti_klepto_signer_commit(const secp256k1_context* ctx, secp
     return 1;
 }
 
+int secp256k1_anti_klepto_sign(const secp256k1_context* ctx, secp256k1_ecdsa_signature* sig, const unsigned char* msg32, const unsigned char* seckey, const unsigned char* host_data32) {
+    return secp256k1_ecdsa_s2c_sign(ctx, sig, NULL, msg32, seckey, host_data32);
+}
+
+int secp256k1_anti_klepto_host_verify(const secp256k1_context* ctx, const secp256k1_ecdsa_signature *sig, const unsigned char *msg32, const secp256k1_pubkey *pubkey, const unsigned char *host_data32, const secp256k1_ecdsa_s2c_opening *opening) {
+    return secp256k1_ecdsa_s2c_verify_commit(ctx, sig, host_data32, opening) &&
+        secp256k1_ecdsa_verify(ctx, sig, msg32, pubkey);
+}
+
 #endif /* SECP256K1_ECDSA_S2C_MAIN_H */
