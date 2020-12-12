@@ -122,8 +122,10 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_ecdsa_s2c_verify_commit
  *     outputs since it will match the public nonce from step 2.)
  *  5. The host verifies that the signature's public nonce matches the opening from
  *     step 2 and its original randomness `rho`, using `secp256k1_ecdsa_s2c_verify_commit`.
- *     If this fails, it indicates a potentially serious problem with the hardware device,
- *     and we strongly discourage its continued use.
+ *     End users should be advised that if this fails a noticeable proportion of the time
+ *     (say, more than a few times in the device's lifetime, absent obvious connectivity
+ *     problems), it indicates a serious problem with the device, which should probably
+ *     be securely destroyed.
  *
  *  Rationale:
  *      - The reason for having a host commitment is to allow the signing device to
