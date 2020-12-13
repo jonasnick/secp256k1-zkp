@@ -103,7 +103,7 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_ecdsa_s2c_verify_commit
  *  idea is that a host provides additional randomness to the signing device client
  *  and the client commits to the randomness in the nonce using sign-to-contract.
  *
- *  The following scheme is described by Stepan Snirigiv here:
+ *  The following scheme is described by Stepan Snigirev here:
  *    https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2020-February/017655.html
  *  and by Pieter Wuille (as "Scheme 6") here:
  *    https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2020-March/017667.html
