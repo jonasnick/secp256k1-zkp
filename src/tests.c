@@ -2625,11 +2625,11 @@ void test_ec_commit(void) {
 
     /* Commit to data and verify */
     secp256k1_sha256_initialize(&sha);
-    CHECK(secp256k1_ec_commit(&ctx->ecmult_ctx, &commitment, &pubkey, &sha, data, 32));
+    CHECK(secp256k1_ec_commit(&ctx->ecmult_ctx, &commitment, &pubkey, &sha, data, 32) == 1);
     secp256k1_sha256_initialize(&sha);
-    CHECK(secp256k1_ec_commit_verify(&ctx->ecmult_ctx, &commitment, &pubkey, &sha, data, 32));
+    CHECK(secp256k1_ec_commit_verify(&ctx->ecmult_ctx, &commitment, &pubkey, &sha, data, 32) == 1);
     secp256k1_sha256_initialize(&sha);
-    CHECK(secp256k1_ec_commit_seckey(&seckey_s, &pubkey, &sha, data, 32));
+    CHECK(secp256k1_ec_commit_seckey(&seckey_s, &pubkey, &sha, data, 32) == 1);
     secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &pubkeyj, &seckey_s);
     ge_equals_gej(&commitment, &pubkeyj);
 

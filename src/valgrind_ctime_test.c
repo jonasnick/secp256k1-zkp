@@ -158,8 +158,8 @@ int main(void) {
 
 #ifdef ENABLE_MODULE_ECDSA_S2C
     {
-        unsigned char s2c_data[32];
-        unsigned char s2c_data_comm[32];
+        unsigned char s2c_data[32] = {0};
+        unsigned char s2c_data_comm[32] = {0};
         secp256k1_ecdsa_s2c_opening s2c_opening;
 
         VALGRIND_MAKE_MEM_UNDEFINED(key, 32);

@@ -517,7 +517,8 @@ static int secp256k1_ecdsa_sign_inner(const secp256k1_context* ctx, secp256k1_sc
     }
     /* sign-to-contract commitments only work with the default nonce function,
      * because we need to ensure that s2c_data is actually hashed into the nonce and
-     * not just ignored. */
+     * not just ignored. Otherwise an attacker can exfiltrate the secret key by
+     * signing the same message twice with different commitments. */
     VERIFY_CHECK(s2c_data32 == NULL || noncefp == secp256k1_nonce_function_default);
 
     /* Fail if the secret key is invalid. */
@@ -536,7 +537,7 @@ static int secp256k1_ecdsa_sign_inner(const secp256k1_context* ctx, secp256k1_sc
         if (is_nonce_valid) {
             if (s2c_data32 != NULL) {
                 secp256k1_gej nonce_pj;
-		secp256k1_ge nonce_p;
+                secp256k1_ge nonce_p;
 
                 /* Compute original nonce commitment/pubkey */
                 secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &nonce_pj, &non);

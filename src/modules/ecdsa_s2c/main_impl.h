@@ -70,7 +70,6 @@ int secp256k1_ecdsa_s2c_sign(const secp256k1_context* ctx, secp256k1_ecdsa_signa
     secp256k1_scalar r, s;
     int ret;
     unsigned char ndata[32];
-    const unsigned char* noncedata = NULL;
     secp256k1_sha256 s2c_sha;
 
     VERIFY_CHECK(ctx != NULL);
@@ -81,16 +80,15 @@ int secp256k1_ecdsa_s2c_sign(const secp256k1_context* ctx, secp256k1_ecdsa_signa
     ARG_CHECK(s2c_data32 != NULL);
 
     /* Provide `s2c_data32` to the nonce function as additional data to
-     * derive the nonce It is first hashed because it should be possible
+     * derive the nonce. It is first hashed because it should be possible
      * to derive nonces even if only a SHA256 commitment to the data is
      * known.  This is important in the ECDSA anti-klepto protocol. */
     secp256k1_s2c_ecdsa_data_sha256_tagged(&s2c_sha);
     secp256k1_sha256_write(&s2c_sha, s2c_data32, 32);
     secp256k1_sha256_finalize(&s2c_sha, ndata);
-    noncedata = ndata;
 
     secp256k1_s2c_ecdsa_point_sha256_tagged(&s2c_sha);
-    ret = secp256k1_ecdsa_sign_inner(ctx, &r, &s, NULL, &s2c_sha, s2c_opening, s2c_data32, msg32, seckey, NULL, noncedata);
+    ret = secp256k1_ecdsa_sign_inner(ctx, &r, &s, NULL, &s2c_sha, s2c_opening, s2c_data32, msg32, seckey, NULL, ndata);
     secp256k1_scalar_cmov(&r, &secp256k1_scalar_zero, !ret);
     secp256k1_scalar_cmov(&s, &secp256k1_scalar_zero, !ret);
     secp256k1_ecdsa_signature_save(signature, &r, &s);
@@ -141,7 +139,7 @@ int secp256k1_ecdsa_s2c_verify_commit(const secp256k1_context* ctx, const secp25
 }
 
 /*** anti-klepto ***/
-int secp256k1_ecdsa_anti_klepto_host_commit(secp256k1_context* ctx, unsigned char* rand_commitment32, const unsigned char* rand32) {
+int secp256k1_ecdsa_anti_klepto_host_commit(const secp256k1_context* ctx, unsigned char* rand_commitment32, const unsigned char* rand32) {
     secp256k1_sha256 sha;
 
     VERIFY_CHECK(ctx != NULL);

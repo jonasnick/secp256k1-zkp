@@ -1,5 +1,5 @@
 /**********************************************************************
- * Copyright (c) 2020 The libsecp256k1 Developers                     *
+ * Copyright (c) 2020 The libsecp256k1-zkp Developers                 *
  * Distributed under the MIT software license, see the accompanying   *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/

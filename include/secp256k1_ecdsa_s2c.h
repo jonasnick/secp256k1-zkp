@@ -31,8 +31,8 @@ typedef struct {
 
 /** Parse a sign-to-contract opening.
  *
- *  Returns: 1 if the opening was fully valid.
- *           0 if the opening could not be parsed or is invalid.
+ *  Returns: 1 if the opening could be parsed
+ *           0 if the opening could not be parsed
  *  Args:    ctx: a secp256k1 context object.
  *  Out: opening: pointer to an opening object. If 1 is returned, it is set to a
  *                parsed version of input. If not, its value is unspecified.
@@ -81,7 +81,8 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_ecdsa_s2c_sign(
 
 /** Verify a sign-to-contract commitment.
  *
- *  Returns: 1: the signature contains a commitment to data32
+ *  Returns: 1: the signature contains a commitment to data32 (though it does
+ *              not necessarily need to be a valid siganture!)
  *           0: incorrect opening
  *  Args:    ctx: a secp256k1 context object, initialized for verification.
  *  In:      sig: the signature containing the sign-to-contract commitment (cannot be NULL)
@@ -121,7 +122,8 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_ecdsa_s2c_verify_commit
  *     and sends the signature to the host.
  *  5. The host verifies that the signature's public nonce matches the opening from
  *     step 2 and its original randomness `rho`, using `secp256k1_anti_klepto_host_verify`.
- *     End users should be advised that if this fails a noticeable proportion of the time
+ *     End users should be advised that if this fails (either the verification, or if
+ *     the hardware device simply does not reply) a noticeable proportion of the time
  *     (say, more than a few times in the device's lifetime, absent obvious connectivity
  *     problems), it indicates a serious problem with the device, which should probably
  *     be securely destroyed.
@@ -151,7 +153,7 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_ecdsa_s2c_verify_commit
  *                          commitment.
  */
 SECP256K1_API int secp256k1_ecdsa_anti_klepto_host_commit(
-    secp256k1_context* ctx,
+    const secp256k1_context* ctx,
     unsigned char* rand_commitment32,
     const unsigned char* rand32
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
