@@ -17,10 +17,14 @@ static int secp256k1_ec_pubkey_tweak_add_helper(const secp256k1_ecmult_context* 
 static void secp256k1_ec_commit_tweak(unsigned char *tweak32, secp256k1_ge* pubp, secp256k1_sha256* sha, const unsigned char *data, size_t data_size)
 {
     unsigned char rbuf[33];
-    size_t rbuf_size = sizeof(rbuf);
-    secp256k1_eckey_pubkey_serialize(pubp, rbuf, &rbuf_size, 1);
 
-    secp256k1_sha256_write(sha, rbuf, rbuf_size);
+    /* secp256k1_eckey_pubkey_serialize is not constant-time */
+    secp256k1_fe_normalize(&pubp->x);
+    secp256k1_fe_normalize(&pubp->y);
+    rbuf[0] = 2 + secp256k1_fe_is_odd(&pubp->y);
+    secp256k1_fe_get_b32(&rbuf[1], &pubp->x);
+
+    secp256k1_sha256_write(sha, rbuf, sizeof(rbuf));
     secp256k1_sha256_write(sha, data, data_size);
     secp256k1_sha256_finalize(sha, tweak32);
 }

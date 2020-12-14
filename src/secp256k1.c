@@ -542,7 +542,6 @@ static int secp256k1_ecdsa_sign_inner(const secp256k1_context* ctx, secp256k1_sc
                 /* Compute original nonce commitment/pubkey */
                 secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &nonce_pj, &non);
                 secp256k1_ge_set_gej(&nonce_p, &nonce_pj);
-                secp256k1_declassify(ctx, &nonce_p, sizeof(nonce_p)); /* a public nonce is not a secret */
                 if (s2c_opening != NULL) {
                     secp256k1_ecdsa_s2c_opening_save(s2c_opening, &nonce_p);
                 }
