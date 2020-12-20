@@ -117,16 +117,28 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_ecdsa_s2c_verify_commit
  *  2. The signing device computes a public nonce `R` using the host's commitment
  *     as auxiliary randomness, using `secp256k1_ecdsa_anti_klepto_signer_commit`.
  *     The signing device sends the resulting `R` to the host as a s2c_opening.
+ *
+ *     If, at any point from this step onward, the hardware device fails, it is
+ *     okay to restart the protocol using **exactly the same `rho`** and checking
+ *     that the hardware device proposes **exactly the same** `R`. Otherwise, the
+ *     hardware device may be selectively aborting and thereby biasing the set of
+ *     nonces that are used in actual signatures.
+ *
+ *     It takes many (>100) such aborts before there is a plausible attack, given
+ *     current knowledge in 2020. However such aborts accumulate even across a total
+ *     replacement of all relevant devices (but not across replacement of the actual
+ *     signing keys with new independently random ones).
+ *
+ *     In case the hardware device cannot be made to sign with the given `rho`, `R`
+ *     pair, wallet authors should alert the user and present a very scary message
+ *     implying that if this happens more than even a few times, say 20 or more times
+ *     EVER, they should change hardware vendors and perhaps sweep their coins.
+ *
  *  3. The host replies with `rho` generated in step 1.
  *  4. The device signs with `secp256k1_anti_klepto_sign`, using `rho` as `host_data32`,
  *     and sends the signature to the host.
  *  5. The host verifies that the signature's public nonce matches the opening from
  *     step 2 and its original randomness `rho`, using `secp256k1_anti_klepto_host_verify`.
- *     End users should be advised that if this fails (either the verification, or if
- *     the hardware device simply does not reply) a noticeable proportion of the time
- *     (say, more than a few times in the device's lifetime, absent obvious connectivity
- *     problems), it indicates a serious problem with the device, which should probably
- *     be securely destroyed.
  *
  *  Rationale:
  *      - The reason for having a host commitment is to allow the signing device to
