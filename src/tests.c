@@ -2636,6 +2636,16 @@ void test_ec_commit(void) {
     /* Check that verification fails with different data */
     secp256k1_sha256_initialize(&sha);
     CHECK(secp256k1_ec_commit_verify(&ctx->ecmult_ctx, &commitment, &pubkey, &sha, data, 31) == 0);
+
+    /* Check that commmitting fails when the inner pubkey is the point at
+     * infinity */
+    secp256k1_sha256_initialize(&sha);
+    secp256k1_ge_set_infinity(&pubkey);
+    CHECK(secp256k1_ec_commit(&ctx->ecmult_ctx, &commitment, &pubkey, &sha, data, 32) == 0);
+    secp256k1_scalar_set_int(&seckey_s, 0);
+    CHECK(secp256k1_ec_commit_seckey(&seckey_s, &pubkey, &sha, data, 32) == 0);
+    CHECK(secp256k1_ec_commit_verify(&ctx->ecmult_ctx, &commitment, &pubkey, &sha, data, 32) == 0);
+
 }
 
 void test_ec_commit_api(void) {
