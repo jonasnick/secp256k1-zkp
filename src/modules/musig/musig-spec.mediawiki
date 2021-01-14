@@ -73,7 +73,7 @@ The algorithm ''HashKeys(pk<sub>1..u</sub>)'' is defined as:
 * Return ''hash(pk<sub>1</sub> || pk<sub>2</sub> || ... || pk<sub>u</sub>)''
 
 The algorithm ''ComputeCoefficient(L, idx)'' is defined as:
-* Return ''int(hash<sub>MuSig coefficient</sub>(L || reverse(bytes(idx)[28:32])))) mod n''
+* Return ''int(hash<sub>MuSig coefficient</sub>(L || bytes(idx)[28:32])) mod n''
 
 == Applications ==
 

@@ -45,7 +45,7 @@ static void secp256k1_musig_sha256_init_tagged(secp256k1_sha256 *sha) {
     sha->bytes = 64;
 }
 
-/* Compute r = SHA256(ell, idx). The four bytes of idx are serialized least significant byte first. */
+/* Compute r = SHA256(ell, idx). The four bytes of idx are serialized most significant byte first. */
 static void secp256k1_musig_coefficient(secp256k1_scalar *r, const unsigned char *ell, uint32_t idx) {
     secp256k1_sha256 sha;
     unsigned char buf[32];
@@ -65,10 +65,10 @@ static void secp256k1_musig_coefficient(secp256k1_scalar *r, const unsigned char
      * equivalent to hashing the public key. Because the public key can be
      * identified by the index given the ordered list of public keys (included in
      * ell), the index is just a different encoding of the public key.*/
-    for (i = 0; i < sizeof(uint32_t); i++) {
-        unsigned char c = idx;
+    VERIFY_CHECK(sizeof(idx) == 4);
+    for (i = 0; i < 4; i++) {
+        unsigned char c = idx >> 8*(3-i);
         secp256k1_sha256_write(&sha, &c, 1);
-        idx >>= 8;
     }
     secp256k1_sha256_finalize(&sha, buf);
     secp256k1_scalar_set_b32(r, buf, NULL);
