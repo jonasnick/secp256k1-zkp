@@ -65,10 +65,10 @@ void musig_simple_test(secp256k1_scratch_space *scratch) {
     CHECK(secp256k1_musig_session_combine_nonces(ctx, &session[1], signer1, 2, NULL, NULL) == 1);
 
     CHECK(secp256k1_musig_partial_sign(ctx, &session[0], &partial_sig[0]) == 1);
-    CHECK(secp256k1_musig_partial_sig_verify(ctx, &session[0], &signer0[0], &partial_sig[0], &pk[0]) == 1);
+    CHECK(secp256k1_musig_partial_sig_verify(ctx, &session[0], &signer0[0], &partial_sig[0], &pk[signer0[0].index]) == 1);
     CHECK(secp256k1_musig_partial_sign(ctx, &session[1], &partial_sig[1]) == 1);
-    CHECK(secp256k1_musig_partial_sig_verify(ctx, &session[0], &signer0[1], &partial_sig[1], &pk[1]) == 1);
-    CHECK(secp256k1_musig_partial_sig_verify(ctx, &session[1], &signer1[1], &partial_sig[1], &pk[1]) == 1);
+    CHECK(secp256k1_musig_partial_sig_verify(ctx, &session[0], &signer0[1], &partial_sig[1], &pk[signer0[1].index]) == 1);
+    CHECK(secp256k1_musig_partial_sig_verify(ctx, &session[1], &signer1[1], &partial_sig[1], &pk[signer1[1].index]) == 1);
 
     CHECK(secp256k1_musig_partial_sig_combine(ctx, &session[0], final_sig, partial_sig, 2) == 1);
     CHECK(secp256k1_schnorrsig_verify(ctx, final_sig, msg, &combined_pk) == 1);
@@ -388,34 +388,34 @@ void musig_api_tests(secp256k1_scratch_space *scratch) {
 
     /** Partial signature verification */
     ecount = 0;
-    CHECK(secp256k1_musig_partial_sig_verify(none, &session[0], &signer0[0], &partial_sig[0], &pk[0]) == 0);
+    CHECK(secp256k1_musig_partial_sig_verify(none, &session[0], &signer0[0], &partial_sig[0], &pk[signer0[0].index]) == 0);
     CHECK(ecount == 1);
-    CHECK(secp256k1_musig_partial_sig_verify(sign, &session[0], &signer0[0], &partial_sig[0], &pk[0]) == 0);
+    CHECK(secp256k1_musig_partial_sig_verify(sign, &session[0], &signer0[0], &partial_sig[0], &pk[signer0[0].index]) == 0);
     CHECK(ecount == 2);
-    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &session[0], &signer0[0], &partial_sig[0], &pk[0]) == 1);
+    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &session[0], &signer0[0], &partial_sig[0], &pk[signer0[0].index]) == 1);
     CHECK(ecount == 2);
-    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &session[0], &signer0[0], &partial_sig[1], &pk[0]) == 0);
+    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &session[0], &signer0[0], &partial_sig[1], &pk[signer0[0].index]) == 0);
     CHECK(ecount == 2);
-    CHECK(secp256k1_musig_partial_sig_verify(vrfy, NULL, &signer0[0], &partial_sig[0], &pk[0]) == 0);
+    CHECK(secp256k1_musig_partial_sig_verify(vrfy, NULL, &signer0[0], &partial_sig[0], &pk[signer0[0].index]) == 0);
     CHECK(ecount == 3);
     /* Unitialized session */
-    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &session_uninitialized, &signer0[0], &partial_sig[0], &pk[0]) == 0);
+    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &session_uninitialized, &signer0[0], &partial_sig[0], &pk[signer0[0].index]) == 0);
     CHECK(ecount == 4);
-    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &session[0], NULL, &partial_sig[0], &pk[0]) == 0);
+    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &session[0], NULL, &partial_sig[0], &pk[signer0[0].index]) == 0);
     CHECK(ecount == 5);
-    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &session[0], &signer0[0], NULL, &pk[0]) == 0);
+    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &session[0], &signer0[0], NULL, &pk[signer0[0].index]) == 0);
     CHECK(ecount == 6);
-    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &session[0], &signer0[0], &partial_sig_overflow, &pk[0]) == 0);
+    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &session[0], &signer0[0], &partial_sig_overflow, &pk[signer0[0].index]) == 0);
     CHECK(ecount == 6);
     CHECK(secp256k1_musig_partial_sig_verify(vrfy, &session[0], &signer0[0], &partial_sig[0], NULL) == 0);
     CHECK(ecount == 7);
 
-    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &session[0], &signer0[0], &partial_sig[0], &pk[0]) == 1);
-    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &session[1], &signer1[0], &partial_sig[0], &pk[0]) == 1);
+    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &session[0], &signer0[0], &partial_sig[0], &pk[signer0[0].index]) == 1);
+    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &session[1], &signer1[0], &partial_sig[0], &pk[signer0[0].index]) == 1);
     CHECK(secp256k1_musig_partial_sig_verify(vrfy, &session[0], &signer0[1], &partial_sig[1], &pk[1]) == 1);
     CHECK(secp256k1_musig_partial_sig_verify(vrfy, &session[1], &signer1[1], &partial_sig[1], &pk[1]) == 1);
-    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &verifier_session, &verifier_signer_data[0], &partial_sig[0], &pk[0]) == 1);
-    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &verifier_session, &verifier_signer_data[1], &partial_sig[1], &pk[1]) == 1);
+    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &verifier_session, &verifier_signer_data[0], &partial_sig[0], &pk[verifier_signer_data[0].index]) == 1);
+    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &verifier_session, &verifier_signer_data[1], &partial_sig[1], &pk[verifier_signer_data[1].index]) == 1);
     CHECK(ecount == 7);
 
     /** Adaptor signature verification */
@@ -613,7 +613,7 @@ void musig_state_machine_late_msg_test(secp256k1_xonly_pubkey *pks, secp256k1_mu
     CHECK(secp256k1_musig_set_nonce(ctx, &signers[1], nonce) == 1);
     CHECK(secp256k1_musig_session_combine_nonces(ctx, &session, signers, 2, NULL, NULL) == 1);
     CHECK(secp256k1_musig_partial_sign(ctx, &session, &partial_sig));
-    CHECK(secp256k1_musig_partial_sig_verify(ctx, &session, &signers[1], &partial_sig, &pks[1]));
+    CHECK(secp256k1_musig_partial_sig_verify(ctx, &session, &signers[1], &partial_sig, &pks[signers[1].index]));
     secp256k1_context_destroy(ctx_tmp);
 }
 
@@ -696,7 +696,7 @@ void musig_state_machine_tests(secp256k1_scratch_space *scratch) {
         CHECK(secp256k1_musig_partial_sign(ctx, &session[0], &partial_sig[0]) == 1);
         /* Can't verify, sign or combine signatures until nonce is combined */
         ecount = 0;
-        CHECK(secp256k1_musig_partial_sig_verify(ctx_tmp, &session[1], &signers1[0], &partial_sig[0], &pk[0]) == 0);
+        CHECK(secp256k1_musig_partial_sig_verify(ctx_tmp, &session[1], &signers1[0], &partial_sig[0], &pk[signers1[0].index]) == 0);
         CHECK(ecount == 1);
         CHECK(secp256k1_musig_partial_sign(ctx_tmp, &session[1], &partial_sig[1]) == 0);
         CHECK(ecount == 2);
@@ -705,7 +705,7 @@ void musig_state_machine_tests(secp256k1_scratch_space *scratch) {
         CHECK(ecount == 3);
 
         CHECK(secp256k1_musig_session_combine_nonces(ctx, &session[1], signers1, 2, NULL, NULL) == 1);
-        CHECK(secp256k1_musig_partial_sig_verify(ctx, &session[1], &signers1[0], &partial_sig[0], &pk[0]) == 1);
+        CHECK(secp256k1_musig_partial_sig_verify(ctx, &session[1], &signers1[0], &partial_sig[0], &pk[signers1[0].index]) == 1);
         /* messagehash should be the same as a session whose get_public_nonce was called
          * with different signers (i.e. they diff in public keys). This is because the
          * public keys of the signers is set in stone when initializing the session. */
@@ -714,9 +714,9 @@ void musig_state_machine_tests(secp256k1_scratch_space *scratch) {
         CHECK(memcmp(msghash1, msghash2, 32) == 0);
         CHECK(secp256k1_musig_partial_sign(ctx, &session[1], &partial_sig[1]) == 1);
 
-        CHECK(secp256k1_musig_partial_sig_verify(ctx, &session[1], &signers1[1], &partial_sig[1], &pk[1]) == 1);
+        CHECK(secp256k1_musig_partial_sig_verify(ctx, &session[1], &signers1[1], &partial_sig[1], &pk[signers1[1].index]) == 1);
         /* Wrong signature */
-        CHECK(secp256k1_musig_partial_sig_verify(ctx, &session[1], &signers1[1], &partial_sig[0], &pk[1]) == 0);
+        CHECK(secp256k1_musig_partial_sig_verify(ctx, &session[1], &signers1[1], &partial_sig[0], &pk[signers1[1].index]) == 0);
         /* Can't get the public nonce until msg is set */
         musig_state_machine_late_msg_test(pk, &pre_session, nonce_commitment[0], nonce[0], sk[1], session_id[1], msg);
     }
@@ -808,8 +808,8 @@ void scriptless_atomic_swap(secp256k1_scratch_space *scratch) {
 
     /* Step 4: Signer 1 receives partial signatures, verifies them and creates a
      * partial signature to send B-coins to signer 0. */
-    CHECK(secp256k1_musig_partial_sig_verify(ctx, &musig_session_a[1], data_a, &partial_sig_a[0], &pk_a[0]) == 1);
-    CHECK(secp256k1_musig_partial_sig_verify(ctx, &musig_session_b[1], data_b, &partial_sig_b[0], &pk_b[0]) == 1);
+    CHECK(secp256k1_musig_partial_sig_verify(ctx, &musig_session_a[1], data_a, &partial_sig_a[0], &pk_a[data_a[0].index]) == 1);
+    CHECK(secp256k1_musig_partial_sig_verify(ctx, &musig_session_b[1], data_b, &partial_sig_b[0], &pk_b[data_b[0].index]) == 1);
     CHECK(secp256k1_musig_partial_sign(ctx, &musig_session_b[1], &partial_sig_b[1]));
 
     /* Step 5: Signer 0 adapts its own partial signature and combines it with the
@@ -899,8 +899,8 @@ void musig_tweak_test_helper(const secp256k1_xonly_pubkey* combined_pubkey, cons
     CHECK(secp256k1_musig_session_combine_nonces(ctx, &session[1], signers1, 2, NULL, NULL) == 1);
     CHECK(secp256k1_musig_partial_sign(ctx, &session[0], &partial_sig[0]) == 1);
     CHECK(secp256k1_musig_partial_sign(ctx, &session[1], &partial_sig[1]) == 1);
-    CHECK(secp256k1_musig_partial_sig_verify(ctx, &session[0], &signers0[1], &partial_sig[1], &pk[1]) == 1);
-    CHECK(secp256k1_musig_partial_sig_verify(ctx, &session[1], &signers1[0], &partial_sig[0], &pk[0]) == 1);
+    CHECK(secp256k1_musig_partial_sig_verify(ctx, &session[0], &signers0[1], &partial_sig[1], &pk[signers0[1].index]) == 1);
+    CHECK(secp256k1_musig_partial_sig_verify(ctx, &session[1], &signers1[0], &partial_sig[0], &pk[signers1[0].index]) == 1);
     CHECK(secp256k1_musig_partial_sig_combine(ctx, &session[0], final_sig, partial_sig, 2));
     CHECK(secp256k1_schnorrsig_verify(ctx, final_sig, msg, combined_pubkey) == 1);
 }
@@ -997,6 +997,82 @@ void musig_test_vectors(void) {
     CHECK(memcmp(combined_pk_ser, combined_pk_expected, sizeof(combined_pk_ser)) == 0);
 }
 
+void musig_sort_test_helper(secp256k1_xonly_pubkey *pk, size_t *pk_order, size_t n_pk) {
+    size_t i;
+    secp256k1_xonly_pubkey pk_test[5];
+    secp256k1_musig_session_signer_data signers[5];
+
+    for (i = 0; i < n_pk; i++) {
+        pk_test[i] = pk[pk_order[i]];
+    }
+    secp256k1_musig_signers_init(signers, n_pk, 1);
+    sort_pubkeys(pk_test, n_pk, signers);
+    for (i = 0; i < n_pk; i++) {
+        CHECK(memcmp(&pk_test[i], &pk[i], sizeof(pk_test[i])) == 0);
+        CHECK(signers[i].index == pk_order[i]);
+    }
+}
+
+void permute(size_t *arr, size_t n) {
+    size_t i;
+    for (i = n - 1; i >= 1; i--) {
+        size_t tmp, j;
+        j = secp256k1_testrand_int(i + 1);
+        tmp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = tmp;
+    }
+}
+
+void musig_sort_test(void) {
+    secp256k1_xonly_pubkey combined_pk;
+    secp256k1_xonly_pubkey pk[5];
+    unsigned char pk_ser[5][32];
+    int i;
+    size_t pk_order[5] = { 0, 1, 2, 3, 4 };
+
+    for (i = 0; i < 5; i++) {
+        memset(pk_ser[i], 0, sizeof(pk_ser[i]));
+    }
+    pk_ser[0][0] = 5;
+    pk_ser[1][0] = 8;
+    pk_ser[2][0] = 0x0a;
+    pk_ser[3][0] = 0x0b;
+    pk_ser[4][0] = 0x0c;
+    for (i = 0; i < 5; i++) {
+        CHECK(secp256k1_xonly_pubkey_parse(ctx, &pk[i], pk_ser[i]));
+    }
+
+    permute(pk_order, 1);
+    musig_sort_test_helper(pk, pk_order, 1);
+    permute(pk_order, 2);
+    musig_sort_test_helper(pk, pk_order, 2);
+    permute(pk_order, 3);
+    musig_sort_test_helper(pk, pk_order, 3);
+    for (i = 0; i < count; i++) {
+        permute(pk_order, 4);
+        musig_sort_test_helper(pk, pk_order, 4);
+    }
+    for (i = 0; i < count; i++) {
+        permute(pk_order, 5);
+        musig_sort_test_helper(pk, pk_order, 5);
+    }
+
+    CHECK(secp256k1_musig_pubkey_combine(ctx, NULL, &combined_pk, NULL, NULL, pk, 5) == 1);
+    for (i = 0; i < count; i++) {
+        secp256k1_xonly_pubkey combined_pk_tmp;
+        secp256k1_xonly_pubkey pk_test[5];
+        int j;
+        permute(pk_order, 5);
+        for (j = 0; j < 5; j++) {
+            pk_test[j] = pk[pk_order[j]];
+        }
+        CHECK(secp256k1_musig_pubkey_combine(ctx, NULL, &combined_pk_tmp, NULL, NULL, pk_test, 5) == 1);
+        CHECK(memcmp(&combined_pk, &combined_pk_tmp, sizeof(combined_pk)) == 0);
+    }
+
+}
+
 void run_musig_tests(void) {
     int i;
     secp256k1_scratch_space *scratch = secp256k1_scratch_space_create(ctx, 1024 * 1024);
@@ -1014,6 +1090,8 @@ void run_musig_tests(void) {
     }
     sha256_tag_test();
     musig_test_vectors();
+
+    musig_sort_test();
 
     secp256k1_scratch_space_destroy(ctx, scratch);
 }

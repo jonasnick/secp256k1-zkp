@@ -87,18 +87,79 @@ static int secp256k1_musig_pubkey_combine_callback(secp256k1_scalar *sc, secp256
     return secp256k1_xonly_pubkey_load(ctx->ctx, pt, &ctx->pks[idx]);
 }
 
-static void secp256k1_musig_signers_init(secp256k1_musig_session_signer_data *signers, uint32_t n_signers) {
+static void secp256k1_musig_signers_init(secp256k1_musig_session_signer_data *signers, uint32_t n_signers, int use_present) {
     uint32_t i;
     for (i = 0; i < n_signers; i++) {
         memset(&signers[i], 0, sizeof(signers[i]));
         signers[i].index = i;
-        signers[i].present = 0;
+        if (use_present) {
+            /* This is only temporarily set to the index allow reverting sorting the
+            * signer array in place */
+            signers[i].present = i;
+        }
     }
 }
 
 static const uint64_t pre_session_magic = 0xf4adbbdf7c7dd304UL;
 
-int secp256k1_musig_pubkey_combine(const secp256k1_context* ctx, secp256k1_scratch_space *scratch, secp256k1_xonly_pubkey *combined_pk, secp256k1_musig_pre_session *pre_session, secp256k1_musig_session_signer_data *signers, const secp256k1_xonly_pubkey *pubkeys, size_t n_pubkeys) {
+static int cmppubkey(const void *p1, const void *p2) {
+    return memcmp(((const secp256k1_xonly_pubkey *) p1)->data, ((const secp256k1_xonly_pubkey *) p2)->data, sizeof(((secp256k1_xonly_pubkey *)p1)->data));
+}
+
+/* TODO: replace with something better */
+void insertion_sort(secp256k1_xonly_pubkey *pubkeys, size_t n_pubkeys, secp256k1_musig_session_signer_data *signers)
+{
+    /* TODO; change to large type */
+    int i, j;
+    secp256k1_musig_session_signer_data key;
+    for (i = 1; (size_t)i < n_pubkeys; i++) {
+        key = signers[i];
+        j = i - 1;
+        while (j >= 0 && memcmp(&pubkeys[signers[j].index], &pubkeys[key.index], sizeof(pubkeys[key.index])) > 0) {
+            signers[j + 1] = signers[j];
+            j = j - 1;
+        }
+        signers[j + 1] = key;
+    }
+}
+
+/* Sort pubkeys while making sure that the signer at position i (corresponding
+ * to pubkey i before sorting) has index that is set to the pubkeys' position
+ * after sorting. */
+static void sort_pubkeys(secp256k1_xonly_pubkey *pubkeys, size_t n_pubkeys, secp256k1_musig_session_signer_data *signers) {
+    size_t i;
+    insertion_sort(pubkeys, n_pubkeys, signers);
+    for (i = 0; i < n_pubkeys; i++) {
+        secp256k1_xonly_pubkey tmp;
+        size_t j;
+        /* bring signer back in correct position */
+        signers[signers[i].present].index = i;
+        /* sort pubkeys */
+        j = signers[i].present;
+        while (j < i) {
+            j = signers[j].present;
+        }
+        /* swap */
+        tmp = pubkeys[i];
+        pubkeys[i] = pubkeys[j];
+        pubkeys[j] = tmp;
+    }
+    for (i = 0; i < n_pubkeys; i++) {
+        signers[i].present = 0;
+    }
+}
+
+static int is_sorted(secp256k1_xonly_pubkey *pubkeys, size_t n_pubkeys) {
+    size_t i;
+    for (i = 1; i < n_pubkeys; i++) {
+        if (memcmp(&pubkeys[i - 1], &pubkeys[i], sizeof(pubkeys[i])) > -1) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+int secp256k1_musig_pubkey_combine(const secp256k1_context* ctx, secp256k1_scratch_space *scratch, secp256k1_xonly_pubkey *combined_pk, secp256k1_musig_pre_session *pre_session, secp256k1_musig_session_signer_data *signers, secp256k1_xonly_pubkey *pubkeys, size_t n_pubkeys) {
     secp256k1_musig_pubkey_combine_ecmult_data ecmult_data;
     secp256k1_gej pkj;
     secp256k1_ge pkp;
@@ -110,6 +171,18 @@ int secp256k1_musig_pubkey_combine(const secp256k1_context* ctx, secp256k1_scrat
     ARG_CHECK(pubkeys != NULL);
     ARG_CHECK(n_pubkeys > 0 && n_pubkeys < UINT32_MAX);
 
+    /* Fast sorting algorithms have non-linear best case complexity. Therefore,
+     * we only sort if the pubkeys has not already provided them sorted */
+    if (!is_sorted(pubkeys, n_pubkeys)) {
+        if (signers != NULL) {
+            secp256k1_musig_signers_init(signers, n_pubkeys, 1);
+            sort_pubkeys(pubkeys, n_pubkeys, signers);
+        } else {
+            qsort(pubkeys, n_pubkeys, sizeof(*pubkeys), cmppubkey);
+        }
+    } else if (signers != NULL) {
+        secp256k1_musig_signers_init(signers, n_pubkeys, 0);
+    }
     ecmult_data.ctx = ctx;
     ecmult_data.pks = pubkeys;
     if (!secp256k1_musig_compute_ell(ctx, ecmult_data.ell, pubkeys, n_pubkeys)) {
@@ -129,9 +202,6 @@ int secp256k1_musig_pubkey_combine(const secp256k1_context* ctx, secp256k1_scrat
         memcpy(pre_session->pk_hash, ecmult_data.ell, 32);
         pre_session->pk_parity = pk_parity;
         pre_session->is_tweaked = 0;
-    }
-    if (signers != NULL) {
-        secp256k1_musig_signers_init(signers, n_pubkeys);
     }
     return 1;
 }

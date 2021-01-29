@@ -11,6 +11,7 @@
 
 #include <stdio.h>
 #include <assert.h>
+#include <string.h>
 #include <secp256k1.h>
 #include <secp256k1_schnorrsig.h>
 #include <secp256k1_musig.h>
@@ -40,7 +41,7 @@ int create_keypair(const secp256k1_context* ctx, unsigned char *seckey, secp256k
 }
 
 /* Sign a message hash with the given key pairs and store the result in sig */
-int sign(const secp256k1_context* ctx, unsigned char seckeys[][32], const secp256k1_xonly_pubkey* pubkeys, const unsigned char* msg32, unsigned char *sig64) {
+int sign(const secp256k1_context* ctx, unsigned char seckeys[][32], secp256k1_xonly_pubkey* pubkeys, const unsigned char* msg32, unsigned char *sig64) {
     secp256k1_musig_session musig_session[N_SIGNERS];
     unsigned char nonce_commitment[N_SIGNERS][32];
     const unsigned char *nonce_commitment_ptr[N_SIGNERS];
@@ -48,6 +49,15 @@ int sign(const secp256k1_context* ctx, unsigned char seckeys[][32], const secp25
     unsigned char nonce[N_SIGNERS][32];
     int i, j;
     secp256k1_musig_partial_signature partial_sig[N_SIGNERS];
+    secp256k1_xonly_pubkey pubkeys_tmp[N_SIGNERS][N_SIGNERS];
+
+    for (i = 0; i < N_SIGNERS; i++) {
+        secp256k1_keypair keypair;
+        if (!secp256k1_keypair_create(ctx, &keypair, seckeys[i])
+            || !secp256k1_keypair_xonly_pub(ctx, &pubkeys[i], NULL, &keypair)) {
+            return 0;
+        }
+    }
 
     for (i = 0; i < N_SIGNERS; i++) {
         FILE *frand;
@@ -55,8 +65,11 @@ int sign(const secp256k1_context* ctx, unsigned char seckeys[][32], const secp25
         secp256k1_xonly_pubkey combined_pk;
         secp256k1_musig_pre_session pre_session;
 
+        /* pubkeys can not be reused for different signers because
+        musig_pubkey_combine changes the order */
+        memcpy(pubkeys_tmp[i], pubkeys, sizeof(pubkeys_tmp[i]));
         /* Create combined pubkey and initialize signer data */
-        if (!secp256k1_musig_pubkey_combine(ctx, NULL, &combined_pk, &pre_session, signer_data[i], pubkeys, N_SIGNERS)) {
+        if (!secp256k1_musig_pubkey_combine(ctx, NULL, &combined_pk, &pre_session, signer_data[i], pubkeys_tmp[i], N_SIGNERS)) {
             return 0;
         }
         /* Create random session ID. It is absolutely necessary that the session ID
@@ -117,7 +130,7 @@ int sign(const secp256k1_context* ctx, unsigned char seckeys[][32], const secp25
              * fine to first verify the combined sig, and only verify the individual
              * sigs if it does not work.
              */
-            if (!secp256k1_musig_partial_sig_verify(ctx, &musig_session[i], &signer_data[i][j], &partial_sig[j], &pubkeys[j])) {
+            if (!secp256k1_musig_partial_sig_verify(ctx, &musig_session[i], &signer_data[i][j], &partial_sig[j], &pubkeys_tmp[i][signer_data[i][j].index])) {
                 return 0;
             }
         }

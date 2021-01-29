@@ -161,7 +161,7 @@ SECP256K1_API int secp256k1_musig_pubkey_combine(
     secp256k1_xonly_pubkey *combined_pk,
     secp256k1_musig_pre_session *pre_session,
     secp256k1_musig_session_signer_data *signers,
-    const secp256k1_xonly_pubkey *pubkeys,
+    secp256k1_xonly_pubkey *pubkeys,
     size_t n_pubkeys
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(6);
 
