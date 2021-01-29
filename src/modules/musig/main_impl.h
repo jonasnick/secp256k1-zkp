@@ -98,7 +98,7 @@ static void secp256k1_musig_signers_init(secp256k1_musig_session_signer_data *si
 
 static const uint64_t pre_session_magic = 0xf4adbbdf7c7dd304UL;
 
-int secp256k1_musig_pubkey_combine(const secp256k1_context* ctx, secp256k1_scratch_space *scratch, secp256k1_xonly_pubkey *combined_pk, secp256k1_musig_pre_session *pre_session, const secp256k1_xonly_pubkey *pubkeys, size_t n_pubkeys) {
+int secp256k1_musig_pubkey_combine(const secp256k1_context* ctx, secp256k1_scratch_space *scratch, secp256k1_xonly_pubkey *combined_pk, secp256k1_musig_pre_session *pre_session, secp256k1_musig_session_signer_data *signers, const secp256k1_xonly_pubkey *pubkeys, size_t n_pubkeys) {
     secp256k1_musig_pubkey_combine_ecmult_data ecmult_data;
     secp256k1_gej pkj;
     secp256k1_ge pkp;
@@ -108,7 +108,7 @@ int secp256k1_musig_pubkey_combine(const secp256k1_context* ctx, secp256k1_scrat
     ARG_CHECK(combined_pk != NULL);
     ARG_CHECK(secp256k1_ecmult_context_is_built(&ctx->ecmult_ctx));
     ARG_CHECK(pubkeys != NULL);
-    ARG_CHECK(n_pubkeys > 0);
+    ARG_CHECK(n_pubkeys > 0 && n_pubkeys < UINT32_MAX);
 
     ecmult_data.ctx = ctx;
     ecmult_data.pks = pubkeys;
@@ -125,9 +125,13 @@ int secp256k1_musig_pubkey_combine(const secp256k1_context* ctx, secp256k1_scrat
 
     if (pre_session != NULL) {
         pre_session->magic = pre_session_magic;
+        pre_session->n_signers = n_pubkeys;
         memcpy(pre_session->pk_hash, ecmult_data.ell, 32);
         pre_session->pk_parity = pk_parity;
         pre_session->is_tweaked = 0;
+    }
+    if (signers != NULL) {
+        secp256k1_musig_signers_init(signers, n_pubkeys);
     }
     return 1;
 }
@@ -159,7 +163,8 @@ int secp256k1_musig_pubkey_tweak_add(const secp256k1_context* ctx, secp256k1_mus
 
 static const uint64_t session_magic = 0xd92e6fc1ee41b4cbUL;
 
-int secp256k1_musig_session_init(const secp256k1_context* ctx, secp256k1_musig_session *session, secp256k1_musig_session_signer_data *signers, unsigned char *nonce_commitment32, const unsigned char *session_id32, const unsigned char *msg32, const secp256k1_xonly_pubkey *combined_pk, const secp256k1_musig_pre_session *pre_session, size_t n_signers, size_t my_index, const unsigned char *seckey) {
+
+int secp256k1_musig_session_init(const secp256k1_context* ctx, secp256k1_musig_session *session, secp256k1_musig_session_signer_data *signers, unsigned char *nonce_commitment32, const unsigned char *session_id32, const unsigned char *msg32, const secp256k1_xonly_pubkey *combined_pk, const secp256k1_musig_pre_session *pre_session, size_t my_index, size_t n_signers, const unsigned char *seckey) {
     unsigned char combined_ser[32];
     int overflow;
     secp256k1_scalar secret;
@@ -180,9 +185,7 @@ int secp256k1_musig_session_init(const secp256k1_context* ctx, secp256k1_musig_s
     ARG_CHECK(pre_session != NULL);
     ARG_CHECK(pre_session->magic == pre_session_magic);
     ARG_CHECK(seckey != NULL);
-
-    ARG_CHECK(n_signers > 0);
-    ARG_CHECK(n_signers <= UINT32_MAX);
+    ARG_CHECK(n_signers == pre_session->n_signers);
     ARG_CHECK(my_index < n_signers);
 
     memset(session, 0, sizeof(*session));
@@ -197,8 +200,6 @@ int secp256k1_musig_session_init(const secp256k1_context* ctx, secp256k1_musig_s
     memcpy(&session->combined_pk, combined_pk, sizeof(*combined_pk));
     session->pre_session = *pre_session;
     session->has_secret_data = 1;
-    session->n_signers = (uint32_t) n_signers;
-    secp256k1_musig_signers_init(signers, session->n_signers);
 
     /* Compute secret key */
     secp256k1_scalar_set_b32(&secret, seckey, &overflow);
@@ -206,7 +207,7 @@ int secp256k1_musig_session_init(const secp256k1_context* ctx, secp256k1_musig_s
         secp256k1_scalar_clear(&secret);
         return 0;
     }
-    secp256k1_musig_coefficient(&mu, session->pre_session.pk_hash, (uint32_t) my_index);
+    secp256k1_musig_coefficient(&mu, session->pre_session.pk_hash, signers[my_index].index);
     /* Compute the signer's public key point and determine if the secret is
      * negated before signing. That happens if if the signer's pubkey has an odd
      * Y coordinate XOR the MuSig-combined pubkey has an odd Y coordinate XOR
@@ -293,7 +294,7 @@ int secp256k1_musig_session_get_public_nonce(const secp256k1_context* ctx, secp2
     /* The message can only be set once. */
     ARG_CHECK(!(session->is_msg_set && msg32 != NULL));
     ARG_CHECK(session->has_secret_data);
-    ARG_CHECK(n_commitments == session->n_signers);
+    ARG_CHECK(n_commitments == session->pre_session.n_signers);
     for (i = 0; i < n_commitments; i++) {
         ARG_CHECK(commitments[i] != NULL);
     }
@@ -316,22 +317,18 @@ int secp256k1_musig_session_get_public_nonce(const secp256k1_context* ctx, secp2
     return 1;
 }
 
-int secp256k1_musig_session_init_verifier(const secp256k1_context* ctx, secp256k1_musig_session *session, secp256k1_musig_session_signer_data *signers, const unsigned char *msg32, const secp256k1_xonly_pubkey *combined_pk, const secp256k1_musig_pre_session *pre_session, const unsigned char *const *commitments, size_t n_signers) {
+int secp256k1_musig_session_init_verifier(const secp256k1_context* ctx, secp256k1_musig_session *session, secp256k1_musig_session_signer_data *signers, const unsigned char *msg32, const secp256k1_xonly_pubkey *combined_pk, const secp256k1_musig_pre_session *pre_session, const unsigned char *const *commitments, size_t n_commitments) {
     size_t i;
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(session != NULL);
-    ARG_CHECK(signers != NULL);
     ARG_CHECK(msg32 != NULL);
     ARG_CHECK(combined_pk != NULL);
     ARG_CHECK(pre_session != NULL);
     ARG_CHECK(pre_session->magic == pre_session_magic);
     ARG_CHECK(commitments != NULL);
-    /* Check n_signers before checking commitments to allow testing the case where
-     * n_signers is big without allocating the space. */
-    ARG_CHECK(n_signers > 0);
-    ARG_CHECK(n_signers <= UINT32_MAX);
-    for (i = 0; i < n_signers; i++) {
+    ARG_CHECK(n_commitments == pre_session->n_signers);
+    for (i = 0; i < n_commitments; i++) {
         ARG_CHECK(commitments[i] != NULL);
     }
     (void) ctx;
@@ -341,15 +338,11 @@ int secp256k1_musig_session_init_verifier(const secp256k1_context* ctx, secp256k
     session->magic = session_magic;
     memcpy(&session->combined_pk, combined_pk, sizeof(*combined_pk));
     session->pre_session = *pre_session;
-    session->n_signers = (uint32_t) n_signers;
-    secp256k1_musig_signers_init(signers, session->n_signers);
-
-    session->pre_session = *pre_session;
     session->is_msg_set = 1;
     memcpy(session->msg, msg32, 32);
     session->has_secret_data = 0;
 
-    for (i = 0; i < n_signers; i++) {
+    for (i = 0; i < n_commitments; i++) {
         memcpy(signers[i].nonce_commitment, commitments[i], 32);
     }
     session->round = 1;
@@ -392,7 +385,7 @@ int secp256k1_musig_session_combine_nonces(const secp256k1_context* ctx, secp256
     ARG_CHECK(signers != NULL);
     ARG_CHECK(session->magic == session_magic);
     ARG_CHECK(session->round == 1);
-    ARG_CHECK(n_signers == session->n_signers);
+    ARG_CHECK(n_signers == session->pre_session.n_signers);
 
     secp256k1_sha256_initialize(&sha);
     secp256k1_gej_set_infinity(&combined_noncej);
@@ -524,7 +517,7 @@ int secp256k1_musig_partial_sig_combine(const secp256k1_context* ctx, const secp
     ARG_CHECK(session->magic == session_magic);
     ARG_CHECK(session->round == 2);
 
-    if (n_sigs != session->n_signers) {
+    if (n_sigs != session->pre_session.n_signers) {
         return 0;
     }
     secp256k1_scalar_clear(&s);

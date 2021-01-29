@@ -56,7 +56,7 @@ int sign(const secp256k1_context* ctx, unsigned char seckeys[][32], const secp25
         secp256k1_musig_pre_session pre_session;
 
         /* Create combined pubkey and initialize signer data */
-        if (!secp256k1_musig_pubkey_combine(ctx, NULL, &combined_pk, &pre_session, pubkeys, N_SIGNERS)) {
+        if (!secp256k1_musig_pubkey_combine(ctx, NULL, &combined_pk, &pre_session, signer_data[i], pubkeys, N_SIGNERS)) {
             return 0;
         }
         /* Create random session ID. It is absolutely necessary that the session ID
@@ -72,7 +72,7 @@ int sign(const secp256k1_context* ctx, unsigned char seckeys[][32], const secp25
         }
         fclose(frand);
         /* Initialize session */
-        if (!secp256k1_musig_session_init(ctx, &musig_session[i], signer_data[i], nonce_commitment[i], session_id32, msg32, &combined_pk, &pre_session, N_SIGNERS, i, seckeys[i])) {
+        if (!secp256k1_musig_session_init(ctx, &musig_session[i], signer_data[i], nonce_commitment[i], session_id32, msg32, &combined_pk, &pre_session, i, N_SIGNERS, seckeys[i])) {
             return 0;
         }
         nonce_commitment_ptr[i] = &nonce_commitment[i][0];
@@ -145,7 +145,7 @@ int sign(const secp256k1_context* ctx, unsigned char seckeys[][32], const secp25
     }
     printf("ok\n");
     printf("Combining public keys...");
-    if (!secp256k1_musig_pubkey_combine(ctx, NULL, &combined_pk, NULL, pubkeys, N_SIGNERS)) {
+    if (!secp256k1_musig_pubkey_combine(ctx, NULL, &combined_pk, NULL, NULL, pubkeys, N_SIGNERS)) {
         printf("FAILED\n");
         return 1;
     }
