@@ -10,7 +10,24 @@ extern "C" {
  *  Lloyd Fournier
  *  (https://lists.linuxfoundation.org/pipermail/lightning-dev/2019-November/002316.html
  *  and https://github.com/LLFourn/one-time-VES/blob/master/main.pdf).
-*/
+ *
+ *  WARNING! DANGER AHEAD!
+ *  As mentioned in Lloyd Fournier's paper, the adaptor signature leaks the
+ *  Diffie-Hellmann key between the signing key and the encryption key. This is
+ *  not a problem for ECDSA adaptor signatures themselves, but may result in a
+ *  complete loss of security when they are composed with other schemes. More
+ *  specifically, let us refer to the signer's public key as X = x*G, and to the
+ *  encryption key as Y = y*G. Given X, Y and the adaptor signature, it is
+ *  trivial to compute Y^x = X^y.
+ *  To completely avoid this problem, the signer can require a proof of
+ *  knowledge of the decryption key y before creating an adaptor signature. This
+ *  means that the party providing the proof can already compute the
+ *  Diffie-Hellman key X^y and does not obtain new information from the adaptor
+ *  signature.
+ *  A weaker defense is to simply not compose ECDSA adaptor signatures with
+ *  other protocols. In practice, this means never using the secret signing key
+ *  for anything but ECDSA signatures and ECDSA adaptor signatures.
+ */
 
 /** A pointer to a function to deterministically generate a nonce.
  *
@@ -50,6 +67,8 @@ SECP256K1_API extern const secp256k1_nonce_function_hardened_ecdsa_adaptor secp2
  *
  *  Creates an adaptor signature, which includes a proof to verify the adaptor
  *  signature.
+ *  WARNING: Make sure you have read and understood the WARNING at the top of
+ *  this file and applied the suggested countermeasures.
  *
  *  Returns: 1 on success, 0 on failure
  *  Args:             ctx: a secp256k1 context object, initialized for signing
