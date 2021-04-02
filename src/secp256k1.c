@@ -317,24 +317,26 @@ int secp256k1_ec_pubkey_serialize(const secp256k1_context* ctx, unsigned char *o
     return ret;
 }
 
-int secp256k1_ec_pubkey_cmp(const secp256k1_context* ctx, const secp256k1_pubkey* pubkey1, const secp256k1_pubkey* pubkey2) {
-    unsigned char out1[33];
-    unsigned char out2[33];
-    size_t out_size = sizeof(out1);
-    int check;
+int secp256k1_ec_pubkey_cmp(const secp256k1_context* ctx, const secp256k1_pubkey* pubkey0, const secp256k1_pubkey* pubkey1) {
+    unsigned char out[2][33];
+    size_t out_size = sizeof(out[0]);
+    const secp256k1_pubkey* pk[2];
+    int i;
 
     VERIFY_CHECK(ctx != NULL);
-    ARG_CHECK(pubkey1 != NULL);
-    ARG_CHECK(pubkey2 != NULL);
-
-    check = secp256k1_ec_pubkey_serialize(ctx, out1, &out_size, pubkey1, SECP256K1_EC_COMPRESSED);
-    VERIFY_CHECK(check == 1);
-    VERIFY_CHECK(out_size == sizeof(out1));
-    check = secp256k1_ec_pubkey_serialize(ctx, out2, &out_size, pubkey2, SECP256K1_EC_COMPRESSED);
-    VERIFY_CHECK(check == 1);
-    VERIFY_CHECK(out_size == sizeof(out1));
-
-    return secp256k1_memcmp_var(out1, out2, sizeof(out1));
+    pk[0] = pubkey0; pk[1] = pubkey1;
+    for (i = 0; i < 2; i++) {
+        /* A public key that is NULL or invalid is treated as being smaller than
+           any valid public key */
+        ARG_CHECK_NO_RETURN(pk[i] != NULL);
+        if (pk[i] == NULL
+                || !secp256k1_ec_pubkey_serialize(ctx, out[i], &out_size, pk[i], SECP256K1_EC_COMPRESSED)) {
+            out_size = sizeof(out[i]);
+            memset(out[i], 0, sizeof(out[i]));
+        }
+        VERIFY_CHECK(out_size == sizeof(out[i]));
+    }
+    return secp256k1_memcmp_var(out[0], out[1], sizeof(out[0]));
 }
 
 static void secp256k1_ecdsa_signature_load(const secp256k1_context* ctx, secp256k1_scalar* r, secp256k1_scalar* s, const secp256k1_ecdsa_signature* sig) {

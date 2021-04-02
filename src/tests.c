@@ -4673,15 +4673,25 @@ void run_pubkey_comparison(void) {
     CHECK(secp256k1_ec_pubkey_parse(ctx, &pk2, pk2_ser, sizeof(pk2_ser)) == 1);
 
     secp256k1_context_set_illegal_callback(ctx, counting_illegal_callback_fn, &ecount);
-    CHECK(secp256k1_ec_pubkey_cmp(ctx, NULL, &pk2) == 0);
+    CHECK(secp256k1_ec_pubkey_cmp(ctx, NULL, &pk2) < 0);
     CHECK(ecount == 1);
-    CHECK(secp256k1_ec_pubkey_cmp(ctx, &pk1, NULL) == 0);
+    CHECK(secp256k1_ec_pubkey_cmp(ctx, &pk1, NULL) > 0);
     CHECK(ecount == 2);
     CHECK(secp256k1_ec_pubkey_cmp(ctx, &pk1, &pk2) < 0);
     CHECK(secp256k1_ec_pubkey_cmp(ctx, &pk2, &pk1) > 0);
     CHECK(secp256k1_ec_pubkey_cmp(ctx, &pk1, &pk1) == 0);
     CHECK(secp256k1_ec_pubkey_cmp(ctx, &pk2, &pk2) == 0);
     CHECK(ecount == 2);
+    {
+        secp256k1_pubkey pk_tmp;
+        memset(&pk_tmp, 0, sizeof(pk_tmp)); /* illegal pubkey */
+        CHECK(secp256k1_ec_pubkey_cmp(ctx, &pk_tmp, &pk2) < 0);
+        CHECK(ecount == 3);
+        CHECK(secp256k1_ec_pubkey_cmp(ctx, &pk_tmp, &pk_tmp) == 0);
+        CHECK(ecount == 5);
+        CHECK(secp256k1_ec_pubkey_cmp(ctx, &pk2, &pk_tmp) > 0);
+        CHECK(ecount == 6);
+    }
 
     secp256k1_context_set_illegal_callback(ctx, NULL, NULL);
 
