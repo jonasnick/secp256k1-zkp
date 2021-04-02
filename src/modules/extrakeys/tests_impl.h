@@ -154,15 +154,22 @@ void test_xonly_pubkey_comparison(void) {
     CHECK(secp256k1_xonly_pubkey_parse(none, &pk1, pk1_ser) == 1);
     CHECK(secp256k1_xonly_pubkey_parse(none, &pk2, pk2_ser) == 1);
 
-    CHECK(secp256k1_xonly_pubkey_cmp(none, NULL, &pk2) == 0);
+    CHECK(secp256k1_xonly_pubkey_cmp(none, NULL, &pk2) < 0);
     CHECK(ecount == 1);
-    CHECK(secp256k1_xonly_pubkey_cmp(none, &pk1, NULL) == 0);
+    CHECK(secp256k1_xonly_pubkey_cmp(none, &pk1, NULL) > 0);
     CHECK(ecount == 2);
     CHECK(secp256k1_xonly_pubkey_cmp(none, &pk1, &pk2) < 0);
     CHECK(secp256k1_xonly_pubkey_cmp(none, &pk2, &pk1) > 0);
     CHECK(secp256k1_xonly_pubkey_cmp(none, &pk1, &pk1) == 0);
     CHECK(secp256k1_xonly_pubkey_cmp(none, &pk2, &pk2) == 0);
     CHECK(ecount == 2);
+    memset(&pk1, 0, sizeof(pk1)); /* illegal pubkey */
+    CHECK(secp256k1_xonly_pubkey_cmp(none, &pk1, &pk2) < 0);
+    CHECK(ecount == 3);
+    CHECK(secp256k1_xonly_pubkey_cmp(none, &pk1, &pk1) == 0);
+    CHECK(ecount == 5);
+    CHECK(secp256k1_xonly_pubkey_cmp(none, &pk2, &pk1) > 0);
+    CHECK(ecount == 6);
 
     secp256k1_context_destroy(none);
 }

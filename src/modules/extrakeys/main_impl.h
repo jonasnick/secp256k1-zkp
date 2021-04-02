@@ -55,17 +55,22 @@ int secp256k1_xonly_pubkey_serialize(const secp256k1_context* ctx, unsigned char
     return 1;
 }
 
-int secp256k1_xonly_pubkey_cmp(const secp256k1_context* ctx, const secp256k1_xonly_pubkey* pk1, const secp256k1_xonly_pubkey* pk2) {
-    unsigned char out1[32];
-    unsigned char out2[32];
+int secp256k1_xonly_pubkey_cmp(const secp256k1_context* ctx, const secp256k1_xonly_pubkey* pk0, const secp256k1_xonly_pubkey* pk1) {
+    unsigned char out[2][32];
+    const secp256k1_xonly_pubkey* pk[2];
+    int i;
 
     VERIFY_CHECK(ctx != NULL);
-    ARG_CHECK(pk1 != NULL);
-    ARG_CHECK(pk2 != NULL);
-
-    CHECK(secp256k1_xonly_pubkey_serialize(ctx, out1, pk1));
-    CHECK(secp256k1_xonly_pubkey_serialize(ctx, out2, pk2));
-    return secp256k1_memcmp_var(out1, out2, sizeof(out1));
+    pk[0] = pk0; pk[1] = pk1;
+    for (i = 0; i < 2; i++) {
+        /* A public key that is NULL or invalid is treated as being smaller than
+           any valid public key */
+        ARG_CHECK_NO_RETURN(pk[i] != NULL);
+        if (pk[i] == NULL || !secp256k1_xonly_pubkey_serialize(ctx, out[i], pk[i])) {
+            memset(out[i], 0, sizeof(out[i]));
+        }
+    }
+    return secp256k1_memcmp_var(out[0], out[1], sizeof(out[1]));
 }
 
 /** Keeps a group element as is if it has an even Y and otherwise negates it.
