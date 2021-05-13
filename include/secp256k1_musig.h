@@ -205,6 +205,31 @@ SECP256K1_API int secp256k1_musig_session_init(
     const unsigned char *extra_input32
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(4);
 
+/** Combines received nonces into a single nonce
+ *
+ *  This is useful to reduce the communication between signers, because instead
+ *  of everyone sending nonces to everyone else, there can be one party
+ *  receiving all nonces, combining the nonces with this function and then
+ *  sending only the combined nonce back to the signers. The pubnonces argument
+ *  of secp256k1_musig_process_nonces then simply becomes an array whose sole
+ *  element is a pointer to this combined nonce.
+ *
+ *  Returns: 0 if the arguments are invalid or if all signers sent invalid
+ *           pubnonces, 1 otherwise
+ *  Args:                 ctx: pointer to a context object (cannot be NULL)
+ *  Out:  combined_pubnonce66: a 66-byte array to store the combined pubnonce
+ *  In:             pubnonces: array of pointers to the 66-byte pubnonces sent
+ *                             by the signers
+ *                n_pubnonces: number of elements in the pubnonces array. Must
+ *                             be greater than 0.
+ */
+SECP256K1_API int secp256k1_musig_nonces_combine(
+    const secp256k1_context* ctx,
+    unsigned char *combined_pubnonce66,
+    const unsigned char * const* pubnonces,
+    size_t n_pubnonces
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
 /** Takes the public nonces of all signers and computes a session cache that is
  *  required for signing and verification of partial signatures and a signature
  *  template that is required for combining partial signatures.
