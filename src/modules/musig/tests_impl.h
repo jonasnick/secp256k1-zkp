@@ -110,6 +110,7 @@ void musig_api_tests(secp256k1_scratch_space *scratch) {
     const unsigned char *invalid_pubnonce_ptr[1];
     unsigned char inf_pubnonce[2][66];
     const unsigned char *inf_pubnonce_ptr[2];
+    unsigned char combined_pnonce[66];
     unsigned char msg[32];
     secp256k1_xonly_pubkey combined_pk;
     secp256k1_musig_pre_session pre_session;
@@ -274,6 +275,19 @@ void musig_api_tests(secp256k1_scratch_space *scratch) {
     CHECK(secp256k1_musig_session_init(sign, &secnonce[1], pubnonce[1], session_id[1], sk[1], NULL, NULL, NULL) == 1);
 
     /** Receive nonces **/
+    ecount = 0;
+    CHECK(secp256k1_musig_nonces_combine(none, combined_pnonce, pubnonce_ptr, 2) == 1);
+    CHECK(secp256k1_musig_nonces_combine(none, NULL, pubnonce_ptr, 2) == 0);
+    CHECK(ecount == 1);
+    CHECK(secp256k1_musig_nonces_combine(none, combined_pnonce, NULL, 2) == 0);
+    CHECK(ecount == 2);
+    CHECK(secp256k1_musig_nonces_combine(none, combined_pnonce, pubnonce_ptr, 0) == 0);
+    CHECK(ecount == 3);
+    CHECK(secp256k1_musig_nonces_combine(none, combined_pnonce, invalid_pubnonce_ptr, 1) == 0);
+    CHECK(ecount == 3);
+    CHECK(secp256k1_musig_nonces_combine(none, combined_pnonce, inf_pubnonce_ptr, 2) == 0);
+    CHECK(ecount == 3);
+
     ecount = 0;
     CHECK(secp256k1_musig_process_nonces(none, &session_cache, &sig_template, &nonce_parity, pubnonce_ptr, 2, msg, &combined_pk, &pre_session, &adaptor) == 0);
     CHECK(ecount == 1);
@@ -610,6 +624,49 @@ void scriptless_atomic_swap(secp256k1_scratch_space *scratch) {
     CHECK(secp256k1_schnorrsig_verify(ctx, final_sig_a, msg32_a, &combined_pk_a) == 1);
 }
 
+void musig_combiner_test(secp256k1_scratch_space *scratch) {
+    unsigned char sk[2][32];
+    secp256k1_keypair keypair[2];
+    unsigned char pubnonce[2][66];
+    const unsigned char *pubnonce_ptr[2];
+    unsigned char combined_pnonce[66];
+    const unsigned char *combined_pnonce_ptr[1];
+    unsigned char msg[32];
+    secp256k1_xonly_pubkey combined_pk;
+    secp256k1_musig_pre_session pre_session;
+    unsigned char session_id[2][32];
+    secp256k1_musig_secnonce secnonce[2];
+    secp256k1_xonly_pubkey pk[2];
+    const secp256k1_xonly_pubkey *pk_ptr[2];
+    int nonce_parity, nonce_parity2;
+    secp256k1_musig_template sig_template, sig_template2;
+    secp256k1_musig_session_cache session_cache, session_cache2;
+    int i;
+
+    secp256k1_testrand256(msg);
+    for (i = 0; i < 2; i++) {
+        secp256k1_testrand256(session_id[i]);
+        secp256k1_testrand256(sk[i]);
+        pk_ptr[i] = &pk[i];
+        pubnonce_ptr[i] = pubnonce[i];
+        CHECK(create_keypair_and_pk(&keypair[i], &pk[i], sk[i]));
+    }
+    combined_pnonce_ptr[0] = combined_pnonce;
+
+    CHECK(secp256k1_musig_pubkey_combine(ctx, scratch, &combined_pk, &pre_session, pk_ptr, 2) == 1);
+
+    CHECK(secp256k1_musig_session_init(ctx, &secnonce[0], pubnonce[0], session_id[0], sk[0], NULL, NULL, NULL) == 1);
+    CHECK(secp256k1_musig_session_init(ctx, &secnonce[1], pubnonce[1], session_id[1], sk[1], NULL, NULL, NULL) == 1);
+
+    CHECK(secp256k1_musig_process_nonces(ctx, &session_cache, &sig_template, &nonce_parity, pubnonce_ptr, 2, msg, &combined_pk, &pre_session, NULL) == 1);
+    /* Check that process_nonces on the result of nonces_combine gives the same result */
+    CHECK(secp256k1_musig_nonces_combine(ctx, combined_pnonce, pubnonce_ptr, 2) == 1);
+    CHECK(secp256k1_musig_process_nonces(ctx, &session_cache2, &sig_template2, &nonce_parity2, combined_pnonce_ptr, 1, msg, &combined_pk, &pre_session, NULL) == 1);
+    CHECK(memcmp(&session_cache, &session_cache2, sizeof(session_cache)) == 0);
+    CHECK(memcmp(&sig_template, &sig_template2, sizeof(sig_template)) == 0);
+    CHECK(nonce_parity == nonce_parity2);
+}
+
 /* Checks that hash initialized by secp256k1_musig_sha256_init_tagged has the
  * expected state. */
 void sha256_tag_test(void) {
@@ -887,6 +944,7 @@ void run_musig_tests(void) {
         /* Run multiple times to ensure that pk and nonce have different y
          * parities */
         scriptless_atomic_swap(scratch);
+        musig_combiner_test(scratch);
         musig_tweak_test(scratch);
     }
     musig_test_vectors();

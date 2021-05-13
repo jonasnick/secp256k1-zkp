@@ -299,6 +299,30 @@ static void secp256k1_musig_sum_nonces(const secp256k1_context* ctx, secp256k1_g
     }
 }
 
+
+int secp256k1_musig_nonces_combine(const secp256k1_context* ctx, unsigned char *combined_pubnonce66, const unsigned char * const* pubnonces, size_t n_pubnonces) {
+    secp256k1_gej summed_nonces[2];
+    int i;
+
+    ARG_CHECK(combined_pubnonce66 != NULL);
+    ARG_CHECK(pubnonces != NULL);
+    ARG_CHECK(n_pubnonces > 0);
+
+    secp256k1_musig_sum_nonces(ctx, summed_nonces, pubnonces, n_pubnonces);
+    for (i = 0; i < 2; i++) {
+        int ret;
+        secp256k1_ge noncep;
+        size_t len = 33;
+        if (secp256k1_gej_is_infinity(&summed_nonces[i])) {
+            return 0;
+        }
+        secp256k1_ge_set_gej(&noncep, &summed_nonces[i]);
+        ret = secp256k1_eckey_pubkey_serialize(&noncep, &combined_pubnonce66[i*33], &len, 1);
+        VERIFY_CHECK(ret);
+    }
+    return 1;
+}
+
 static void secp256k1_musig_session_cache_load(secp256k1_scalar *b, secp256k1_scalar *e, int *combined_nonce_parity, const secp256k1_musig_session_cache *cache) {
     secp256k1_scalar_set_b32(b, &cache->data[0], NULL);
     secp256k1_scalar_set_b32(e, &cache->data[32], NULL);
