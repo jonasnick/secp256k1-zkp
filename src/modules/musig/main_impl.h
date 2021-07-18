@@ -340,12 +340,16 @@ int secp256k1_musig_nonces_combine(const secp256k1_context* ctx, unsigned char *
     return 1;
 }
 
+/* A session cache consists of the 32 byte nonce aggregation coefficient b, the
+ * signature challenge hash e and the parity of the combined nonce. */
 static void secp256k1_musig_session_cache_load(secp256k1_scalar *b, secp256k1_scalar *e, int *combined_nonce_parity, const secp256k1_musig_session_cache *cache) {
     secp256k1_scalar_set_b32(b, &cache->data[0], NULL);
     secp256k1_scalar_set_b32(e, &cache->data[32], NULL);
     *combined_nonce_parity = cache->data[64];
 }
 
+/* A signature template consists of the 32-byte aggregated nonce and a scalar s
+ * that is added to the partial signatures of the signers. */
 static void secp256k1_musig_template_load(unsigned char *r32, secp256k1_scalar *s, const secp256k1_musig_template *template) {
     memcpy(r32, &template->data[0], 32);
     secp256k1_scalar_set_b32(s, &template->data[32], NULL);

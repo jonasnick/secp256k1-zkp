@@ -57,25 +57,34 @@ typedef struct {
  *  serialization and parsing functions.
  */
 
-/** Guaranteed to be 32 bytes in size. Serialized and parsed with
- *  `musig_partial_signature_serialize` and `musig_partial_signature_parse`. */
+/** Opaque data structure that holds a partial MuSig signature.
+ *
+ *  Guaranteed to be 32 bytes in size. Serialized and parsed with
+ *  `musig_partial_signature_serialize` and `musig_partial_signature_parse`.
+ */
 typedef struct {
     unsigned char data[32];
 } secp256k1_musig_partial_signature;
 
-/** Guaranteed to be 64 bytes in size. No serialization and parsing functions
- *  (yet). */
+/** Opaque data structure that holds a MuSig signature template.
+ *
+ *  Guaranteed to be 64 bytes in size. No serialization and parsing functions
+ *  (yet).
+ */
 typedef struct {
     unsigned char data[64];
 } secp256k1_musig_template;
 
-/** Guaranteed to be 65 bytes in size. No serialization and parsing functions
- *  (yet). */
+/** Opaque data structure that holds a cache for a MuSig session.
+ *
+ *  Guaranteed to be 65 bytes in size. No serialization and parsing functions
+ *  (yet).
+ */
 typedef struct {
     unsigned char data[65];
 } secp256k1_musig_session_cache;
 
-/** Guaranteed to be 64 bytes in size. This structure is MUST NOT be copied or
+/** Guaranteed to be 64 bytes in size. This structure MUST NOT be copied or
  *  read or written to it directly. A signer who is online throughout the whole
  *  process and can keep this structure in memory can use the provided API
  *  functions for a safe standard workflow. See
@@ -164,14 +173,15 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_pubkey_tweak_add(
  *
  *  1. Always provide a unique session_id32. It is a "number used once".
  *  2. If you already know the signing key, message or combined public key, they
- *     can be optionally povided to derive the nonce and increase
+ *     can be optionally provided to derive the nonce and increase
  *     misuse-resistance. The extra_input32 argument can be used to provide
  *     additional data that does not repeat in normal scenarios, such as the
  *     current time.
  *  3. If you do not provide a seckey, session_id32 _must_ be UNIFORMLY RANDOM.
  *     If you do provide a seckey, session_id32 can instead be a counter (that
  *     must never repeat!). However, it is recommended to always choose
- *     session_id32 uniformly at random.
+ *     session_id32 uniformly at random. Note that using the same seckey for
+ *     multiple MuSig sessions is fine.
  *  4. Avoid copying (or serializing) the secnonce. This reduces the possibility
  *     that it is used more than once for signing.
  *
@@ -253,8 +263,9 @@ SECP256K1_API int secp256k1_musig_nonces_combine(
  *        combined_pk: pointer to combined public key of all signers
  *        pre_session: pointer to the pre_session that was output when
  *                     combined_pk was created
- *            adaptor: optional pointer to an adaptor if this signing session is
- *                     part of an adaptor signature protocol (can be NULL)
+ *            adaptor: optional pointer to an adaptor point encoded as a public
+ *                     key if this signing session is part of an adaptor
+ *                     signature protocol (can be NULL)
  */
 SECP256K1_API int secp256k1_musig_process_nonces(
     const secp256k1_context* ctx,
