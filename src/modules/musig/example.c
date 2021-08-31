@@ -90,13 +90,13 @@ int sign(const secp256k1_context* ctx, struct signer_secrets_t *signer_secrets, 
     }
     /* Communication round 1: Exchange nonces */
     for (i = 0; i < N_SIGNERS; i++) {
-        secp256k1_xonly_pubkey combined_pk;
+        secp256k1_xonly_pubkey agg_pk;
 
-        /* Create combined pubkey and initialize signer data */
-        if (!secp256k1_musig_pubkey_combine(ctx, NULL, &combined_pk, &pre_session, pubkeys, N_SIGNERS)) {
+        /* Create aggregate pubkey and initialize signer data */
+        if (!secp256k1_musig_pubkey_agg(ctx, NULL, &agg_pk, &pre_session, pubkeys, N_SIGNERS)) {
             return 0;
         }
-        if(!secp256k1_musig_process_nonces(ctx, &session_cache, &sig_template, NULL, pubnonces, N_SIGNERS, msg32, &combined_pk, &pre_session, NULL)) {
+        if(!secp256k1_musig_process_nonces(ctx, &session_cache, &sig_template, NULL, pubnonces, N_SIGNERS, msg32, &agg_pk, &pre_session, NULL)) {
             return 0;
         }
         /* partial_sign will clear the secnonce by setting it 0. That's because
@@ -111,21 +111,21 @@ int sign(const secp256k1_context* ctx, struct signer_secrets_t *signer_secrets, 
     /* Communication round 2: Exchange partial signatures */
     for (i = 0; i < N_SIGNERS; i++) {
         /* To check whether signing was successful, it suffices to either verify
-         * the combined signature with the combined public key using
+         * the aggregate signature with the aggregate public key using
          * secp256k1_schnorrsig_verify, or verify all partial signatures of all
-         * signers individually. Verifying the combined signature is cheaper but
+         * signers individually. Verifying the aggregate signature is cheaper but
          * verifying the individual partial signatures has the advantage that it
          * can be used to determine which of the partial signatures are invalid
-         * (if any), i.e., which of the partial signatures cause the combined
+         * (if any), i.e., which of the partial signatures cause the aggregate
          * signature to be invalid and thus the protocol run to fail. It's also
-         * fine to first verify the combined sig, and only verify the individual
+         * fine to first verify the aggregate sig, and only verify the individual
          * sigs if it does not work.
          */
         if (!secp256k1_musig_partial_sig_verify(ctx, &signer[i].partial_sig, signer[i].pubnonce, &signer[i].pubkey, &pre_session, &session_cache)) {
             return 0;
         }
     }
-    return secp256k1_musig_partial_sig_combine(ctx, sig64, &sig_template, partial_sigs, N_SIGNERS);
+    return secp256k1_musig_partial_sig_agg(ctx, sig64, &sig_template, partial_sigs, N_SIGNERS);
 }
 
  int main(void) {
@@ -134,7 +134,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets_t *signer_secrets, 
     struct signer_secrets_t signer_secrets[N_SIGNERS];
     struct signer_t signers[N_SIGNERS];
     const secp256k1_xonly_pubkey *pubkeys_ptr[N_SIGNERS];
-    secp256k1_xonly_pubkey combined_pk;
+    secp256k1_xonly_pubkey agg_pk;
     unsigned char msg[32] = "this_could_be_the_hash_of_a_msg!";
     unsigned char sig[64];
 
@@ -150,7 +150,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets_t *signer_secrets, 
     }
     printf("ok\n");
     printf("Combining public keys...");
-    if (!secp256k1_musig_pubkey_combine(ctx, NULL, &combined_pk, NULL, pubkeys_ptr, N_SIGNERS)) {
+    if (!secp256k1_musig_pubkey_agg(ctx, NULL, &agg_pk, NULL, pubkeys_ptr, N_SIGNERS)) {
         printf("FAILED\n");
         return 1;
     }
@@ -162,7 +162,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets_t *signer_secrets, 
     }
     printf("ok\n");
     printf("Verifying signature.....");
-    if (!secp256k1_schnorrsig_verify(ctx, sig, msg, 32, &combined_pk)) {
+    if (!secp256k1_schnorrsig_verify(ctx, sig, msg, 32, &agg_pk)) {
         printf("FAILED\n");
         return 1;
     }
