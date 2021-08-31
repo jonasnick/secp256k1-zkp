@@ -66,7 +66,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets_t *signer_secrets, 
         unsigned char seckey[32];
         unsigned char session_id[32];
         /* Create random session ID. It is absolutely necessary that the session ID
-         * is unique for every call of secp256k1_musig_session_init. Otherwise
+         * is unique for every call of secp256k1_musig_nonce_gen. Otherwise
          * it's trivial for an attacker to extract the secret key! */
         frand = fopen("/dev/urandom", "r");
         if(frand == NULL) {
@@ -82,7 +82,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets_t *signer_secrets, 
         }
         /* Initialize session and create secret nonce for signing and public
          * nonce to send to the other signers. */
-        if (!secp256k1_musig_session_init(ctx, &signer_secrets[i].secnonce, signer[i].pubnonce, session_id, seckey, msg32, NULL, NULL)) {
+        if (!secp256k1_musig_nonce_gen(ctx, &signer_secrets[i].secnonce, signer[i].pubnonce, session_id, seckey, msg32, NULL, NULL)) {
             return 0;
         }
         pubkeys[i] = &signer[i].pubkey;
@@ -96,7 +96,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets_t *signer_secrets, 
         if (!secp256k1_musig_pubkey_agg(ctx, NULL, &agg_pk, &keyagg_cache, pubkeys, N_SIGNERS)) {
             return 0;
         }
-        if(!secp256k1_musig_process_nonces(ctx, &session_cache, &sig_template, NULL, pubnonces, N_SIGNERS, msg32, &agg_pk, &keyagg_cache, NULL)) {
+        if(!secp256k1_musig_nonce_process(ctx, &session_cache, &sig_template, NULL, pubnonces, N_SIGNERS, msg32, &agg_pk, &keyagg_cache, NULL)) {
             return 0;
         }
         /* partial_sign will clear the secnonce by setting it 0. That's because

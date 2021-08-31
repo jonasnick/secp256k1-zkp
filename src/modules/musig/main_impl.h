@@ -240,7 +240,7 @@ static void secp256k1_musig_secnonce_load(secp256k1_scalar *k, secp256k1_musig_s
     secp256k1_scalar_set_b32(&k[1], &secnonce->data[32], NULL);
 }
 
-int secp256k1_musig_session_init(const secp256k1_context* ctx, secp256k1_musig_secnonce *secnonce, unsigned char *pubnonce66, const unsigned char *session_id32, const unsigned char *seckey, const unsigned char *msg32, const secp256k1_xonly_pubkey *agg_pk, const unsigned char *extra_input32) {
+int secp256k1_musig_nonce_gen(const secp256k1_context* ctx, secp256k1_musig_secnonce *secnonce, unsigned char *pubnonce66, const unsigned char *session_id32, const unsigned char *seckey, const unsigned char *msg32, const secp256k1_xonly_pubkey *agg_pk, const unsigned char *extra_input32) {
     secp256k1_scalar k[2];
     int i;
     unsigned char pk_ser[32];
@@ -396,7 +396,7 @@ static int secp256k1_musig_compute_noncehash(unsigned char *noncehash, secp256k1
     return 1;
 }
 
-static int secp256k1_musig_process_nonces_internal(const secp256k1_ecmult_context* ecmult_ctx, secp256k1_ge *agg_nonce, unsigned char *noncehash, secp256k1_gej *summed_noncesj, const unsigned char *agg_pk32, const unsigned char *msg) {
+static int secp256k1_musig_nonce_process_internal(const secp256k1_ecmult_context* ecmult_ctx, secp256k1_ge *agg_nonce, unsigned char *noncehash, secp256k1_gej *summed_noncesj, const unsigned char *agg_pk32, const unsigned char *msg) {
     secp256k1_scalar b;
     secp256k1_gej agg_noncej;
     secp256k1_ge summed_nonces[2];
@@ -414,7 +414,7 @@ static int secp256k1_musig_process_nonces_internal(const secp256k1_ecmult_contex
     return 1;
 }
 
-int secp256k1_musig_process_nonces(const secp256k1_context* ctx, secp256k1_musig_session_cache *session_cache, secp256k1_musig_template *sig_template, int *nonce_parity, const unsigned char * const* pubnonces, size_t n_pubnonces, const unsigned char *msg32, const secp256k1_xonly_pubkey *agg_pk, const secp256k1_musig_keyagg_cache *keyagg_cache, const secp256k1_pubkey *adaptor) {
+int secp256k1_musig_nonce_process(const secp256k1_context* ctx, secp256k1_musig_session_cache *session_cache, secp256k1_musig_template *sig_template, int *nonce_parity, const unsigned char * const* pubnonces, size_t n_pubnonces, const unsigned char *msg32, const secp256k1_xonly_pubkey *agg_pk, const secp256k1_musig_keyagg_cache *keyagg_cache, const secp256k1_pubkey *adaptor) {
     secp256k1_gej summed_nonces[2];
     secp256k1_ge agg_nonce;
     unsigned char agg_pk32[32];
@@ -445,7 +445,7 @@ int secp256k1_musig_process_nonces(const secp256k1_context* ctx, secp256k1_musig
         }
         secp256k1_gej_add_ge_var(&summed_nonces[0], &summed_nonces[0], &adaptorp, NULL);
     }
-    if (!secp256k1_musig_process_nonces_internal(&ctx->ecmult_ctx, &agg_nonce, &session_cache->data[0], summed_nonces, agg_pk32, msg32)) {
+    if (!secp256k1_musig_nonce_process_internal(&ctx->ecmult_ctx, &agg_nonce, &session_cache->data[0], summed_nonces, agg_pk32, msg32)) {
         return 0;
     }
     if (!secp256k1_xonly_ge_serialize(&sig_template->data[0], &agg_nonce)) {
