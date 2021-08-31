@@ -379,16 +379,17 @@ static int secp256k1_musig_compute_messagehash(unsigned char *msghash, const uns
 
 /* hash(summed_nonces[0], summed_nonces[1], combined_pk, msg) */
 static int secp256k1_musig_compute_noncehash(unsigned char *noncehash, secp256k1_ge *summed_nonces, const unsigned char *combined_pk32, const unsigned char *msg) {
-    unsigned char buf[32];
+    unsigned char buf[33];
     secp256k1_sha256 sha;
     int i;
 
     secp256k1_sha256_initialize(&sha);
     for (i = 0; i < 2; i++) {
-        if (!secp256k1_xonly_ge_serialize(buf, &summed_nonces[i])) {
+        size_t size = sizeof(buf);
+        if (!secp256k1_eckey_pubkey_serialize(&summed_nonces[i], buf, &size, 1)) {
             return 0;
         }
-        secp256k1_sha256_write(&sha, buf, 32);
+        secp256k1_sha256_write(&sha, buf, sizeof(buf));
     }
     secp256k1_sha256_write(&sha, combined_pk32, 32);
     secp256k1_sha256_write(&sha, msg, 32);
