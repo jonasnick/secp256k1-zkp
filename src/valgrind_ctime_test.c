@@ -259,7 +259,7 @@ void run_tests(secp256k1_context *ctx, unsigned char *key) {
         secp256k1_musig_keyagg_cache keyagg_cache;
         secp256k1_musig_session_cache session_cache;
         secp256k1_musig_template sig_template;
-        secp256k1_musig_partial_signature partial_sig;
+        secp256k1_musig_partial_sig partial_sig;
         unsigned char extra_input[32];
 
         pk_ptr[0] = &pk;

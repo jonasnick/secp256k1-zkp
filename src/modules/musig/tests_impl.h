@@ -34,8 +34,8 @@ void musig_simple_test(secp256k1_scratch_space *scratch) {
     secp256k1_musig_secnonce secnonce[2];
     secp256k1_xonly_pubkey pk[2];
     const secp256k1_xonly_pubkey *pk_ptr[2];
-    secp256k1_musig_partial_signature partial_sig[2];
-    const secp256k1_musig_partial_signature *partial_sig_ptr[2];
+    secp256k1_musig_partial_sig partial_sig[2];
+    const secp256k1_musig_partial_sig *partial_sig_ptr[2];
     unsigned char final_sig[64];
     secp256k1_musig_template sig_template;
     secp256k1_musig_session_cache session_cache;
@@ -90,10 +90,10 @@ void pubnonce66_summing_to_inf(unsigned char *pubnonce66) {
 
 void musig_api_tests(secp256k1_scratch_space *scratch) {
     secp256k1_scratch_space *scratch_small;
-    secp256k1_musig_partial_signature partial_sig[2];
-    secp256k1_musig_partial_signature partial_sig_adapted[2];
-    const secp256k1_musig_partial_signature *partial_sig_adapted_ptr[2];
-    secp256k1_musig_partial_signature partial_sig_overflow;
+    secp256k1_musig_partial_sig partial_sig[2];
+    secp256k1_musig_partial_sig partial_sig_adapted[2];
+    const secp256k1_musig_partial_sig *partial_sig_adapted_ptr[2];
+    secp256k1_musig_partial_sig partial_sig_overflow;
     unsigned char final_sig[64];
     unsigned char buf[32];
     unsigned char sk[2][32];
@@ -357,17 +357,17 @@ void musig_api_tests(secp256k1_scratch_space *scratch) {
     CHECK(secp256k1_musig_partial_sign(none, &partial_sig[1], &secnonce[1], &keypair[1], &keyagg_cache, &session_cache) == 1);
 
     ecount = 0;
-    CHECK(secp256k1_musig_partial_signature_serialize(none, buf, &partial_sig[0]) == 1);
-    CHECK(secp256k1_musig_partial_signature_serialize(none, NULL, &partial_sig[0]) == 0);
+    CHECK(secp256k1_musig_partial_sig_serialize(none, buf, &partial_sig[0]) == 1);
+    CHECK(secp256k1_musig_partial_sig_serialize(none, NULL, &partial_sig[0]) == 0);
     CHECK(ecount == 1);
-    CHECK(secp256k1_musig_partial_signature_serialize(none, buf, NULL) == 0);
+    CHECK(secp256k1_musig_partial_sig_serialize(none, buf, NULL) == 0);
     CHECK(ecount == 2);
-    CHECK(secp256k1_musig_partial_signature_parse(none, &partial_sig[0], buf) == 1);
-    CHECK(secp256k1_musig_partial_signature_parse(none, NULL, buf) == 0);
+    CHECK(secp256k1_musig_partial_sig_parse(none, &partial_sig[0], buf) == 1);
+    CHECK(secp256k1_musig_partial_sig_parse(none, NULL, buf) == 0);
     CHECK(ecount == 3);
-    CHECK(secp256k1_musig_partial_signature_parse(none, &partial_sig_overflow, ones) == 0);
+    CHECK(secp256k1_musig_partial_sig_parse(none, &partial_sig_overflow, ones) == 0);
     CHECK(ecount == 3);
-    CHECK(secp256k1_musig_partial_signature_parse(none, &partial_sig[0], NULL) == 0);
+    CHECK(secp256k1_musig_partial_sig_parse(none, &partial_sig[0], NULL) == 0);
     CHECK(ecount == 4);
 
     /** Partial signature verification */
@@ -531,11 +531,11 @@ void scriptless_atomic_swap(secp256k1_scratch_space *scratch) {
      * 0. Signer 0 produces the adaptor signatures. */
     unsigned char final_sig_a[64];
     unsigned char final_sig_b[64];
-    secp256k1_musig_partial_signature partial_sig_a[2];
-    const secp256k1_musig_partial_signature *partial_sig_a_ptr[2];
-    secp256k1_musig_partial_signature partial_sig_b_adapted[2];
-    const secp256k1_musig_partial_signature *partial_sig_b_adapted_ptr[2];
-    secp256k1_musig_partial_signature partial_sig_b[2];
+    secp256k1_musig_partial_sig partial_sig_a[2];
+    const secp256k1_musig_partial_sig *partial_sig_a_ptr[2];
+    secp256k1_musig_partial_sig partial_sig_b_adapted[2];
+    const secp256k1_musig_partial_sig *partial_sig_b_adapted_ptr[2];
+    secp256k1_musig_partial_sig partial_sig_b[2];
     unsigned char sec_adaptor[32];
     unsigned char sec_adaptor_extracted[32];
     secp256k1_pubkey pub_adaptor;
@@ -723,8 +723,8 @@ void musig_tweak_test_helper(const secp256k1_xonly_pubkey* agg_pk, const unsigne
     secp256k1_keypair keypair[2];
     secp256k1_musig_session_cache session_cache;
     secp256k1_musig_template sig_template;
-    secp256k1_musig_partial_signature partial_sig[2];
-    const secp256k1_musig_partial_signature *partial_sig_ptr[2];
+    secp256k1_musig_partial_sig partial_sig[2];
+    const secp256k1_musig_partial_sig *partial_sig_ptr[2];
     unsigned char final_sig[64];
     int i;
 
@@ -951,7 +951,7 @@ void musig_test_vectors_sign_helper(secp256k1_musig_keyagg_cache *keyagg_cache, 
     secp256k1_xonly_pubkey agg_pk;
     secp256k1_musig_session_cache session_cache;
     const unsigned char *pubnonce_ptr[1];
-    secp256k1_musig_partial_signature partial_sig;
+    secp256k1_musig_partial_sig partial_sig;
     secp256k1_musig_template sig_template;
     int i;
 

@@ -23,7 +23,7 @@ struct signer_secrets_t {
 struct signer_t {
     secp256k1_xonly_pubkey pubkey;
     unsigned char pubnonce[66];
-    secp256k1_musig_partial_signature partial_sig;
+    secp256k1_musig_partial_sig partial_sig;
 };
 
  /* Number of public keys involved in creating the aggregate signature */
@@ -55,7 +55,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets_t *signer_secrets, 
     int i;
     const secp256k1_xonly_pubkey *pubkeys[N_SIGNERS];
     const unsigned char *pubnonces[N_SIGNERS];
-    const secp256k1_musig_partial_signature *partial_sigs[N_SIGNERS];
+    const secp256k1_musig_partial_sig *partial_sigs[N_SIGNERS];
     /* The same for all signers */
     secp256k1_musig_keyagg_cache keyagg_cache;
     secp256k1_musig_session_cache session_cache;

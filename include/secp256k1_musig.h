@@ -60,11 +60,11 @@ typedef struct {
 /** Opaque data structure that holds a partial MuSig signature.
  *
  *  Guaranteed to be 32 bytes in size. Serialized and parsed with
- *  `musig_partial_signature_serialize` and `musig_partial_signature_parse`.
+ *  `musig_partial_sig_serialize` and `musig_partial_sig_parse`.
  */
 typedef struct {
     unsigned char data[32];
-} secp256k1_musig_partial_signature;
+} secp256k1_musig_partial_sig;
 
 /** Opaque data structure that holds a MuSig signature template.
  *
@@ -287,10 +287,10 @@ SECP256K1_API int secp256k1_musig_process_nonces(
  *  Out:   out32: pointer to a 32-byte array to store the serialized signature
  *  In:      sig: pointer to the signature
  */
-SECP256K1_API int secp256k1_musig_partial_signature_serialize(
+SECP256K1_API int secp256k1_musig_partial_sig_serialize(
     const secp256k1_context* ctx,
     unsigned char *out32,
-    const secp256k1_musig_partial_signature* sig
+    const secp256k1_musig_partial_sig* sig
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
 /** Parse and verify a MuSig partial signature.
@@ -304,9 +304,9 @@ SECP256K1_API int secp256k1_musig_partial_signature_serialize(
  *  encoded numbers are out of range, signature verification with it is
  *  guaranteed to fail for every message and public key.
  */
-SECP256K1_API int secp256k1_musig_partial_signature_parse(
+SECP256K1_API int secp256k1_musig_partial_sig_parse(
     const secp256k1_context* ctx,
-    secp256k1_musig_partial_signature* sig,
+    secp256k1_musig_partial_sig* sig,
     const unsigned char *in32
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
@@ -332,7 +332,7 @@ SECP256K1_API int secp256k1_musig_partial_signature_parse(
  */
 SECP256K1_API int secp256k1_musig_partial_sign(
     const secp256k1_context* ctx,
-    secp256k1_musig_partial_signature *partial_sig,
+    secp256k1_musig_partial_sig *partial_sig,
     secp256k1_musig_secnonce *secnonce,
     const secp256k1_keypair *keypair,
     const secp256k1_musig_keyagg_cache *keyagg_cache,
@@ -362,7 +362,7 @@ SECP256K1_API int secp256k1_musig_partial_sign(
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_verify(
     const secp256k1_context* ctx,
-    const secp256k1_musig_partial_signature *partial_sig,
+    const secp256k1_musig_partial_sig *partial_sig,
     const unsigned char *pubnonce66,
     const secp256k1_xonly_pubkey *pubkey,
     const secp256k1_musig_keyagg_cache *keyagg_cache,
@@ -384,7 +384,7 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_agg(
     const secp256k1_context* ctx,
     unsigned char *sig64,
     const secp256k1_musig_template *sig_template,
-    const secp256k1_musig_partial_signature * const* partial_sigs,
+    const secp256k1_musig_partial_sig * const* partial_sigs,
     size_t n_sigs
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
@@ -402,8 +402,8 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_agg(
  */
 SECP256K1_API int secp256k1_musig_partial_sig_adapt(
     const secp256k1_context* ctx,
-    secp256k1_musig_partial_signature *adaptor_sig,
-    const secp256k1_musig_partial_signature *partial_sig,
+    secp256k1_musig_partial_sig *adaptor_sig,
+    const secp256k1_musig_partial_sig *partial_sig,
     const unsigned char *sec_adaptor32,
     int nonce_parity
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
@@ -427,7 +427,7 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_extract_secret_ad
     const secp256k1_context* ctx,
     unsigned char *sec_adaptor32,
     const unsigned char *sig64,
-    const secp256k1_musig_partial_signature *partial_sigs,
+    const secp256k1_musig_partial_sig *partial_sigs,
     size_t n_partial_sigs,
     int nonce_parity
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
