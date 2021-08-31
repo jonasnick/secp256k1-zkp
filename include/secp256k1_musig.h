@@ -45,7 +45,7 @@ typedef struct {
     int is_tweaked;
     unsigned char tweak[32];
     int internal_key_parity;
-} secp256k1_musig_pre_session;
+} secp256k1_musig_keyagg_cache;
 
 
 /** Opaque data structures
@@ -111,7 +111,7 @@ typedef struct {
  *           scratch: scratch space used to compute the aggregate pubkey by
  *                    multiexponentiation. If NULL, an inefficient algorithm is used.
  *  Out:      agg_pk: the MuSig-aggregated xonly public key (cannot be NULL)
- *       pre_session: if non-NULL, pointer to a musig_pre_session struct to be used in
+ *      keyagg_cache: if non-NULL, pointer to a musig_keyagg_cache struct to be used in
  *                    `musig_process_nonces` or `musig_pubkey_tweak_add`.
  *   In:     pubkeys: input array of pointers to public keys to aggregate. The order
  *                    is important; a different order will result in a different
@@ -122,7 +122,7 @@ SECP256K1_API int secp256k1_musig_pubkey_agg(
     const secp256k1_context* ctx,
     secp256k1_scratch_space *scratch,
     secp256k1_xonly_pubkey *agg_pk,
-    secp256k1_musig_pre_session *pre_session,
+    secp256k1_musig_keyagg_cache *keyagg_cache,
     const secp256k1_xonly_pubkey * const* pubkeys,
     size_t n_pubkeys
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(5);
@@ -134,14 +134,14 @@ SECP256K1_API int secp256k1_musig_pubkey_agg(
  *  This function is only useful before initializing a signing session. If you
  *  are only computing a public key, but not intending to create a signature for
  *  it, you can just use `secp256k1_xonly_pubkey_tweak_add`. Can only be called
- *  once with a given pre_session.
+ *  once with a given keyagg_cache.
  *
  *  Returns: 0 if the arguments are invalid or the resulting public key would be
  *           invalid (only when the tweak is the negation of the corresponding
  *           secret key). 1 otherwise.
  *  Args:          ctx: pointer to a context object initialized for verification
  *                      (cannot be NULL)
- *         pre_session: pointer to a `musig_pre_session` struct initialized in
+ *        keyagg_cache: pointer to a `musig_keyagg_cache` struct initialized in
  *                      `musig_pubkey_agg` (cannot be NULL)
  *  Out: output_pubkey: pointer to a public key to store the result. Will be set
  *                      to an invalid value if this function returns 0 (cannot
@@ -157,7 +157,7 @@ SECP256K1_API int secp256k1_musig_pubkey_agg(
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_pubkey_tweak_add(
     const secp256k1_context* ctx,
-    secp256k1_musig_pre_session *pre_session,
+    secp256k1_musig_keyagg_cache *keyagg_cache,
     secp256k1_pubkey *output_pubkey,
     const secp256k1_xonly_pubkey *internal_pubkey,
     const unsigned char *tweak32
@@ -261,7 +261,7 @@ SECP256K1_API int secp256k1_musig_nonce_agg(
  *                     greater than 0.
  *              msg32: the 32-byte message to sign
  *             agg_pk: pointer to aggregate public key of all signers
- *        pre_session: pointer to the pre_session that was output when
+ *       keyagg_cache: pointer to the keyagg_cache that was output when
  *                     agg_pk was created
  *            adaptor: optional pointer to an adaptor point encoded as a public
  *                     key if this signing session is part of an adaptor
@@ -276,7 +276,7 @@ SECP256K1_API int secp256k1_musig_process_nonces(
     size_t n_pubnonces,
     const unsigned char *msg32,
     const secp256k1_xonly_pubkey *agg_pk,
-    const secp256k1_musig_pre_session *pre_session,
+    const secp256k1_musig_keyagg_cache *keyagg_cache,
     const secp256k1_pubkey *adaptor
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(7) SECP256K1_ARG_NONNULL(8) SECP256K1_ARG_NONNULL(9);
 
@@ -325,7 +325,7 @@ SECP256K1_API int secp256k1_musig_partial_signature_parse(
  *  In/Out:  secnonce: pointer to the secnonce struct created in
  *                     musig_session_init
  *  In:       keypair: pointer to keypair to sign the message with
- *        pre_session: pointer to the pre_session that was output when the
+ *       keyagg_cache: pointer to the keyagg_cache that was output when the
  *                     aggregate public key for this session
  *      session_cache: pointer to the session_cache that was created with
  *                     musig_process_nonces
@@ -335,7 +335,7 @@ SECP256K1_API int secp256k1_musig_partial_sign(
     secp256k1_musig_partial_signature *partial_sig,
     secp256k1_musig_secnonce *secnonce,
     const secp256k1_keypair *keypair,
-    const secp256k1_musig_pre_session *pre_session,
+    const secp256k1_musig_keyagg_cache *keyagg_cache,
     const secp256k1_musig_session_cache *session_cache
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6);
 
@@ -355,7 +355,7 @@ SECP256K1_API int secp256k1_musig_partial_sign(
  *        pubnonce66: the 66-byte pubnonce array sent by the signer who produced
  *                    the signature
  *            pubkey: public key of the signer who produced the signature
- *       pre_session: pointer to the pre_session that was output when the
+ *      keyagg_cache: pointer to the keyagg_cache that was output when the
  *                    aggregate public key for this session
  *     session_cache: pointer to the session_cache that was created with
  *                    musig_process_nonces
@@ -365,7 +365,7 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_verif
     const secp256k1_musig_partial_signature *partial_sig,
     const unsigned char *pubnonce66,
     const secp256k1_xonly_pubkey *pubkey,
-    const secp256k1_musig_pre_session *pre_session,
+    const secp256k1_musig_keyagg_cache *keyagg_cache,
     const secp256k1_musig_session_cache *session_cache
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6);
 

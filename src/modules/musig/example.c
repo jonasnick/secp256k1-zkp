@@ -57,7 +57,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets_t *signer_secrets, 
     const unsigned char *pubnonces[N_SIGNERS];
     const secp256k1_musig_partial_signature *partial_sigs[N_SIGNERS];
     /* The same for all signers */
-    secp256k1_musig_pre_session pre_session;
+    secp256k1_musig_keyagg_cache keyagg_cache;
     secp256k1_musig_session_cache session_cache;
     secp256k1_musig_template sig_template;
 
@@ -93,17 +93,17 @@ int sign(const secp256k1_context* ctx, struct signer_secrets_t *signer_secrets, 
         secp256k1_xonly_pubkey agg_pk;
 
         /* Create aggregate pubkey and initialize signer data */
-        if (!secp256k1_musig_pubkey_agg(ctx, NULL, &agg_pk, &pre_session, pubkeys, N_SIGNERS)) {
+        if (!secp256k1_musig_pubkey_agg(ctx, NULL, &agg_pk, &keyagg_cache, pubkeys, N_SIGNERS)) {
             return 0;
         }
-        if(!secp256k1_musig_process_nonces(ctx, &session_cache, &sig_template, NULL, pubnonces, N_SIGNERS, msg32, &agg_pk, &pre_session, NULL)) {
+        if(!secp256k1_musig_process_nonces(ctx, &session_cache, &sig_template, NULL, pubnonces, N_SIGNERS, msg32, &agg_pk, &keyagg_cache, NULL)) {
             return 0;
         }
         /* partial_sign will clear the secnonce by setting it 0. That's because
          * you must _never_ reuse the secnonce (or use the same session_id to
          * create a secnonce). If you do, you effectively reuse the nonce and
          * leak the secret key. */
-        if (!secp256k1_musig_partial_sign(ctx, &signer[i].partial_sig, &signer_secrets[i].secnonce, &signer_secrets[i].keypair, &pre_session, &session_cache)) {
+        if (!secp256k1_musig_partial_sign(ctx, &signer[i].partial_sig, &signer_secrets[i].secnonce, &signer_secrets[i].keypair, &keyagg_cache, &session_cache)) {
             return 0;
         }
         partial_sigs[i] = &signer[i].partial_sig;
@@ -121,7 +121,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets_t *signer_secrets, 
          * fine to first verify the aggregate sig, and only verify the individual
          * sigs if it does not work.
          */
-        if (!secp256k1_musig_partial_sig_verify(ctx, &signer[i].partial_sig, signer[i].pubnonce, &signer[i].pubkey, &pre_session, &session_cache)) {
+        if (!secp256k1_musig_partial_sig_verify(ctx, &signer[i].partial_sig, signer[i].pubnonce, &signer[i].pubkey, &keyagg_cache, &session_cache)) {
             return 0;
         }
     }
