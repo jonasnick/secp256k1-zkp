@@ -215,19 +215,18 @@ SECP256K1_API int secp256k1_musig_nonce_gen(
     const unsigned char *extra_input32
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(4);
 
-/** Aggregates received nonces into a single nonce
+/** Aggregates the nonces of every signer into a single nonce
  *
- *  This is useful to reduce the communication between signers, because instead
- *  of everyone sending nonces to everyone else, there can be one party
- *  receiving all nonces, combining the nonces with this function and then
- *  sending only the aggregate nonce back to the signers. The pubnonces argument
- *  of secp256k1_musig_nonce_process then simply becomes an array whose sole
- *  element is a pointer to this aggregate nonce.
+ *  This can be done by a thrid party to reduce the communication between
+ *  signers. Instead of everyone sending nonces to everyone else, there can be
+ *  one party receiving all nonces, aggregateing the nonces with this function
+ *  and then sending only the aggregate nonce back to the signers.
  *
  *  Returns: 0 if the arguments are invalid or if all signers sent invalid
  *           pubnonces, 1 otherwise
  *  Args:                 ctx: pointer to a context object (cannot be NULL)
- *  Out: agg_pubnonce66: a 66-byte array to store the aggregate pubnonce
+ *  Out: agg_pubnonce66: a 66-byte array to store the aggregate pubnonce for
+ *                       musig_nonce_process
  *  In:       pubnonces: array of pointers to the 66-byte pubnonces sent by
  *                       the signers
  *          n_pubnonces: number of elements in the pubnonces array. Must be
@@ -255,10 +254,7 @@ SECP256K1_API int secp256k1_musig_nonce_agg(
  *       nonce_parity: optional pointer to an integer that indicates the parity
  *                     of the aggregate public nonce. Used for adaptor
  *                     signatures. (can be NULL)
- * In:      pubnonces: array of pointers to the 66-byte pubnonces sent by the
- *                     signers
- *        n_pubnonces: number of elements in the pubnonces array. Must be
- *                     greater than 0.
+ * In: agg_pubnonce66: the 66-byte output of musig_nonce_agg
  *              msg32: the 32-byte message to sign
  *             agg_pk: pointer to aggregate public key of all signers
  *       keyagg_cache: pointer to the keyagg_cache that was output when
@@ -272,13 +268,12 @@ SECP256K1_API int secp256k1_musig_nonce_process(
     secp256k1_musig_session_cache *session_cache,
     secp256k1_musig_template *sig_template,
     int *nonce_parity,
-    const unsigned char * const* pubnonces,
-    size_t n_pubnonces,
+    const unsigned char *agg_pubnonce66,
     const unsigned char *msg32,
     const secp256k1_xonly_pubkey *agg_pk,
     const secp256k1_musig_keyagg_cache *keyagg_cache,
     const secp256k1_pubkey *adaptor
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(7) SECP256K1_ARG_NONNULL(8) SECP256K1_ARG_NONNULL(9);
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6) SECP256K1_ARG_NONNULL(7) SECP256K1_ARG_NONNULL(8);
 
 /** Serialize a MuSig partial signature or adaptor signature
  *
