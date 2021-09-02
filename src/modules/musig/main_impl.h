@@ -316,26 +316,92 @@ static void secp256k1_musig_sum_nonces(const secp256k1_context* ctx, secp256k1_g
     }
 }
 
-int secp256k1_musig_nonce_agg(const secp256k1_context* ctx, unsigned char *agg_pubnonce66, const unsigned char * const* pubnonces, size_t n_pubnonces) {
+/* Provided group element must not be point at infinity! */
+static void secp256k1_musig_agg_nonce_save(secp256k1_musig_agg_nonce* nonce, secp256k1_ge* ge) {
+    int i;
+    for (i = 0; i < 2; i++) {
+        VERIFY_CHECK(!secp256k1_ge_is_infinity(&ge[i]));
+        secp256k1_fe_normalize_var(&ge[i].x);
+        secp256k1_fe_normalize_var(&ge[i].y);
+        secp256k1_fe_get_b32(nonce->data + 64*i, &ge[i].x);
+        secp256k1_fe_get_b32(nonce->data + 64*i + 32, &ge[i].y);
+    }
+}
+
+/* Returns 1 unless the nonce wasn't properly initialized */
+static int secp256k1_musig_agg_nonce_load(const secp256k1_context* ctx, secp256k1_ge* ge, const secp256k1_musig_agg_nonce* nonce) {
+    int i;
+    for (i = 0; i < 2; i++) {
+        secp256k1_fe x, y;
+        secp256k1_fe_set_b32(&x, nonce->data + 64*i);
+        secp256k1_fe_set_b32(&y, nonce->data + 64*i + 32);
+        secp256k1_ge_set_xy(&ge[i], &x, &y);
+        ARG_CHECK(!secp256k1_fe_is_zero(&ge[i].x));
+    }
+    return 1;
+}
+
+int secp256k1_musig_nonce_agg(const secp256k1_context* ctx, secp256k1_musig_agg_nonce  *agg_pubnonce, const unsigned char * const* pubnonces, size_t n_pubnonces) {
     secp256k1_gej agg_nonce[2];
+    secp256k1_ge ge[2];
     int i;
 
-    ARG_CHECK(agg_pubnonce66 != NULL);
+    ARG_CHECK(agg_pubnonce != NULL);
     ARG_CHECK(pubnonces != NULL);
     ARG_CHECK(n_pubnonces > 0);
 
     secp256k1_musig_sum_nonces(ctx, agg_nonce, pubnonces, n_pubnonces);
     for (i = 0; i < 2; i++) {
-        int ret;
-        secp256k1_ge noncep;
-        size_t len = 33;
         if (secp256k1_gej_is_infinity(&agg_nonce[i])) {
             return 0;
         }
-        secp256k1_ge_set_gej(&noncep, &agg_nonce[i]);
-        ret = secp256k1_eckey_pubkey_serialize(&noncep, &agg_pubnonce66[i*33], &len, 1);
+        secp256k1_ge_set_gej(&ge[i], &agg_nonce[i]);
+    }
+    secp256k1_musig_agg_nonce_save(agg_pubnonce, ge);
+    return 1;
+}
+
+int secp256k1_musig_agg_nonce_serialize(const secp256k1_context* ctx, unsigned char *out66, const secp256k1_musig_agg_nonce* nonce) {
+    secp256k1_ge ge[2];
+    int i;
+
+    VERIFY_CHECK(ctx != NULL);
+    ARG_CHECK(out66 != NULL);
+    memset(out66, 0, 66);
+    ARG_CHECK(nonce != NULL);
+
+    if (!secp256k1_musig_agg_nonce_load(ctx, ge, nonce)) {
+        return 0;
+    }
+    for (i = 0; i < 2; i++) {
+        int ret;
+        size_t size = 33;
+        ret = secp256k1_eckey_pubkey_serialize(&ge[i], &out66[33*i], &size, 1);
+        /* serialize must succeed because the point was just loaded */
         VERIFY_CHECK(ret);
     }
+    return 1;
+}
+
+int secp256k1_musig_agg_nonce_parse(const secp256k1_context* ctx, secp256k1_musig_agg_nonce* nonce, const unsigned char *in66) {
+    secp256k1_ge ge[2];
+    int i;
+
+    VERIFY_CHECK(ctx != NULL);
+    ARG_CHECK(nonce != NULL);
+    ARG_CHECK(in66 != NULL);
+
+    for (i = 0; i < 2; i++) {
+        if (!secp256k1_eckey_pubkey_parse(&ge[i], &in66[33*i], 33)) {
+            return 0;
+        }
+        if (!secp256k1_ge_is_in_correct_subgroup(&ge[i])) {
+            return 0;
+        }
+    }
+    secp256k1_musig_agg_nonce_save(nonce, ge);
+    secp256k1_ge_clear(&ge[0]);
+    secp256k1_ge_clear(&ge[1]);
     return 1;
 }
 
@@ -414,18 +480,18 @@ static int secp256k1_musig_nonce_process_internal(const secp256k1_ecmult_context
     return 1;
 }
 
-int secp256k1_musig_nonce_process(const secp256k1_context* ctx, secp256k1_musig_session_cache *session_cache, secp256k1_musig_template *sig_template, int *nonce_parity, const unsigned char *agg_pubnonce66, const unsigned char *msg32, const secp256k1_xonly_pubkey *agg_pk, const secp256k1_musig_keyagg_cache *keyagg_cache, const secp256k1_pubkey *adaptor) {
-    secp256k1_gej agg_nonce[2];
+int secp256k1_musig_nonce_process(const secp256k1_context* ctx, secp256k1_musig_session_cache *session_cache, secp256k1_musig_template *sig_template, int *nonce_parity, const secp256k1_musig_agg_nonce  *agg_pubnonce, const unsigned char *msg32, const secp256k1_xonly_pubkey *agg_pk, const secp256k1_musig_keyagg_cache *keyagg_cache, const secp256k1_pubkey *adaptor) {
+    secp256k1_ge agg_nonce[2];
+    secp256k1_gej agg_noncej[2];
     secp256k1_ge fin_nonce;
     unsigned char agg_pk32[32];
     secp256k1_scalar s;
-    int i;
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(secp256k1_ecmult_context_is_built(&ctx->ecmult_ctx));
     ARG_CHECK(session_cache != NULL);
     ARG_CHECK(sig_template != NULL);
-    ARG_CHECK(agg_pubnonce66 != NULL);
+    ARG_CHECK(agg_pubnonce != NULL);
     ARG_CHECK(msg32 != NULL);
     ARG_CHECK(agg_pk != NULL);
     ARG_CHECK(keyagg_cache != NULL);
@@ -434,22 +500,21 @@ int secp256k1_musig_nonce_process(const secp256k1_context* ctx, secp256k1_musig_
     if (!secp256k1_xonly_pubkey_serialize(ctx, agg_pk32, agg_pk)) {
         return 0;
     }
-    for (i = 0; i < 2; i++) {
-        secp256k1_ge tmp;
-        if (!secp256k1_eckey_pubkey_parse(&tmp, &agg_pubnonce66[i*33], 33)) {
-            return 0;
-        }
-        secp256k1_gej_set_ge(&agg_nonce[i], &tmp);
+
+    if (!secp256k1_musig_agg_nonce_load(ctx, agg_nonce, agg_pubnonce)) {
+        return 0;
     }
+    secp256k1_gej_set_ge(&agg_noncej[0], &agg_nonce[0]);
+    secp256k1_gej_set_ge(&agg_noncej[1], &agg_nonce[1]);
     /* Add public adaptor to nonce */
     if (adaptor != NULL) {
         secp256k1_ge adaptorp;
         if (!secp256k1_pubkey_load(ctx, &adaptorp, adaptor)) {
             return 0;
         }
-        secp256k1_gej_add_ge_var(&agg_nonce[0], &agg_nonce[0], &adaptorp, NULL);
+        secp256k1_gej_add_ge_var(&agg_noncej[0], &agg_noncej[0], &adaptorp, NULL);
     }
-    if (!secp256k1_musig_nonce_process_internal(&ctx->ecmult_ctx, &fin_nonce, &session_cache->data[0], agg_nonce, agg_pk32, msg32)) {
+    if (!secp256k1_musig_nonce_process_internal(&ctx->ecmult_ctx, &fin_nonce, &session_cache->data[0], agg_noncej, agg_pk32, msg32)) {
         return 0;
     }
     if (!secp256k1_xonly_ge_serialize(&sig_template->data[0], &fin_nonce)) {

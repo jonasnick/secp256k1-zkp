@@ -57,6 +57,15 @@ typedef struct {
  *  serialization and parsing functions.
  */
 
+/** Opaque data structure that holds an aggregate public nonce.
+ *
+ *  Guaranteed to be 128 bytes in size. Serialized and parsed with
+ *  `musig_agg_nonce_serialize` and `musig_agg_nonce_parse`.
+ */
+typedef struct {
+    unsigned char data[128];
+} secp256k1_musig_agg_nonce;
+
 /** Opaque data structure that holds a partial MuSig signature.
  *
  *  Guaranteed to be 32 bytes in size. Serialized and parsed with
@@ -225,7 +234,7 @@ SECP256K1_API int secp256k1_musig_nonce_gen(
  *  Returns: 0 if the arguments are invalid or if all signers sent invalid
  *           pubnonces, 1 otherwise
  *  Args:                 ctx: pointer to a context object (cannot be NULL)
- *  Out: agg_pubnonce66: a 66-byte array to store the aggregate pubnonce for
+ *  Out:   agg_pubnonce: pointer to an the aggregate public nonce object for
  *                       musig_nonce_process
  *  In:       pubnonces: array of pointers to the 66-byte pubnonces sent by
  *                       the signers
@@ -234,9 +243,35 @@ SECP256K1_API int secp256k1_musig_nonce_gen(
  */
 SECP256K1_API int secp256k1_musig_nonce_agg(
     const secp256k1_context* ctx,
-    unsigned char *agg_pubnonce66,
+    secp256k1_musig_agg_nonce  *agg_pubnonce,
     const unsigned char * const* pubnonces,
     size_t n_pubnonces
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
+/** Serialize an aggregate public nonce
+ *
+ *  Returns: 1 when the nonce could be serialized, 0 otherwise
+ *  Args:    ctx: a secp256k1 context object
+ *  Out:   out32: pointer to a 66-byte array to store the serialized nonce
+ *  In:    nonce: pointer to the nonce
+ */
+SECP256K1_API int secp256k1_musig_agg_nonce_serialize(
+    const secp256k1_context* ctx,
+    unsigned char *out66,
+    const secp256k1_musig_agg_nonce* nonce
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
+/** Parse an aggregate public nonce.
+ *
+ *  Returns: 1 when the nonce could be parsed, 0 otherwise.
+ *  Args:    ctx: a secp256k1 context object
+ *  Out:   nonce: pointer to a nonce object
+ *  In:     in66: pointer to the 66-byte nonce to be parsed
+ */
+SECP256K1_API int secp256k1_musig_agg_nonce_parse(
+    const secp256k1_context* ctx,
+    secp256k1_musig_agg_nonce* nonce,
+    const unsigned char *in66
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
 /** Takes the public nonces of all signers and computes a session cache that is
@@ -254,7 +289,8 @@ SECP256K1_API int secp256k1_musig_nonce_agg(
  *       nonce_parity: optional pointer to an integer that indicates the parity
  *                     of the aggregate public nonce. Used for adaptor
  *                     signatures. (can be NULL)
- * In: agg_pubnonce66: the 66-byte output of musig_nonce_agg
+ * In:   agg_pubnonce: pointer to an the aggregate public nonce object that is
+ *                     output of musig_nonce_agg
  *              msg32: the 32-byte message to sign
  *             agg_pk: pointer to aggregate public key of all signers
  *       keyagg_cache: pointer to the keyagg_cache that was output when
@@ -268,7 +304,7 @@ SECP256K1_API int secp256k1_musig_nonce_process(
     secp256k1_musig_session_cache *session_cache,
     secp256k1_musig_template *sig_template,
     int *nonce_parity,
-    const unsigned char *agg_pubnonce66,
+    const secp256k1_musig_agg_nonce  *agg_pubnonce,
     const unsigned char *msg32,
     const secp256k1_xonly_pubkey *agg_pk,
     const secp256k1_musig_keyagg_cache *keyagg_cache,
