@@ -229,14 +229,19 @@ static void secp256k1_nonce_function_musig(secp256k1_scalar *k, const unsigned c
     }
 }
 
+static const unsigned char secp256k1_musig_secnonce_magic[4] = { 0x22, 0x0e, 0xdc, 0xf1 };
+
 static void secp256k1_musig_secnonce_save(secp256k1_musig_secnonce *secnonce, secp256k1_scalar *k) {
-    secp256k1_scalar_get_b32(&secnonce->data[0], &k[0]);
-    secp256k1_scalar_get_b32(&secnonce->data[32], &k[1]);
+    memcpy(&secnonce->data[0], secp256k1_musig_secnonce_magic, 4);
+    secp256k1_scalar_get_b32(&secnonce->data[4], &k[0]);
+    secp256k1_scalar_get_b32(&secnonce->data[36], &k[1]);
 }
 
-static void secp256k1_musig_secnonce_load(secp256k1_scalar *k, secp256k1_musig_secnonce *secnonce) {
-    secp256k1_scalar_set_b32(&k[0], &secnonce->data[0], NULL);
-    secp256k1_scalar_set_b32(&k[1], &secnonce->data[32], NULL);
+static int secp256k1_musig_secnonce_load(const secp256k1_context* ctx, secp256k1_scalar *k, secp256k1_musig_secnonce *secnonce) {
+    ARG_CHECK(memcmp(&secnonce->data[0], secp256k1_musig_secnonce_magic, 4) == 0);
+    secp256k1_scalar_set_b32(&k[0], &secnonce->data[4], NULL);
+    secp256k1_scalar_set_b32(&k[1], &secnonce->data[36], NULL);
+    return 1;
 }
 
 int secp256k1_musig_nonce_gen(const secp256k1_context* ctx, secp256k1_musig_secnonce *secnonce, unsigned char *pubnonce66, const unsigned char *session_id32, const unsigned char *seckey, const unsigned char *msg32, const secp256k1_xonly_pubkey *agg_pk, const unsigned char *extra_input32) {
@@ -589,18 +594,12 @@ int secp256k1_musig_partial_sign(const secp256k1_context* ctx, secp256k1_musig_p
     ARG_CHECK(keyagg_cache != NULL);
     ARG_CHECK(keyagg_cache->magic == keyagg_cache_magic);
     ARG_CHECK(session_cache != NULL);
-    {
-        /* Check in constant time if secnonce has been zeroed. */
-        size_t i;
-        unsigned char secnonce_acc = 0;
-        for (i = 0; i < sizeof(*secnonce); i++) {
-            secnonce_acc |= secnonce->data[i];
-        }
-        secp256k1_declassify(ctx, &secnonce_acc, sizeof(secnonce_acc));
-        ARG_CHECK(secnonce_acc != 0);
-    }
 
-    secp256k1_musig_secnonce_load(k, secnonce);
+    /* Fails if the magic doesn't match */
+    if (!secp256k1_musig_secnonce_load(ctx, k, secnonce)) {
+        memset(secnonce, 0, sizeof(*secnonce));
+        return 0;
+    }
     memset(secnonce, 0, sizeof(*secnonce));
 
     /* Obtain the signer's public key point and determine if the sk is

@@ -93,7 +93,7 @@ typedef struct {
     unsigned char data[65];
 } secp256k1_musig_session_cache;
 
-/** Guaranteed to be 64 bytes in size. This structure MUST NOT be copied or
+/** Guaranteed to be 68 bytes in size. This structure MUST NOT be copied or
  *  read or written to it directly. A signer who is online throughout the whole
  *  process and can keep this structure in memory can use the provided API
  *  functions for a safe standard workflow. See
@@ -102,7 +102,7 @@ typedef struct {
  *  this structure. There are no serialization and parsing functions (yet).
  */
 typedef struct {
-    unsigned char data[64];
+    unsigned char data[68];
 } secp256k1_musig_secnonce;
 
 /** Computes a aggregate public key and the hash of the given public keys.
