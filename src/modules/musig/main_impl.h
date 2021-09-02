@@ -229,7 +229,6 @@ static void secp256k1_nonce_function_musig(secp256k1_scalar *k, const unsigned c
     }
 }
 
-
 static void secp256k1_musig_secnonce_save(secp256k1_musig_secnonce *secnonce, secp256k1_scalar *k) {
     secp256k1_scalar_get_b32(&secnonce->data[0], &k[0]);
     secp256k1_scalar_get_b32(&secnonce->data[32], &k[1]);
@@ -248,6 +247,7 @@ int secp256k1_musig_nonce_gen(const secp256k1_context* ctx, secp256k1_musig_secn
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(secnonce != NULL);
+    memset(secnonce, 0, sizeof(*secnonce));
     ARG_CHECK(session_id32 != NULL);
     ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
     /* Check that the seckey is valid to be able to sign for it later. */
