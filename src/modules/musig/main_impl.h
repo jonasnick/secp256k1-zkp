@@ -430,18 +430,6 @@ static int secp256k1_xonly_ge_serialize(unsigned char *output32, secp256k1_ge *g
     return 1;
 }
 
-/* Compute msghash = SHA256(fin_nonce, agg_pk, msg) */
-static int secp256k1_musig_compute_messagehash(unsigned char *msghash, const unsigned char *fin_nonce32, const unsigned char *agg_pk32, const unsigned char *msg) {
-    secp256k1_sha256 sha;
-
-    secp256k1_schnorrsig_sha256_tagged(&sha);
-    secp256k1_sha256_write(&sha, fin_nonce32, 32);
-    secp256k1_sha256_write(&sha, agg_pk32, 32);
-    secp256k1_sha256_write(&sha, msg, 32);
-    secp256k1_sha256_finalize(&sha, msghash);
-    return 1;
-}
-
 /* hash(agg_nonce[0], agg_nonce[1], agg_pk, msg) */
 static int secp256k1_musig_compute_noncehash(unsigned char *noncehash, secp256k1_ge *agg_nonce, const unsigned char *agg_pk32, const unsigned char *msg) {
     unsigned char buf[33];
@@ -486,6 +474,7 @@ int secp256k1_musig_nonce_process(const secp256k1_context* ctx, secp256k1_musig_
     secp256k1_ge fin_nonce;
     unsigned char agg_pk32[32];
     secp256k1_scalar s;
+    secp256k1_scalar e;
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(secp256k1_ecmult_context_is_built(&ctx->ecmult_ctx));
@@ -530,15 +519,15 @@ int secp256k1_musig_nonce_process(const secp256k1_context* ctx, secp256k1_musig_
     }
 
     /* Compute messagehash and store in session cache */
-    secp256k1_musig_compute_messagehash(&session_cache->data[32], &sig_template->data[0], agg_pk32, msg32);
+    secp256k1_schnorrsig_challenge(&e, &sig_template->data[0], msg32, 32, agg_pk32);
+    secp256k1_scalar_get_b32(&session_cache->data[32], &e);
 
     /* If there is a tweak then set `msghash` times `tweak` to the `s`-part of the sig template.*/
     secp256k1_scalar_clear(&s);
     if (keyagg_cache->is_tweaked) {
-        secp256k1_scalar e, scalar_tweak;
+        secp256k1_scalar scalar_tweak;
         int overflow = 0;
 
-        secp256k1_scalar_set_b32(&e, &session_cache->data[32], NULL);
         secp256k1_scalar_set_b32(&scalar_tweak, keyagg_cache->tweak, &overflow);
         if (overflow || !secp256k1_eckey_privkey_tweak_mul(&e, &scalar_tweak)) {
             /* This mimics the behavior of secp256k1_ec_seckey_tweak_mul regarding
