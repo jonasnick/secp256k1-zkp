@@ -110,7 +110,7 @@ static int secp256k1_musig_pubkey_agg_callback(secp256k1_scalar *sc, secp256k1_g
     return 1;
 }
 
-static const uint64_t keyagg_cache_magic = 0xf4adbbdf7c7dd304UL;
+static const uint32_t keyagg_cache_magic = 0xf4adbbdf;
 
 int secp256k1_musig_pubkey_agg(const secp256k1_context* ctx, secp256k1_scratch_space *scratch, secp256k1_xonly_pubkey *agg_pk, secp256k1_musig_keyagg_cache *keyagg_cache, const secp256k1_xonly_pubkey * const* pubkeys, size_t n_pubkeys) {
     secp256k1_musig_pubkey_agg_ecmult_data ecmult_data;
@@ -188,8 +188,6 @@ int secp256k1_musig_pubkey_tweak_add(const secp256k1_context* ctx, secp256k1_mus
     keyagg_cache->pk_parity = secp256k1_fe_is_odd(&pk.y);
     return 1;
 }
-
-static const uint64_t session_magic = 0xd92e6fc1ee41b4cbUL;
 
 static void secp256k1_nonce_function_musig(secp256k1_scalar *k, const unsigned char *session_id, const unsigned char *key32, const unsigned char *msg32, const unsigned char *agg_pk, const unsigned char *extra_input32) {
     secp256k1_sha256 sha;

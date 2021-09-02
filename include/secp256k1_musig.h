@@ -38,7 +38,7 @@ extern "C" {
  *                 before tweaking
  */
 typedef struct {
-    uint64_t magic;
+    uint32_t magic;
     unsigned char pk_hash[32];
     unsigned char second_pk[32];
     int pk_parity;
