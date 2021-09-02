@@ -324,7 +324,7 @@ SECP256K1_API int secp256k1_musig_partial_sig_serialize(
     const secp256k1_musig_partial_sig* sig
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
-/** Parse and verify a MuSig partial signature.
+/** Parse a MuSig partial signature.
  *
  *  Returns: 1 when the signature could be parsed, 0 otherwise.
  *  Args:    ctx: a secp256k1 context object
