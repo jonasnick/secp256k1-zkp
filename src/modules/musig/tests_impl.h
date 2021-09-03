@@ -961,7 +961,8 @@ void musig_test_vectors_sign_helper(secp256k1_musig_keyagg_cache *keyagg_cache, 
         pk_ptr[i] = &pk[i];
     }
     CHECK(secp256k1_musig_pubkey_agg(ctx, NULL, &agg_pk, keyagg_cache, pk_ptr, 3) == 1);
-    memcpy(secnonce.data, state, sizeof(secnonce.data));
+    memcpy(&secnonce.data[0], secp256k1_musig_secnonce_magic, 4);
+    memcpy(&secnonce.data[4], state, sizeof(secnonce.data) - 4);
     CHECK(secp256k1_musig_agg_nonce_parse(ctx, &agg_pubnonce, agg_pubnonce_ser) == 1);
     CHECK(secp256k1_musig_nonce_process(ctx, &session_cache, &sig_template, fin_nonce_parity, &agg_pubnonce, msg, &agg_pk, keyagg_cache, NULL) == 1);
     CHECK(secp256k1_musig_partial_sign(ctx, &partial_sig, &secnonce, &signer_keypair, keyagg_cache, &session_cache) == 1);
