@@ -801,7 +801,7 @@ void musig_tweak_test(secp256k1_scratch_space *scratch) {
     musig_tweak_test_helper(&Q_xonly, sk[0], sk[1], &keyagg_cache_Q);
 }
 
-void musig_test_vectors_keyagg_helper(unsigned char pk_ser[][32], int n_pks, const unsigned char *agg_pk_expected, int has_second_pk, int second_pk_idx) {
+void musig_test_vectors_keyagg_helper(const unsigned char **pk_ser, int n_pks, const unsigned char *agg_pk_expected, int has_second_pk, int second_pk_idx) {
     secp256k1_xonly_pubkey *pk = malloc(n_pks * sizeof(*pk));
     const secp256k1_xonly_pubkey **pk_ptr = malloc(n_pks * sizeof(*pk_ptr));
     secp256k1_xonly_pubkey agg_pk;
@@ -819,7 +819,7 @@ void musig_test_vectors_keyagg_helper(unsigned char pk_ser[][32], int n_pks, con
     CHECK(secp256k1_fe_set_b32(&second_pk_x, keyagg_cache.second_pk));
     CHECK(secp256k1_fe_is_zero(&second_pk_x) == !has_second_pk);
     if (!secp256k1_fe_is_zero(&second_pk_x)) {
-        CHECK(secp256k1_memcmp_var(&pk_ser[second_pk_idx], &keyagg_cache.second_pk, sizeof(pk_ser[second_pk_idx])) == 0);
+        CHECK(secp256k1_memcmp_var(pk_ser[second_pk_idx], &keyagg_cache.second_pk, sizeof(keyagg_cache.second_pk)) == 0);
     }
     CHECK(secp256k1_xonly_pubkey_serialize(ctx, agg_pk_ser, &agg_pk));
     /* TODO: remove when test vectors are not expected to change anymore */
@@ -838,7 +838,8 @@ void musig_test_vectors_keyagg_helper(unsigned char pk_ser[][32], int n_pks, con
     free(pk_ptr);
 }
 
-const unsigned char vec_pk_ser[3][32] = {
+/* Test vector public keys */
+const unsigned char vec_pk[3][32] = {
     /* X1 */
     {
         0xF9, 0x30, 0x8A, 0x01, 0x92, 0x58, 0xC3, 0x10,
@@ -864,7 +865,7 @@ const unsigned char vec_pk_ser[3][32] = {
 
 void musig_test_vectors_keyagg(void) {
     size_t i;
-    unsigned char pk_ser_tmp[4][32];
+    const unsigned char *pk[4];
     const unsigned char agg_pk_expected[4][32] = {
         { /* 0 */
             0xE5, 0x83, 0x01, 0x40, 0x51, 0x21, 0x95, 0xD7,
@@ -900,47 +901,47 @@ void musig_test_vectors_keyagg(void) {
             case 0:
                 /* [X1, X2, X3] */
                 n_pks = 3;
-                memcpy(pk_ser_tmp[0], vec_pk_ser[0], sizeof(pk_ser_tmp[0]));
-                memcpy(pk_ser_tmp[1], vec_pk_ser[1], sizeof(pk_ser_tmp[1]));
-                memcpy(pk_ser_tmp[2], vec_pk_ser[2], sizeof(pk_ser_tmp[2]));
+                pk[0] = vec_pk[0];
+                pk[1] = vec_pk[1];
+                pk[2] = vec_pk[2];
                 has_second_pk = 1;
                 second_pk_idx = 1;
                 break;
             case 1:
                 /* [X3, X2, X1] */
                 n_pks = 3;
-                memcpy(pk_ser_tmp[2], vec_pk_ser[0], sizeof(pk_ser_tmp[0]));
-                memcpy(pk_ser_tmp[1], vec_pk_ser[1], sizeof(pk_ser_tmp[1]));
-                memcpy(pk_ser_tmp[0], vec_pk_ser[2], sizeof(pk_ser_tmp[2]));
+                pk[2] = vec_pk[0];
+                pk[1] = vec_pk[1];
+                pk[0] = vec_pk[2];
                 has_second_pk = 1;
                 second_pk_idx = 1;
                 break;
             case 2:
                 /* [X1, X1, X1] */
                 n_pks = 3;
-                memcpy(pk_ser_tmp[0], vec_pk_ser[0], sizeof(pk_ser_tmp[0]));
-                memcpy(pk_ser_tmp[1], vec_pk_ser[0], sizeof(pk_ser_tmp[1]));
-                memcpy(pk_ser_tmp[2], vec_pk_ser[0], sizeof(pk_ser_tmp[2]));
+                pk[0] = vec_pk[0];
+                pk[1] = vec_pk[0];
+                pk[2] = vec_pk[0];
                 has_second_pk = 0;
                 second_pk_idx = 0; /* unchecked */
                 break;
             case 3:
                 /* [X1, X1, X2, X2] */
                 n_pks = 4;
-                memcpy(pk_ser_tmp[0], vec_pk_ser[0], sizeof(pk_ser_tmp[0]));
-                memcpy(pk_ser_tmp[1], vec_pk_ser[0], sizeof(pk_ser_tmp[1]));
-                memcpy(pk_ser_tmp[2], vec_pk_ser[1], sizeof(pk_ser_tmp[2]));
-                memcpy(pk_ser_tmp[3], vec_pk_ser[1], sizeof(pk_ser_tmp[3]));
+                pk[0] = vec_pk[0];
+                pk[1] = vec_pk[0];
+                pk[2] = vec_pk[1];
+                pk[3] = vec_pk[1];
                 has_second_pk = 1;
                 second_pk_idx = 2; /* second_pk_idx = 3 is equally valid */
                 break;
             default:
                 CHECK(0);
         }
-        musig_test_vectors_keyagg_helper(pk_ser_tmp, n_pks, agg_pk_expected[i], has_second_pk, second_pk_idx);
+        musig_test_vectors_keyagg_helper(pk, n_pks, agg_pk_expected[i], has_second_pk, second_pk_idx);
     }
 }
-void musig_test_vectors_sign_helper(secp256k1_musig_keyagg_cache *keyagg_cache, int *fin_nonce_parity, unsigned char *sig, const unsigned char state[2][32], const unsigned char *agg_pubnonce_ser, const unsigned char *sk, const unsigned char *msg, unsigned char pk_ser[2][32], int signer_pos) {
+void musig_test_vectors_sign_helper(secp256k1_musig_keyagg_cache *keyagg_cache, int *fin_nonce_parity, unsigned char *sig, const unsigned char state[2][32], const unsigned char *agg_pubnonce_ser, const unsigned char *sk, const unsigned char *msg, const unsigned char **pk_ser, int signer_pos) {
     secp256k1_keypair signer_keypair;
     secp256k1_musig_secnonce secnonce;
     secp256k1_xonly_pubkey pk[3];
@@ -977,11 +978,13 @@ int musig_test_is_second_pk(const secp256k1_musig_keyagg_cache *keyagg_cache, co
     return memcmp(keyagg_cache->second_pk, pk_ser, sizeof(pk_ser)) == 0;
 }
 
+/* TODO: Add test vectors for failed signing */
 void musig_test_vectors_sign(void) {
-    /* TODO: Add test vectors for failed signing */
     unsigned char sig[32];
     secp256k1_musig_keyagg_cache keyagg_cache;
     int fin_nonce_parity;
+    /* The state corresponds to the two scalars that constitute the secret
+     * nonce. */
     const unsigned char state[2][32] = {
         {
             0x50, 0x8B, 0x81, 0xA6, 0x11, 0xF1, 0x00, 0xA6,
@@ -1021,9 +1024,7 @@ void musig_test_vectors_sign(void) {
         0xED, 0x21, 0x5C, 0x92, 0xAE, 0x20, 0xBA, 0xB5,
         0xC9, 0xD7, 0x9A, 0xDD, 0xDD, 0xF3, 0xC0, 0xCF,
     };
-    unsigned char pk[2][32];
-    memcpy(pk[0], vec_pk_ser[0], 32);
-    memcpy(pk[1], vec_pk_ser[1], 32);
+    const unsigned char *pk[2] = { vec_pk[0], vec_pk[1] };
 
     {
         const unsigned char sig_expected[32] = {
