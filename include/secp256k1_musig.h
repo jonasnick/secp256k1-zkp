@@ -70,6 +70,15 @@ typedef struct {
     unsigned char data[68];
 } secp256k1_musig_secnonce;
 
+/** Opaque data structure that holds a signer's public nonce.
+*
+*  Guaranteed to be 128 bytes in size. Serialized and parsed with
+*  `musig_pubnonce_serialize` and `musig_pubnonce_parse`.
+*/
+typedef struct {
+    unsigned char data[128];
+} secp256k1_musig_pubnonce;
+
 /** Opaque data structure that holds an aggregate public nonce.
  *
  *  Guaranteed to be 128 bytes in size. Serialized and parsed with
@@ -257,7 +266,7 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_pubkey_tweak_add(
  *  Args:         ctx: pointer to a context object, initialized for signing (cannot
  *                     be NULL)
  *  Out:     secnonce: pointer to a structure to store the secret nonce
- *         pubnonce66: a 66-byte array to store the public nonce
+ *           pubnonce: pointer to a structure to store the public nonce
  *  In:  session_id32: a 32-byte session_id32 as explained above. Must be
  *                     uniformly random unless you really know what you are
  *                     doing.
@@ -273,7 +282,7 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_pubkey_tweak_add(
 SECP256K1_API int secp256k1_musig_nonce_gen(
     const secp256k1_context* ctx,
     secp256k1_musig_secnonce *secnonce,
-    unsigned char *pubnonce66,
+    secp256k1_musig_pubnonce *pubnonce,
     const unsigned char *session_id32,
     const unsigned char *seckey,
     const unsigned char *msg32,
@@ -293,15 +302,15 @@ SECP256K1_API int secp256k1_musig_nonce_gen(
  *  Args:                 ctx: pointer to a context object (cannot be NULL)
  *  Out:       aggnonce: pointer to an the aggregate public nonce object for
  *                       musig_nonce_process
- *  In:       pubnonces: array of pointers to the 66-byte pubnonces sent by
- *                       the signers
+ *  In:       pubnonces: array of pointers to public nonces sent by the
+ *                       signers
  *          n_pubnonces: number of elements in the pubnonces array. Must be
  *                       greater than 0.
  */
 SECP256K1_API int secp256k1_musig_nonce_agg(
     const secp256k1_context* ctx,
     secp256k1_musig_aggnonce  *aggnonce,
-    const unsigned char * const* pubnonces,
+    const secp256k1_musig_pubnonce * const* pubnonces,
     size_t n_pubnonces
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
@@ -384,8 +393,8 @@ SECP256K1_API int secp256k1_musig_partial_sign(
  *  Args         ctx: pointer to a context object, initialized for verification
  *                    (cannot be NULL)
  *  In:  partial_sig: pointer to partial signature to verify
- *        pubnonce66: the 66-byte pubnonce array sent by the signer who produced
- *                    the signature
+ *          pubnonce: public nonce sent by the signer who produced the
+ *                    signature
  *            pubkey: public key of the signer who produced the signature
  *      keyagg_cache: pointer to the keyagg_cache that was output when the
  *                    aggregate public key for this session
@@ -395,7 +404,7 @@ SECP256K1_API int secp256k1_musig_partial_sign(
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_verify(
     const secp256k1_context* ctx,
     const secp256k1_musig_partial_sig *partial_sig,
-    const unsigned char *pubnonce66,
+    const secp256k1_musig_pubnonce *pubnonce,
     const secp256k1_xonly_pubkey *pubkey,
     const secp256k1_musig_keyagg_cache *keyagg_cache,
     const secp256k1_musig_session_cache *session_cache

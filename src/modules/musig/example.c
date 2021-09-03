@@ -22,7 +22,7 @@ struct signer_secrets_t {
 
 struct signer_t {
     secp256k1_xonly_pubkey pubkey;
-    unsigned char pubnonce[66];
+    secp256k1_musig_pubnonce pubnonce;
     secp256k1_musig_partial_sig partial_sig;
 };
 
@@ -54,7 +54,7 @@ int create_keypair(const secp256k1_context* ctx, struct signer_secrets_t *signer
 int sign(const secp256k1_context* ctx, struct signer_secrets_t *signer_secrets, struct signer_t *signer, const unsigned char* msg32, unsigned char *sig64) {
     int i;
     const secp256k1_xonly_pubkey *pubkeys[N_SIGNERS];
-    const unsigned char *pubnonces[N_SIGNERS];
+    const secp256k1_musig_pubnonce *pubnonces[N_SIGNERS];
     secp256k1_musig_aggnonce agg_pubnonce;
     const secp256k1_musig_partial_sig *partial_sigs[N_SIGNERS];
     /* The same for all signers */
@@ -83,11 +83,11 @@ int sign(const secp256k1_context* ctx, struct signer_secrets_t *signer_secrets, 
         }
         /* Initialize session and create secret nonce for signing and public
          * nonce to send to the other signers. */
-        if (!secp256k1_musig_nonce_gen(ctx, &signer_secrets[i].secnonce, signer[i].pubnonce, session_id, seckey, msg32, NULL, NULL)) {
+        if (!secp256k1_musig_nonce_gen(ctx, &signer_secrets[i].secnonce, &signer[i].pubnonce, session_id, seckey, msg32, NULL, NULL)) {
             return 0;
         }
         pubkeys[i] = &signer[i].pubkey;
-        pubnonces[i] = signer[i].pubnonce;
+        pubnonces[i] = &signer[i].pubnonce;
     }
     /* Communication round 1: Exchange nonces */
     for (i = 0; i < N_SIGNERS; i++) {
@@ -125,7 +125,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets_t *signer_secrets, 
          * fine to first verify the aggregate sig, and only verify the individual
          * sigs if it does not work.
          */
-        if (!secp256k1_musig_partial_sig_verify(ctx, &signer[i].partial_sig, signer[i].pubnonce, &signer[i].pubkey, &keyagg_cache, &session_cache)) {
+        if (!secp256k1_musig_partial_sig_verify(ctx, &signer[i].partial_sig, &signer[i].pubnonce, &signer[i].pubkey, &keyagg_cache, &session_cache)) {
             return 0;
         }
     }

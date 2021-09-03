@@ -242,8 +242,36 @@ static int secp256k1_musig_secnonce_load(const secp256k1_context* ctx, secp256k1
     return 1;
 }
 
-int secp256k1_musig_nonce_gen(const secp256k1_context* ctx, secp256k1_musig_secnonce *secnonce, unsigned char *pubnonce66, const unsigned char *session_id32, const unsigned char *seckey, const unsigned char *msg32, const secp256k1_xonly_pubkey *agg_pk, const unsigned char *extra_input32) {
+/* Works for both musig_pubnonce and musig_aggnonce. The provided group element
+ * must not be point at infinity! */
+static void secp256k1_musig_pubnonce_save(secp256k1_musig_pubnonce* nonce, secp256k1_ge* ge) {
+    int i;
+    for (i = 0; i < 2; i++) {
+        VERIFY_CHECK(!secp256k1_ge_is_infinity(&ge[i]));
+        secp256k1_fe_normalize_var(&ge[i].x);
+        secp256k1_fe_normalize_var(&ge[i].y);
+        secp256k1_fe_get_b32(nonce->data + 64*i, &ge[i].x);
+        secp256k1_fe_get_b32(nonce->data + 64*i + 32, &ge[i].y);
+    }
+}
+
+/* Works for both musig_pubnonce and musig_aggnonce. Returns 1 unless the nonce
+ * wasn't properly initialized */
+static int secp256k1_musig_pubnonce_load(const secp256k1_context* ctx, secp256k1_ge* ge, const secp256k1_musig_pubnonce* nonce) {
+    int i;
+    for (i = 0; i < 2; i++) {
+        secp256k1_fe x, y;
+        secp256k1_fe_set_b32(&x, nonce->data + 64*i);
+        secp256k1_fe_set_b32(&y, nonce->data + 64*i + 32);
+        secp256k1_ge_set_xy(&ge[i], &x, &y);
+        ARG_CHECK(!secp256k1_fe_is_zero(&ge[i].x));
+    }
+    return 1;
+}
+
+int secp256k1_musig_nonce_gen(const secp256k1_context* ctx, secp256k1_musig_secnonce *secnonce, secp256k1_musig_pubnonce *pubnonce, const unsigned char *session_id32, const unsigned char *seckey, const unsigned char *msg32, const secp256k1_xonly_pubkey *agg_pk, const unsigned char *extra_input32) {
     secp256k1_scalar k[2];
+    secp256k1_ge nonce_pt[2];
     int i;
     unsigned char pk_ser[32];
     unsigned char *pk_ser_ptr = pk_ser;
@@ -251,6 +279,8 @@ int secp256k1_musig_nonce_gen(const secp256k1_context* ctx, secp256k1_musig_secn
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(secnonce != NULL);
     memset(secnonce, 0, sizeof(*secnonce));
+    ARG_CHECK(pubnonce != NULL);
+    memset(pubnonce, 0, sizeof(*pubnonce));
     ARG_CHECK(session_id32 != NULL);
     ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
     /* Check that the seckey is valid to be able to sign for it later. */
@@ -277,94 +307,18 @@ int secp256k1_musig_nonce_gen(const secp256k1_context* ctx, secp256k1_musig_secn
     secp256k1_nonce_function_musig(k, session_id32, seckey, msg32, pk_ser_ptr, extra_input32);
     secp256k1_musig_secnonce_save(secnonce, k);
 
-    if (pubnonce66 != NULL) {
-        for (i = 0; i < 2; i++) {
-            secp256k1_ge nonce;
-            secp256k1_gej noncej;
-            size_t len = 33;
-            int ret;
-            secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &noncej, &k[i]);
-            secp256k1_ge_set_gej(&nonce, &noncej);
-            secp256k1_declassify(ctx, &nonce, sizeof(nonce));
-            ret = secp256k1_eckey_pubkey_serialize(&nonce, &pubnonce66[i*33], &len, 1);
-            VERIFY_CHECK(ret);
-            secp256k1_scalar_clear(&k[i]);
-        }
+    for (i = 0; i < 2; i++) {
+        secp256k1_gej nonce_ptj;
+        secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &nonce_ptj, &k[i]);
+        secp256k1_ge_set_gej(&nonce_pt[i], &nonce_ptj);
+        secp256k1_declassify(ctx, &nonce_pt[i], sizeof(nonce_pt));
+        secp256k1_scalar_clear(&k[i]);
     }
+    secp256k1_musig_pubnonce_save(pubnonce, nonce_pt);
     return 1;
 }
 
-static void secp256k1_musig_sum_nonces(const secp256k1_context* ctx, secp256k1_gej *summed_nonces, const unsigned char * const* pubnonces, size_t n_pubnonces) {
-    size_t i;
-    int j;
-
-    secp256k1_gej_set_infinity(&summed_nonces[0]);
-    secp256k1_gej_set_infinity(&summed_nonces[1]);
-
-    for (i = 0; i < n_pubnonces; i++) {
-        for (j = 0; j < 2; j++) {
-            secp256k1_pubkey nonce;
-            secp256k1_ge noncep;
-            int ret;
-            if (!secp256k1_ec_pubkey_parse(ctx, &nonce, &pubnonces[i][j*33], 33)) {
-                /* Ignore if a nonce is invalid. partial_sig_verify will return
-                 * 0 in that case. */
-                continue;
-            }
-            ret = secp256k1_pubkey_load(ctx, &noncep, &nonce);
-            /* Successfully parsed pubkey is always valid */
-            VERIFY_CHECK(ret);
-            secp256k1_gej_add_ge_var(&summed_nonces[j], &summed_nonces[j], &noncep, NULL);
-        }
-    }
-}
-
-/* Provided group element must not be point at infinity! */
-static void secp256k1_musig_aggnonce_save(secp256k1_musig_aggnonce* nonce, secp256k1_ge* ge) {
-    int i;
-    for (i = 0; i < 2; i++) {
-        VERIFY_CHECK(!secp256k1_ge_is_infinity(&ge[i]));
-        secp256k1_fe_normalize_var(&ge[i].x);
-        secp256k1_fe_normalize_var(&ge[i].y);
-        secp256k1_fe_get_b32(nonce->data + 64*i, &ge[i].x);
-        secp256k1_fe_get_b32(nonce->data + 64*i + 32, &ge[i].y);
-    }
-}
-
-/* Returns 1 unless the nonce wasn't properly initialized */
-static int secp256k1_musig_aggnonce_load(const secp256k1_context* ctx, secp256k1_ge* ge, const secp256k1_musig_aggnonce* nonce) {
-    int i;
-    for (i = 0; i < 2; i++) {
-        secp256k1_fe x, y;
-        secp256k1_fe_set_b32(&x, nonce->data + 64*i);
-        secp256k1_fe_set_b32(&y, nonce->data + 64*i + 32);
-        secp256k1_ge_set_xy(&ge[i], &x, &y);
-        ARG_CHECK(!secp256k1_fe_is_zero(&ge[i].x));
-    }
-    return 1;
-}
-
-int secp256k1_musig_nonce_agg(const secp256k1_context* ctx, secp256k1_musig_aggnonce  *aggnonce, const unsigned char * const* pubnonces, size_t n_pubnonces) {
-    secp256k1_gej aggnonce_ptj[2];
-    secp256k1_ge aggnonce_pt[2];
-    int i;
-
-    ARG_CHECK(aggnonce != NULL);
-    ARG_CHECK(pubnonces != NULL);
-    ARG_CHECK(n_pubnonces > 0);
-
-    secp256k1_musig_sum_nonces(ctx, aggnonce_ptj, pubnonces, n_pubnonces);
-    for (i = 0; i < 2; i++) {
-        if (secp256k1_gej_is_infinity(&aggnonce_ptj[i])) {
-            return 0;
-        }
-        secp256k1_ge_set_gej(&aggnonce_pt[i], &aggnonce_ptj[i]);
-    }
-    secp256k1_musig_aggnonce_save(aggnonce, aggnonce_pt);
-    return 1;
-}
-
-int secp256k1_musig_aggnonce_serialize(const secp256k1_context* ctx, unsigned char *out66, const secp256k1_musig_aggnonce* nonce) {
+int secp256k1_musig_pubnonce_serialize(const secp256k1_context* ctx, unsigned char *out66, const secp256k1_musig_pubnonce* nonce) {
     secp256k1_ge ge[2];
     int i;
 
@@ -373,7 +327,7 @@ int secp256k1_musig_aggnonce_serialize(const secp256k1_context* ctx, unsigned ch
     memset(out66, 0, 66);
     ARG_CHECK(nonce != NULL);
 
-    if (!secp256k1_musig_aggnonce_load(ctx, ge, nonce)) {
+    if (!secp256k1_musig_pubnonce_load(ctx, ge, nonce)) {
         return 0;
     }
     for (i = 0; i < 2; i++) {
@@ -386,7 +340,7 @@ int secp256k1_musig_aggnonce_serialize(const secp256k1_context* ctx, unsigned ch
     return 1;
 }
 
-int secp256k1_musig_aggnonce_parse(const secp256k1_context* ctx, secp256k1_musig_aggnonce* nonce, const unsigned char *in66) {
+int secp256k1_musig_pubnonce_parse(const secp256k1_context* ctx, secp256k1_musig_pubnonce* nonce, const unsigned char *in66) {
     secp256k1_ge ge[2];
     int i;
 
@@ -402,10 +356,59 @@ int secp256k1_musig_aggnonce_parse(const secp256k1_context* ctx, secp256k1_musig
             return 0;
         }
     }
-    secp256k1_musig_aggnonce_save(nonce, ge);
+    secp256k1_musig_pubnonce_save(nonce, ge);
     secp256k1_ge_clear(&ge[0]);
     secp256k1_ge_clear(&ge[1]);
     return 1;
+}
+
+static int secp256k1_musig_sum_nonces(const secp256k1_context* ctx, secp256k1_gej *summed_nonces, const secp256k1_musig_pubnonce * const* pubnonces, size_t n_pubnonces) {
+    size_t i;
+    int j;
+
+    secp256k1_gej_set_infinity(&summed_nonces[0]);
+    secp256k1_gej_set_infinity(&summed_nonces[1]);
+
+    for (i = 0; i < n_pubnonces; i++) {
+        secp256k1_ge nonce_pt[2];
+        if (!secp256k1_musig_pubnonce_load(ctx, nonce_pt, pubnonces[i])) {
+            return 0;
+        }
+        for (j = 0; j < 2; j++) {
+            secp256k1_gej_add_ge_var(&summed_nonces[j], &summed_nonces[j], &nonce_pt[j], NULL);
+        }
+    }
+    return 1;
+}
+
+int secp256k1_musig_nonce_agg(const secp256k1_context* ctx, secp256k1_musig_aggnonce  *aggnonce, const secp256k1_musig_pubnonce * const* pubnonces, size_t n_pubnonces) {
+    secp256k1_gej aggnonce_ptj[2];
+    secp256k1_ge aggnonce_pt[2];
+    int i;
+
+    ARG_CHECK(aggnonce != NULL);
+    ARG_CHECK(pubnonces != NULL);
+    ARG_CHECK(n_pubnonces > 0);
+
+    if (!secp256k1_musig_sum_nonces(ctx, aggnonce_ptj, pubnonces, n_pubnonces)) {
+        return 0;
+    }
+    for (i = 0; i < 2; i++) {
+        if (secp256k1_gej_is_infinity(&aggnonce_ptj[i])) {
+            return 0;
+        }
+        secp256k1_ge_set_gej(&aggnonce_pt[i], &aggnonce_ptj[i]);
+    }
+    secp256k1_musig_pubnonce_save((secp256k1_musig_pubnonce*)aggnonce, aggnonce_pt);
+    return 1;
+}
+
+int secp256k1_musig_aggnonce_serialize(const secp256k1_context* ctx, unsigned char *out66, const secp256k1_musig_aggnonce* nonce) {
+    return secp256k1_musig_pubnonce_serialize(ctx, out66, (secp256k1_musig_pubnonce*) nonce);
+}
+
+int secp256k1_musig_aggnonce_parse(const secp256k1_context* ctx, secp256k1_musig_aggnonce* nonce, const unsigned char *in66) {
+    return secp256k1_musig_pubnonce_parse(ctx, (secp256k1_musig_pubnonce*) nonce, in66);
 }
 
 /* A session cache consists of the 32 byte nonce aggregation coefficient b, the
@@ -493,7 +496,7 @@ int secp256k1_musig_nonce_process(const secp256k1_context* ctx, secp256k1_musig_
         return 0;
     }
 
-    if (!secp256k1_musig_aggnonce_load(ctx, aggnonce_pt, aggnonce)) {
+    if (!secp256k1_musig_pubnonce_load(ctx, aggnonce_pt, (secp256k1_musig_pubnonce*)aggnonce)) {
         return 0;
     }
     secp256k1_gej_set_ge(&aggnonce_ptj[0], &aggnonce_pt[0]);
@@ -654,10 +657,10 @@ int secp256k1_musig_partial_sign(const secp256k1_context* ctx, secp256k1_musig_p
     return 1;
 }
 
-int secp256k1_musig_partial_sig_verify(const secp256k1_context* ctx, const secp256k1_musig_partial_sig *partial_sig, const unsigned char *pubnonce66, const secp256k1_xonly_pubkey *pubkey, const secp256k1_musig_keyagg_cache *keyagg_cache, const secp256k1_musig_session_cache *session_cache) {
+int secp256k1_musig_partial_sig_verify(const secp256k1_context* ctx, const secp256k1_musig_partial_sig *partial_sig, const secp256k1_musig_pubnonce *pubnonce, const secp256k1_xonly_pubkey *pubkey, const secp256k1_musig_keyagg_cache *keyagg_cache, const secp256k1_musig_session_cache *session_cache) {
     secp256k1_scalar mu, b, e, s;
     secp256k1_gej pkj;
-    secp256k1_ge aggnonce[2];
+    secp256k1_ge nonce_pt[2];
     secp256k1_gej rj;
     secp256k1_gej tmp;
     secp256k1_ge pkp;
@@ -667,7 +670,7 @@ int secp256k1_musig_partial_sig_verify(const secp256k1_context* ctx, const secp2
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(secp256k1_ecmult_context_is_built(&ctx->ecmult_ctx));
     ARG_CHECK(partial_sig != NULL);
-    ARG_CHECK(pubnonce66 != NULL);
+    ARG_CHECK(pubnonce != NULL);
     ARG_CHECK(pubkey != NULL);
     ARG_CHECK(keyagg_cache != NULL);
     ARG_CHECK(keyagg_cache->magic == keyagg_cache_magic);
@@ -678,18 +681,13 @@ int secp256k1_musig_partial_sig_verify(const secp256k1_context* ctx, const secp2
     /* Compute "effective" nonce rj = aggnonce[0] + b*aggnonce[1] */
     /* TODO: use multiexp */
     for (i = 0; i < 2; i++) {
-        secp256k1_pubkey n;
-        int ret;
-        if (!secp256k1_ec_pubkey_parse(ctx, &n, &pubnonce66[i*33], 33)) {
+        if (!secp256k1_musig_pubnonce_load(ctx, nonce_pt, pubnonce)) {
             return 0;
         }
-        ret = secp256k1_pubkey_load(ctx, &aggnonce[i], &n);
-        /* Successfully parsed pubkey is always valid */
-        VERIFY_CHECK(ret);
     }
-    secp256k1_gej_set_ge(&rj, &aggnonce[1]);
+    secp256k1_gej_set_ge(&rj, &nonce_pt[1]);
     secp256k1_ecmult(&ctx->ecmult_ctx, &rj, &rj, &b, NULL);
-    secp256k1_gej_add_ge_var(&rj, &rj, &aggnonce[0], NULL);
+    secp256k1_gej_add_ge_var(&rj, &rj, &nonce_pt[0], NULL);
 
     if (!secp256k1_xonly_pubkey_load(ctx, &pkp, pubkey)) {
         return 0;
