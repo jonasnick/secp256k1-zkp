@@ -10,11 +10,12 @@ extern "C" {
 #include <stdint.h>
 
 /** This module implements a Schnorr-based multi-signature scheme called MuSig2
- * (https://eprint.iacr.org/2020/1261). It is compatible with bip-schnorr.
+ * (https://eprint.iacr.org/2020/1261). It is compatible with BIP-340 ("Schnorr").
  * There's an example C source file in the module's directory
  * (src/modules/musig/example.c) that demonstrates how it can be used.
  *
- * The module also supports adaptor signatures as described in
+ * The module also supports BIP-341 ("Taproot") public key tweaking and adaptor
+ * signatures as described in
  * https://github.com/ElementsProject/scriptless-scripts/pull/24
  *
  * The documentation in this include file is for reference and may not be sufficient
@@ -57,6 +58,18 @@ typedef struct {
  *  serialization and parsing functions.
  */
 
+/** Guaranteed to be 68 bytes in size. This structure MUST NOT be copied or
+ *  read or written to it directly. A signer who is online throughout the whole
+ *  process and can keep this structure in memory can use the provided API
+ *  functions for a safe standard workflow. See
+ *  https://blockstream.com/2019/02/18/musig-a-new-multisignature-standard/ for
+ *  more details about the risks associated with serializing or deserializing
+ *  this structure. There are no serialization and parsing functions (yet).
+ */
+typedef struct {
+    unsigned char data[68];
+} secp256k1_musig_secnonce;
+
 /** Opaque data structure that holds an aggregate public nonce.
  *
  *  Guaranteed to be 128 bytes in size. Serialized and parsed with
@@ -93,17 +106,61 @@ typedef struct {
     unsigned char data[65];
 } secp256k1_musig_session_cache;
 
-/** Guaranteed to be 68 bytes in size. This structure MUST NOT be copied or
- *  read or written to it directly. A signer who is online throughout the whole
- *  process and can keep this structure in memory can use the provided API
- *  functions for a safe standard workflow. See
- *  https://blockstream.com/2019/02/18/musig-a-new-multisignature-standard/ for
- *  more details about the risks associated with serializing or deserializing
- *  this structure. There are no serialization and parsing functions (yet).
+/** Serialize an aggregate public nonce
+ *
+ *  Returns: 1 when the nonce could be serialized, 0 otherwise
+ *  Args:    ctx: a secp256k1 context object
+ *  Out:   out32: pointer to a 66-byte array to store the serialized nonce
+ *  In:    nonce: pointer to the nonce
  */
-typedef struct {
-    unsigned char data[68];
-} secp256k1_musig_secnonce;
+SECP256K1_API int secp256k1_musig_aggnonce_serialize(
+    const secp256k1_context* ctx,
+    unsigned char *out66,
+    const secp256k1_musig_aggnonce* nonce
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
+/** Parse an aggregate public nonce.
+ *
+ *  Returns: 1 when the nonce could be parsed, 0 otherwise.
+ *  Args:    ctx: a secp256k1 context object
+ *  Out:   nonce: pointer to a nonce object
+ *  In:     in66: pointer to the 66-byte nonce to be parsed
+ */
+SECP256K1_API int secp256k1_musig_aggnonce_parse(
+    const secp256k1_context* ctx,
+    secp256k1_musig_aggnonce* nonce,
+    const unsigned char *in66
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
+/** Serialize a MuSig partial signature or adaptor signature
+ *
+ *  Returns: 1 when the signature could be serialized, 0 otherwise
+ *  Args:    ctx: a secp256k1 context object
+ *  Out:   out32: pointer to a 32-byte array to store the serialized signature
+ *  In:      sig: pointer to the signature
+ */
+SECP256K1_API int secp256k1_musig_partial_sig_serialize(
+    const secp256k1_context* ctx,
+    unsigned char *out32,
+    const secp256k1_musig_partial_sig* sig
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
+/** Parse a MuSig partial signature.
+ *
+ *  Returns: 1 when the signature could be parsed, 0 otherwise.
+ *  Args:    ctx: a secp256k1 context object
+ *  Out:     sig: pointer to a signature object
+ *  In:     in32: pointer to the 32-byte signature to be parsed
+ *
+ *  After the call, sig will always be initialized. If parsing failed or the
+ *  encoded numbers are out of range, signature verification with it is
+ *  guaranteed to fail for every message and public key.
+ */
+SECP256K1_API int secp256k1_musig_partial_sig_parse(
+    const secp256k1_context* ctx,
+    secp256k1_musig_partial_sig* sig,
+    const unsigned char *in32
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
 /** Computes a aggregate public key and the hash of the given public keys.
  *
@@ -248,32 +305,6 @@ SECP256K1_API int secp256k1_musig_nonce_agg(
     size_t n_pubnonces
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
-/** Serialize an aggregate public nonce
- *
- *  Returns: 1 when the nonce could be serialized, 0 otherwise
- *  Args:    ctx: a secp256k1 context object
- *  Out:   out32: pointer to a 66-byte array to store the serialized nonce
- *  In:    nonce: pointer to the nonce
- */
-SECP256K1_API int secp256k1_musig_aggnonce_serialize(
-    const secp256k1_context* ctx,
-    unsigned char *out66,
-    const secp256k1_musig_aggnonce* nonce
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
-
-/** Parse an aggregate public nonce.
- *
- *  Returns: 1 when the nonce could be parsed, 0 otherwise.
- *  Args:    ctx: a secp256k1 context object
- *  Out:   nonce: pointer to a nonce object
- *  In:     in66: pointer to the 66-byte nonce to be parsed
- */
-SECP256K1_API int secp256k1_musig_aggnonce_parse(
-    const secp256k1_context* ctx,
-    secp256k1_musig_aggnonce* nonce,
-    const unsigned char *in66
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
-
 /** Takes the public nonces of all signers and computes a session cache that is
  *  required for signing and verification of partial signatures and a signature
  *  template that is required for combining partial signatures.
@@ -310,36 +341,6 @@ SECP256K1_API int secp256k1_musig_nonce_process(
     const secp256k1_musig_keyagg_cache *keyagg_cache,
     const secp256k1_pubkey *adaptor
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6) SECP256K1_ARG_NONNULL(7) SECP256K1_ARG_NONNULL(8);
-
-/** Serialize a MuSig partial signature or adaptor signature
- *
- *  Returns: 1 when the signature could be serialized, 0 otherwise
- *  Args:    ctx: a secp256k1 context object
- *  Out:   out32: pointer to a 32-byte array to store the serialized signature
- *  In:      sig: pointer to the signature
- */
-SECP256K1_API int secp256k1_musig_partial_sig_serialize(
-    const secp256k1_context* ctx,
-    unsigned char *out32,
-    const secp256k1_musig_partial_sig* sig
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
-
-/** Parse a MuSig partial signature.
- *
- *  Returns: 1 when the signature could be parsed, 0 otherwise.
- *  Args:    ctx: a secp256k1 context object
- *  Out:     sig: pointer to a signature object
- *  In:     in32: pointer to the 32-byte signature to be parsed
- *
- *  After the call, sig will always be initialized. If parsing failed or the
- *  encoded numbers are out of range, signature verification with it is
- *  guaranteed to fail for every message and public key.
- */
-SECP256K1_API int secp256k1_musig_partial_sig_parse(
-    const secp256k1_context* ctx,
-    secp256k1_musig_partial_sig* sig,
-    const unsigned char *in32
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
 /** Produces a partial signature
  *
