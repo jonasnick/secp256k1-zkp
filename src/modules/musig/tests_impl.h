@@ -27,7 +27,7 @@ void musig_simple_test(secp256k1_scratch_space *scratch) {
     secp256k1_keypair keypair[2];
     unsigned char pubnonce[2][66];
     const unsigned char *pubnonce_ptr[2];
-    secp256k1_musig_agg_nonce agg_nonce;
+    secp256k1_musig_aggnonce aggnonce;
     unsigned char msg[32];
     secp256k1_xonly_pubkey agg_pk;
     secp256k1_musig_keyagg_cache keyagg_cache;
@@ -58,8 +58,8 @@ void musig_simple_test(secp256k1_scratch_space *scratch) {
     CHECK(secp256k1_musig_nonce_gen(ctx, &secnonce[1], pubnonce[1], session_id[1], sk[1], NULL, NULL, NULL) == 1);
 
 
-    CHECK(secp256k1_musig_nonce_agg(ctx, &agg_nonce, pubnonce_ptr, 2) == 1);
-    CHECK(secp256k1_musig_nonce_process(ctx, &session_cache, &sig_template, NULL, &agg_nonce, msg, &agg_pk, &keyagg_cache, NULL) == 1);
+    CHECK(secp256k1_musig_nonce_agg(ctx, &aggnonce, pubnonce_ptr, 2) == 1);
+    CHECK(secp256k1_musig_nonce_process(ctx, &session_cache, &sig_template, NULL, &aggnonce, msg, &agg_pk, &keyagg_cache, NULL) == 1);
 
     CHECK(secp256k1_musig_partial_sign(ctx, &partial_sig[0], &secnonce[0], &keypair[0], &keyagg_cache, &session_cache) == 1);
     CHECK(secp256k1_musig_partial_sig_verify(ctx, &partial_sig[0], pubnonce[0], &pk[0], &keyagg_cache, &session_cache) == 1);
@@ -113,8 +113,8 @@ void musig_api_tests(secp256k1_scratch_space *scratch) {
     const unsigned char *invalid_pubnonce_ptr[1];
     unsigned char inf_pubnonce[2][66];
     const unsigned char *inf_pubnonce_ptr[2];
-    secp256k1_musig_agg_nonce agg_pnonce;
-    unsigned char agg_nonce_ser[66];
+    secp256k1_musig_aggnonce aggnonce;
+    unsigned char aggnonce_ser[66];
     unsigned char msg[32];
     secp256k1_xonly_pubkey agg_pk;
     secp256k1_musig_keyagg_cache keyagg_cache;
@@ -282,83 +282,83 @@ void musig_api_tests(secp256k1_scratch_space *scratch) {
 
     /** Receive nonces and aggregate**/
     ecount = 0;
-    CHECK(secp256k1_musig_nonce_agg(none, &agg_pnonce, pubnonce_ptr, 2) == 1);
+    CHECK(secp256k1_musig_nonce_agg(none, &aggnonce, pubnonce_ptr, 2) == 1);
     CHECK(secp256k1_musig_nonce_agg(none, NULL, pubnonce_ptr, 2) == 0);
     CHECK(ecount == 1);
-    CHECK(secp256k1_musig_nonce_agg(none, &agg_pnonce, NULL, 2) == 0);
+    CHECK(secp256k1_musig_nonce_agg(none, &aggnonce, NULL, 2) == 0);
     CHECK(ecount == 2);
-    CHECK(secp256k1_musig_nonce_agg(none, &agg_pnonce, pubnonce_ptr, 0) == 0);
+    CHECK(secp256k1_musig_nonce_agg(none, &aggnonce, pubnonce_ptr, 0) == 0);
     CHECK(ecount == 3);
-    CHECK(secp256k1_musig_nonce_agg(none, &agg_pnonce, invalid_pubnonce_ptr, 1) == 0);
+    CHECK(secp256k1_musig_nonce_agg(none, &aggnonce, invalid_pubnonce_ptr, 1) == 0);
     CHECK(ecount == 3);
-    CHECK(secp256k1_musig_nonce_agg(none, &agg_pnonce, inf_pubnonce_ptr, 2) == 0);
+    CHECK(secp256k1_musig_nonce_agg(none, &aggnonce, inf_pubnonce_ptr, 2) == 0);
     CHECK(ecount == 3);
 
     /** Serialize and parse nonces **/
     ecount = 0;
-    CHECK(secp256k1_musig_agg_nonce_serialize(none, agg_nonce_ser, &agg_pnonce) == 1);
-    CHECK(secp256k1_musig_agg_nonce_serialize(none, NULL, &agg_pnonce) == 0);
+    CHECK(secp256k1_musig_aggnonce_serialize(none, aggnonce_ser, &aggnonce) == 1);
+    CHECK(secp256k1_musig_aggnonce_serialize(none, NULL, &aggnonce) == 0);
     CHECK(ecount == 1);
-    CHECK(secp256k1_musig_agg_nonce_serialize(none, agg_nonce_ser, NULL) == 0);
+    CHECK(secp256k1_musig_aggnonce_serialize(none, aggnonce_ser, NULL) == 0);
     CHECK(ecount == 2);
-    CHECK(memcmp(zeros68, agg_nonce_ser, sizeof(agg_nonce_ser)) == 0);
+    CHECK(memcmp(zeros68, aggnonce_ser, sizeof(aggnonce_ser)) == 0);
     {
-        secp256k1_musig_agg_nonce agg_nonce_tmp;
-        memset(&agg_nonce_tmp, 0, sizeof(agg_nonce_tmp));
-        CHECK(secp256k1_musig_agg_nonce_serialize(none, agg_nonce_ser, &agg_nonce_tmp) == 0);
+        secp256k1_musig_aggnonce aggnonce_tmp;
+        memset(&aggnonce_tmp, 0, sizeof(aggnonce_tmp));
+        CHECK(secp256k1_musig_aggnonce_serialize(none, aggnonce_ser, &aggnonce_tmp) == 0);
         CHECK(ecount == 3);
-        CHECK(memcmp(zeros68, agg_nonce_ser, sizeof(agg_nonce_ser)) == 0);
+        CHECK(memcmp(zeros68, aggnonce_ser, sizeof(aggnonce_ser)) == 0);
     }
-    CHECK(secp256k1_musig_agg_nonce_serialize(none, agg_nonce_ser, &agg_pnonce) == 1);
+    CHECK(secp256k1_musig_aggnonce_serialize(none, aggnonce_ser, &aggnonce) == 1);
 
     ecount = 0;
-    CHECK(secp256k1_musig_agg_nonce_parse(none, &agg_pnonce, agg_nonce_ser) == 1);
-    CHECK(secp256k1_musig_agg_nonce_parse(none, NULL, agg_nonce_ser) == 0);
+    CHECK(secp256k1_musig_aggnonce_parse(none, &aggnonce, aggnonce_ser) == 1);
+    CHECK(secp256k1_musig_aggnonce_parse(none, NULL, aggnonce_ser) == 0);
     CHECK(ecount == 1);
-    CHECK(secp256k1_musig_agg_nonce_parse(none, &agg_pnonce, NULL) == 0);
+    CHECK(secp256k1_musig_aggnonce_parse(none, &aggnonce, NULL) == 0);
     CHECK(ecount == 2);
-    CHECK(secp256k1_musig_agg_nonce_parse(none, &agg_pnonce, zeros68) == 0);
+    CHECK(secp256k1_musig_aggnonce_parse(none, &aggnonce, zeros68) == 0);
     CHECK(ecount == 2);
-    CHECK(secp256k1_musig_agg_nonce_parse(none, &agg_pnonce, agg_nonce_ser) == 1);
+    CHECK(secp256k1_musig_aggnonce_parse(none, &aggnonce, aggnonce_ser) == 1);
 
     /** Process nonces **/
     ecount = 0;
-    CHECK(secp256k1_musig_nonce_process(none, &session_cache, &sig_template, &nonce_parity, &agg_pnonce, msg, &agg_pk, &keyagg_cache, &adaptor) == 0);
+    CHECK(secp256k1_musig_nonce_process(none, &session_cache, &sig_template, &nonce_parity, &aggnonce, msg, &agg_pk, &keyagg_cache, &adaptor) == 0);
     CHECK(ecount == 1);
-    CHECK(secp256k1_musig_nonce_process(sign, &session_cache, &sig_template, &nonce_parity, &agg_pnonce, msg, &agg_pk, &keyagg_cache, &adaptor) == 0);
+    CHECK(secp256k1_musig_nonce_process(sign, &session_cache, &sig_template, &nonce_parity, &aggnonce, msg, &agg_pk, &keyagg_cache, &adaptor) == 0);
     CHECK(ecount == 2);
-    CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, &sig_template, NULL, &agg_pnonce, msg, &agg_pk, &keyagg_cache, &adaptor) == 1);
+    CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, &sig_template, NULL, &aggnonce, msg, &agg_pk, &keyagg_cache, &adaptor) == 1);
     CHECK(ecount == 2);
-    CHECK(secp256k1_musig_nonce_process(vrfy, NULL, &sig_template, &nonce_parity, &agg_pnonce, msg, &agg_pk, &keyagg_cache, &adaptor) == 0);
+    CHECK(secp256k1_musig_nonce_process(vrfy, NULL, &sig_template, &nonce_parity, &aggnonce, msg, &agg_pk, &keyagg_cache, &adaptor) == 0);
     CHECK(ecount == 3);
-    CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, NULL, &nonce_parity, &agg_pnonce, msg, &agg_pk, &keyagg_cache, &adaptor) == 0);
+    CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, NULL, &nonce_parity, &aggnonce, msg, &agg_pk, &keyagg_cache, &adaptor) == 0);
     CHECK(ecount == 4);
-    CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, &sig_template, NULL, &agg_pnonce, msg, &agg_pk, &keyagg_cache, &adaptor) == 1);
+    CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, &sig_template, NULL, &aggnonce, msg, &agg_pk, &keyagg_cache, &adaptor) == 1);
     CHECK(ecount == 4);
     CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, &sig_template, &nonce_parity, NULL, msg, &agg_pk, &keyagg_cache, &adaptor) == 0);
     CHECK(ecount == 5);
     {
-        secp256k1_musig_agg_nonce agg_nonce_tmp;
-        memset(&agg_nonce_tmp, 0, sizeof(agg_nonce_tmp));
-        CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, &sig_template, &nonce_parity, &agg_nonce_tmp, msg, &agg_pk, &keyagg_cache, &adaptor) == 0);
+        secp256k1_musig_aggnonce aggnonce_tmp;
+        memset(&aggnonce_tmp, 0, sizeof(aggnonce_tmp));
+        CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, &sig_template, &nonce_parity, &aggnonce_tmp, msg, &agg_pk, &keyagg_cache, &adaptor) == 0);
         CHECK(ecount == 6);
     }
-    CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, &sig_template, &nonce_parity, &agg_pnonce, NULL, &agg_pk, &keyagg_cache, &adaptor) == 0);
+    CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, &sig_template, &nonce_parity, &aggnonce, NULL, &agg_pk, &keyagg_cache, &adaptor) == 0);
     CHECK(ecount == 7);
-    CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, &sig_template, &nonce_parity, &agg_pnonce, msg, NULL, &keyagg_cache, &adaptor) == 0);
+    CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, &sig_template, &nonce_parity, &aggnonce, msg, NULL, &keyagg_cache, &adaptor) == 0);
     CHECK(ecount == 8);
-    CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, &sig_template, &nonce_parity, &agg_pnonce, msg, &invalid_pk, &keyagg_cache, &adaptor) == 0);
+    CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, &sig_template, &nonce_parity, &aggnonce, msg, &invalid_pk, &keyagg_cache, &adaptor) == 0);
     CHECK(ecount == 9);
-    CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, &sig_template, &nonce_parity, &agg_pnonce, msg, &agg_pk, NULL, &adaptor) == 0);
+    CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, &sig_template, &nonce_parity, &aggnonce, msg, &agg_pk, NULL, &adaptor) == 0);
     CHECK(ecount == 10);
-    CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, &sig_template, &nonce_parity, &agg_pnonce, msg, &agg_pk, &keyagg_cache_uninit, &adaptor) == 0);
+    CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, &sig_template, &nonce_parity, &aggnonce, msg, &agg_pk, &keyagg_cache_uninit, &adaptor) == 0);
     CHECK(ecount == 11);
-    CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, &sig_template, &nonce_parity, &agg_pnonce, msg, &agg_pk, &keyagg_cache, NULL) == 1);
+    CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, &sig_template, &nonce_parity, &aggnonce, msg, &agg_pk, &keyagg_cache, NULL) == 1);
     CHECK(ecount == 11);
-    CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, &sig_template, &nonce_parity, &agg_pnonce, msg, &agg_pk, &keyagg_cache, (secp256k1_pubkey *)&invalid_pk) == 0);
+    CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, &sig_template, &nonce_parity, &aggnonce, msg, &agg_pk, &keyagg_cache, (secp256k1_pubkey *)&invalid_pk) == 0);
     CHECK(ecount == 12);
 
-    CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, &sig_template, &nonce_parity, &agg_pnonce, msg, &agg_pk, &keyagg_cache, &adaptor) == 1);
+    CHECK(secp256k1_musig_nonce_process(vrfy, &session_cache, &sig_template, &nonce_parity, &aggnonce, msg, &agg_pk, &keyagg_cache, &adaptor) == 1);
 
     ecount = 0;
     memcpy(&secnonce_tmp, &secnonce[0], sizeof(secnonce_tmp));
@@ -591,8 +591,8 @@ void scriptless_atomic_swap(secp256k1_scratch_space *scratch) {
     unsigned char pubnonce_b[2][66];
     const unsigned char *pubnonce_ptr_a[2];
     const unsigned char *pubnonce_ptr_b[2];
-    secp256k1_musig_agg_nonce agg_nonce_a;
-    secp256k1_musig_agg_nonce agg_nonce_b;
+    secp256k1_musig_aggnonce aggnonce_a;
+    secp256k1_musig_aggnonce aggnonce_b;
     secp256k1_musig_template sig_template_a, sig_template_b;
     secp256k1_musig_session_cache session_cache_a, session_cache_b;
     int nonce_parity_a;
@@ -629,10 +629,10 @@ void scriptless_atomic_swap(secp256k1_scratch_space *scratch) {
     CHECK(secp256k1_musig_nonce_gen(ctx, &secnonce_b[1], pubnonce_b[1], seed_b[1], sk_b[1], NULL, NULL, NULL));
     
     /* Step 2: Exchange nonces */
-    CHECK(secp256k1_musig_nonce_agg(ctx, &agg_nonce_a, pubnonce_ptr_a, 2));
-    CHECK(secp256k1_musig_nonce_process(ctx, &session_cache_a, &sig_template_a, &nonce_parity_a, &agg_nonce_a, msg32_a, &agg_pk_a, &keyagg_cache_a, &pub_adaptor));
-    CHECK(secp256k1_musig_nonce_agg(ctx, &agg_nonce_b, pubnonce_ptr_b, 2));
-    CHECK(secp256k1_musig_nonce_process(ctx, &session_cache_b, &sig_template_b, &nonce_parity_b, &agg_nonce_b, msg32_b, &agg_pk_b, &keyagg_cache_b, &pub_adaptor));
+    CHECK(secp256k1_musig_nonce_agg(ctx, &aggnonce_a, pubnonce_ptr_a, 2));
+    CHECK(secp256k1_musig_nonce_process(ctx, &session_cache_a, &sig_template_a, &nonce_parity_a, &aggnonce_a, msg32_a, &agg_pk_a, &keyagg_cache_a, &pub_adaptor));
+    CHECK(secp256k1_musig_nonce_agg(ctx, &aggnonce_b, pubnonce_ptr_b, 2));
+    CHECK(secp256k1_musig_nonce_process(ctx, &session_cache_b, &sig_template_b, &nonce_parity_b, &aggnonce_b, msg32_b, &agg_pk_b, &keyagg_cache_b, &pub_adaptor));
 
     /* Step 3: Signer 0 produces partial signatures for both chains. */
     CHECK(secp256k1_musig_partial_sign(ctx, &partial_sig_a[0], &secnonce_a[0], &keypair_a[0], &keyagg_cache_a, &session_cache_a));
@@ -715,7 +715,7 @@ void musig_tweak_test_helper(const secp256k1_xonly_pubkey* agg_pk, const unsigne
     secp256k1_musig_secnonce secnonce[2];
     unsigned char pubnonce[2][66];
     const unsigned char *pubnonce_ptr[2];
-    secp256k1_musig_agg_nonce agg_nonce;
+    secp256k1_musig_aggnonce aggnonce;
     secp256k1_keypair keypair[2];
     secp256k1_musig_session_cache session_cache;
     secp256k1_musig_template sig_template;
@@ -737,8 +737,8 @@ void musig_tweak_test_helper(const secp256k1_xonly_pubkey* agg_pk, const unsigne
     CHECK(secp256k1_musig_nonce_gen(ctx, &secnonce[0], pubnonce[0], session_id[0], sk0, NULL, NULL, NULL) == 1);
     CHECK(secp256k1_musig_nonce_gen(ctx, &secnonce[1], pubnonce[1], session_id[1], sk1, NULL, NULL, NULL) == 1);
 
-    CHECK(secp256k1_musig_nonce_agg(ctx, &agg_nonce, pubnonce_ptr, 2));
-    CHECK(secp256k1_musig_nonce_process(ctx, &session_cache, &sig_template, NULL, &agg_nonce, msg, agg_pk, keyagg_cache, NULL) == 1);
+    CHECK(secp256k1_musig_nonce_agg(ctx, &aggnonce, pubnonce_ptr, 2));
+    CHECK(secp256k1_musig_nonce_process(ctx, &session_cache, &sig_template, NULL, &aggnonce, msg, agg_pk, keyagg_cache, NULL) == 1);
 
     CHECK(secp256k1_musig_partial_sign(ctx, &partial_sig[0], &secnonce[0], &keypair[0], keyagg_cache, &session_cache) == 1);
     CHECK(secp256k1_musig_partial_sign(ctx, &partial_sig[1], &secnonce[1], &keypair[1], keyagg_cache, &session_cache) == 1);
@@ -948,7 +948,7 @@ void musig_test_vectors_sign_helper(secp256k1_musig_keyagg_cache *keyagg_cache, 
     const secp256k1_xonly_pubkey *pk_ptr[3];
     secp256k1_xonly_pubkey agg_pk;
     secp256k1_musig_session_cache session_cache;
-    secp256k1_musig_agg_nonce agg_pubnonce;
+    secp256k1_musig_aggnonce agg_pubnonce;
     secp256k1_musig_partial_sig partial_sig;
     secp256k1_musig_template sig_template;
     int i;
@@ -964,7 +964,7 @@ void musig_test_vectors_sign_helper(secp256k1_musig_keyagg_cache *keyagg_cache, 
     CHECK(secp256k1_musig_pubkey_agg(ctx, NULL, &agg_pk, keyagg_cache, pk_ptr, 3) == 1);
     memcpy(&secnonce.data[0], secp256k1_musig_secnonce_magic, 4);
     memcpy(&secnonce.data[4], state, sizeof(secnonce.data) - 4);
-    CHECK(secp256k1_musig_agg_nonce_parse(ctx, &agg_pubnonce, agg_pubnonce_ser) == 1);
+    CHECK(secp256k1_musig_aggnonce_parse(ctx, &agg_pubnonce, agg_pubnonce_ser) == 1);
     CHECK(secp256k1_musig_nonce_process(ctx, &session_cache, &sig_template, fin_nonce_parity, &agg_pubnonce, msg, &agg_pk, keyagg_cache, NULL) == 1);
     CHECK(secp256k1_musig_partial_sign(ctx, &partial_sig, &secnonce, &signer_keypair, keyagg_cache, &session_cache) == 1);
     memcpy(sig, &partial_sig, 32);

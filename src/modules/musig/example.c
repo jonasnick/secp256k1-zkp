@@ -55,7 +55,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets_t *signer_secrets, 
     int i;
     const secp256k1_xonly_pubkey *pubkeys[N_SIGNERS];
     const unsigned char *pubnonces[N_SIGNERS];
-    secp256k1_musig_agg_nonce agg_pubnonce;
+    secp256k1_musig_aggnonce agg_pubnonce;
     const secp256k1_musig_partial_sig *partial_sigs[N_SIGNERS];
     /* The same for all signers */
     secp256k1_musig_keyagg_cache keyagg_cache;
