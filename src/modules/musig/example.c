@@ -129,7 +129,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets_t *signer_secrets, 
             return 0;
         }
     }
-    return secp256k1_musig_partial_sig_agg(ctx, sig64, &sig_template, partial_sigs, N_SIGNERS, NULL, NULL);
+    return secp256k1_musig_partial_sig_agg(ctx, sig64, &sig_template, partial_sigs, N_SIGNERS);
 }
 
  int main(void) {

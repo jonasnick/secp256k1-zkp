@@ -420,18 +420,33 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_verif
  *                     musig_nonce_process
  *       partial_sigs: array of pointers to partial signatures to aggregate
  *             n_sigs: number of elements in the partial_sigs array
- *      sec_adaptor32: optional 32-byte secret adaptor corresponding to the
- *                     adaptor used in musig_nonce_process. If the adaptor
- *                     argument was NULL, this argument should be NULL as well.
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_agg(
     const secp256k1_context* ctx,
     unsigned char *sig64,
     const secp256k1_musig_template *sig_template,
     const secp256k1_musig_partial_sig * const* partial_sigs,
-    size_t n_sigs,
+    size_t n_sigs
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
+
+/** Converts a partial signature to an adaptor signature by adding a given secret
+ *  adaptor.
+ *
+ *  Returns: 1: signature and secret adaptor contained valid values
+ *           0: otherwise
+ *  Args:         ctx: pointer to a context object (cannot be NULL)
+ *  Out:  adaptor_sig: adaptor signature to produce (cannot be NULL)
+ *  In:   partial_sig: partial signature to tweak with secret adaptor (cannot be NULL)
+ *      sec_adaptor32: 32-byte secret adaptor to add to the partial signature (cannot
+ *                     be NULL)
+ *       nonce_parity: the `nonce_parity` output of `musig_session_nonce_process`
+ */
+SECP256K1_API int secp256k1_musig_partial_sig_adapt(
+    const secp256k1_context* ctx,
+    secp256k1_musig_partial_sig *adaptor_sig,
+    const secp256k1_musig_partial_sig *partial_sig,
     const unsigned char *sec_adaptor32,
-    const int *nonce_parity
+    int nonce_parity
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
 /** Extracts a secret adaptor from a MuSig, given all parties' partial
