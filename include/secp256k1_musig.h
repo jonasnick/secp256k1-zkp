@@ -429,25 +429,27 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_agg(
     size_t n_sigs
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
-/** Converts a partial signature to an adaptor signature by adding a given secret
- *  adaptor.
+/** Converts a pre-signature that misses the adaptor into a full signature
  *
- *  Returns: 1: signature and secret adaptor contained valid values
+ *  If the sec_adaptor32 argument is incorrect, the adapted signature will be
+ *  invalid. This function does not verify the adapted signature.
+ *
+ *  Returns: 1: signature and secret adaptor contained valid values (which does
+ *              NOT mean the signature or the adaptor are valid!)
  *           0: otherwise
  *  Args:         ctx: pointer to a context object (cannot be NULL)
- *  Out:  adaptor_sig: adaptor signature to produce (cannot be NULL)
- *  In:   partial_sig: partial signature to tweak with secret adaptor (cannot be NULL)
- *      sec_adaptor32: 32-byte secret adaptor to add to the partial signature (cannot
+ *  In/Out:     sig64: 64-byte pre-signature that is adapted to a full signature
+ *                     (cannot be NULL)
+ *  In: sec_adaptor32: 32-byte secret adaptor to add to the partial signature (cannot
  *                     be NULL)
  *       nonce_parity: the `nonce_parity` output of `musig_session_nonce_process`
  */
 SECP256K1_API int secp256k1_musig_partial_sig_adapt(
     const secp256k1_context* ctx,
-    secp256k1_musig_partial_sig *adaptor_sig,
-    const secp256k1_musig_partial_sig *partial_sig,
+    unsigned char *sig64,
     const unsigned char *sec_adaptor32,
     int nonce_parity
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
 /** Extracts a secret adaptor from a MuSig, given all parties' partial
  *  signatures. This function will not fail unless given grossly invalid data; if it
