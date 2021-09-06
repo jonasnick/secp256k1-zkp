@@ -451,27 +451,32 @@ SECP256K1_API int secp256k1_musig_partial_sig_adapt(
     int nonce_parity
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
-/** Extracts a secret adaptor from a MuSig, given all parties' partial
- *  signatures. This function will not fail unless given grossly invalid data; if it
- *  is merely given signatures that do not verify, the returned value will be
- *  nonsense. It is therefore important that all data be verified at earlier steps of
- *  any protocol that uses this function.
+/** Extracts a secret adaptor from a MuSig pre-signature and corresponding
+ *  signature
+ * 
+ *  This function will not fail unless given grossly invalid data; if it is
+ *  merely given signatures that do not verify, the returned value will be
+ *  nonsense. It is therefore important that all data be verified at earlier
+ *  steps of any protocol that uses this function. In particular, this includes
+ *  verifying all partial signatures that were aggregated into pre_sig64.
  *
- *  Returns: 1: signatures contained valid data such that an adaptor could be extracted
+ *  Returns: 1: signatures contained valid data such that an adaptor could be
+ *              extracted (which does NOT mean the signatures or the adaptor are
+ *              valid!)
  *           0: otherwise
  *  Args:         ctx: pointer to a context object (cannot be NULL)
  *  Out:sec_adaptor32: 32-byte secret adaptor (cannot be NULL)
- *  In:         sig64: complete 2-of-2 signature (cannot be NULL)
- *       partial_sigs: array of partial signatures (cannot be NULL)
- *     n_partial_sigs: number of elements in partial_sigs array
- *   nonce_parity: the `nonce_parity` output of `musig_session_nonce_process`
+ *  In:         sig64: complete, valid 64-byte signature (cannot be NULL)
+ *          pre_sig64: the pre-signature corresponding to sig64, i.e., the
+ *                     aggregate of partial signatures without the secret
+ *                     adaptor (cannot be NULL)
+ *       nonce_parity: the `nonce_parity` output of `musig_session_nonce_process`
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_extract_secret_adaptor(
     const secp256k1_context* ctx,
     unsigned char *sec_adaptor32,
     const unsigned char *sig64,
-    const secp256k1_musig_partial_sig *partial_sigs,
-    size_t n_partial_sigs,
+    const unsigned char *pre_sig64,
     int nonce_parity
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
