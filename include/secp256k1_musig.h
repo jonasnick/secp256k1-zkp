@@ -333,9 +333,6 @@ SECP256K1_API int secp256k1_musig_nonce_agg(
  *                     used for partial_sign and partial_verify
  *       sig_template: pointer to a struct to store a sig template, which is
  *                     used for partial_sig_agg
- *       nonce_parity: optional pointer to an integer that indicates the parity
- *                     of the aggregate public nonce. Used for adaptor
- *                     signatures. (can be NULL)
  * In:       aggnonce: pointer to an the aggregate public nonce object that is
  *                     output of musig_nonce_agg
  *              msg32: the 32-byte message to sign
@@ -350,13 +347,12 @@ SECP256K1_API int secp256k1_musig_nonce_process(
     const secp256k1_context* ctx,
     secp256k1_musig_session_cache *session_cache,
     secp256k1_musig_template *sig_template,
-    int *nonce_parity,
     const secp256k1_musig_aggnonce  *aggnonce,
     const unsigned char *msg32,
     const secp256k1_xonly_pubkey *agg_pk,
     const secp256k1_musig_keyagg_cache *keyagg_cache,
     const secp256k1_pubkey *adaptor
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6) SECP256K1_ARG_NONNULL(7) SECP256K1_ARG_NONNULL(8);
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6) SECP256K1_ARG_NONNULL(7);
 
 /** Produces a partial signature
  *
@@ -436,6 +432,24 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_agg(
     size_t n_sigs
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
+/** Extracts the nonce_parity bit from a session_cache
+ *
+ *  This is used for adaptor signatures.
+ *
+ *  Returns: 0 if one of the arguments was NULL, and 1 otherwise.
+ *  Args:         ctx: pointer to a context object (cannot be NULL)
+ *  Out: nonce_parity: pointer to an integer that indicates the parity
+ *                     of the aggregate public nonce. Used for adaptor
+ *                     signatures.
+ *  In: session_cache: pointer to the session_cache that was created with
+ *                     musig_nonce_process
+ */
+int secp256k1_musig_nonce_parity(
+    const secp256k1_context* ctx,
+    int *nonce_parity,
+    secp256k1_musig_session_cache *session_cache
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
 /** Converts a pre-signature that misses the adaptor into a full signature
  *
  *  If the sec_adaptor32 argument is incorrect, the adapted signature will be
@@ -449,7 +463,8 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_agg(
  *                     (cannot be NULL)
  *  In: sec_adaptor32: 32-byte secret adaptor to add to the partial signature (cannot
  *                     be NULL)
- *       nonce_parity: the `nonce_parity` output of `musig_session_nonce_process`
+ *       nonce_parity: the output of `musig_nonce_parity` called with the
+ *                     session_cache used for producing sig64
  */
 SECP256K1_API int secp256k1_musig_partial_sig_adapt(
     const secp256k1_context* ctx,
@@ -477,7 +492,8 @@ SECP256K1_API int secp256k1_musig_partial_sig_adapt(
  *          pre_sig64: the pre-signature corresponding to sig64, i.e., the
  *                     aggregate of partial signatures without the secret
  *                     adaptor (cannot be NULL)
- *       nonce_parity: the `nonce_parity` output of `musig_session_nonce_process`
+ *       nonce_parity: the output of `musig_nonce_parity` called with the
+ *                     session_cache used for producing sig64
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_extract_secret_adaptor(
     const secp256k1_context* ctx,
