@@ -58,13 +58,20 @@ typedef struct {
  *  serialization and parsing functions.
  */
 
-/** Guaranteed to be 68 bytes in size. This structure MUST NOT be copied or
- *  read or written to it directly. A signer who is online throughout the whole
- *  process and can keep this structure in memory can use the provided API
- *  functions for a safe standard workflow. See
+/** Opaque data structure that holds a signer's secret nonce.
+ *  
+ *  Guaranteed to be 68 bytes in size.
+ * 
+ *  WARNING: This structure MUST NOT be copied or read or written to directly. A
+ *  signer who is online throughout the whole process and can keep this
+ *  structure in memory can use the provided API functions for a safe standard
+ *  workflow. See
  *  https://blockstream.com/2019/02/18/musig-a-new-multisignature-standard/ for
  *  more details about the risks associated with serializing or deserializing
- *  this structure. There are no serialization and parsing functions (yet).
+ *  this structure.
+ *
+ *  We repeat, copying this data structure can result in nonce reuse which will
+ *  leak the secret signing key.
  */
 typedef struct {
     unsigned char data[68];
