@@ -325,6 +325,10 @@ SECP256K1_API int secp256k1_musig_nonce_agg(
  *  required for signing and verification of partial signatures and a signature
  *  template that is required for combining partial signatures.
  *
+ *  If the adaptor argument is non-NULL then the output of musig_partial_sig_agg
+ *  will be an invalid Schnorr signature, until the signature is given to
+ *  musig_partial_sig_adapt with the corresponding secret adaptor.
+ *
  *  Returns: 0 if the arguments are invalid or if all signers sent invalid
  *           pubnonces, 1 otherwise
  *  Args:         ctx: pointer to a context object, initialized for verification
