@@ -486,19 +486,19 @@ void musig_api_tests(secp256k1_scratch_space *scratch) {
 
     /** Secret adaptor can be extracted from signature */
     ecount = 0;
-    CHECK(secp256k1_musig_extract_secret_adaptor(none, sec_adaptor1, final_sig, pre_sig, nonce_parity) == 1);
+    CHECK(secp256k1_musig_extract_adaptor(none, sec_adaptor1, final_sig, pre_sig, nonce_parity) == 1);
     CHECK(memcmp(sec_adaptor, sec_adaptor1, 32) == 0);
-    CHECK(secp256k1_musig_extract_secret_adaptor(none, NULL, final_sig, pre_sig, 0) == 0);
+    CHECK(secp256k1_musig_extract_adaptor(none, NULL, final_sig, pre_sig, 0) == 0);
     CHECK(ecount == 1);
-    CHECK(secp256k1_musig_extract_secret_adaptor(none, sec_adaptor1, NULL, pre_sig, 0) == 0);
+    CHECK(secp256k1_musig_extract_adaptor(none, sec_adaptor1, NULL, pre_sig, 0) == 0);
     CHECK(ecount == 2);
-    CHECK(secp256k1_musig_extract_secret_adaptor(none, sec_adaptor1, max64, pre_sig, 0) == 0);
+    CHECK(secp256k1_musig_extract_adaptor(none, sec_adaptor1, max64, pre_sig, 0) == 0);
     CHECK(ecount == 2);
-    CHECK(secp256k1_musig_extract_secret_adaptor(none, sec_adaptor1, final_sig, NULL, 0) == 0);
+    CHECK(secp256k1_musig_extract_adaptor(none, sec_adaptor1, final_sig, NULL, 0) == 0);
     CHECK(ecount == 3);
-    CHECK(secp256k1_musig_extract_secret_adaptor(none, sec_adaptor1, final_sig, max64, 0) == 0);
+    CHECK(secp256k1_musig_extract_adaptor(none, sec_adaptor1, final_sig, max64, 0) == 0);
     CHECK(ecount == 3);
-    CHECK(secp256k1_musig_extract_secret_adaptor(none, sec_adaptor1, final_sig, pre_sig, 1) == 1);
+    CHECK(secp256k1_musig_extract_adaptor(none, sec_adaptor1, final_sig, pre_sig, 1) == 1);
 
     /** cleanup **/
     secp256k1_context_destroy(none);
@@ -677,7 +677,7 @@ void scriptless_atomic_swap(secp256k1_scratch_space *scratch) {
      * and adapts the signature to take A-coins. */
     CHECK(secp256k1_musig_partial_sign(ctx, &partial_sig_a[1], &secnonce_a[1], &keypair_a[1], &keyagg_cache_a, &session_cache_a));
     CHECK(secp256k1_musig_partial_sig_agg(ctx, final_sig_a, &sig_template_a, partial_sig_a_ptr, 2) == 1);
-    CHECK(secp256k1_musig_extract_secret_adaptor(ctx, sec_adaptor_extracted, final_sig_b, pre_sig_b, nonce_parity_b) == 1);
+    CHECK(secp256k1_musig_extract_adaptor(ctx, sec_adaptor_extracted, final_sig_b, pre_sig_b, nonce_parity_b) == 1);
     CHECK(memcmp(sec_adaptor_extracted, sec_adaptor, sizeof(sec_adaptor)) == 0); /* in real life we couldn't check this, of course */
     CHECK(secp256k1_musig_adapt(ctx, final_sig_a, sec_adaptor_extracted, nonce_parity_a));
     CHECK(secp256k1_schnorrsig_verify(ctx, final_sig_a, msg32_a, sizeof(msg32_a), &agg_pk_a) == 1);

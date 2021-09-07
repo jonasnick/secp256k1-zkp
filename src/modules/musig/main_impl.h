@@ -777,7 +777,7 @@ int secp256k1_musig_adapt(const secp256k1_context* ctx, unsigned char *sig64, co
     return 1;
 }
 
-int secp256k1_musig_extract_secret_adaptor(const secp256k1_context* ctx, unsigned char *sec_adaptor32, const unsigned char *sig64, const unsigned char *pre_sig64, int nonce_parity) {
+int secp256k1_musig_extract_adaptor(const secp256k1_context* ctx, unsigned char *sec_adaptor32, const unsigned char *sig64, const unsigned char *pre_sig64, int nonce_parity) {
     secp256k1_scalar t;
     secp256k1_scalar s;
     int overflow;

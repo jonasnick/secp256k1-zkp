@@ -499,7 +499,7 @@ SECP256K1_API int secp256k1_musig_adapt(
  *       nonce_parity: the output of `musig_nonce_parity` called with the
  *                     session_cache used for producing sig64
  */
-SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_extract_secret_adaptor(
+SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_extract_adaptor(
     const secp256k1_context* ctx,
     unsigned char *sec_adaptor32,
     const unsigned char *sig64,
