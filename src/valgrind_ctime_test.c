@@ -259,7 +259,6 @@ void run_tests(secp256k1_context *ctx, unsigned char *key) {
         secp256k1_musig_aggnonce aggnonce;
         secp256k1_musig_keyagg_cache keyagg_cache;
         secp256k1_musig_session_cache session_cache;
-        secp256k1_musig_template sig_template;
         secp256k1_musig_partial_sig partial_sig;
         unsigned char extra_input[32];
 
@@ -281,7 +280,7 @@ void run_tests(secp256k1_context *ctx, unsigned char *key) {
         VALGRIND_MAKE_MEM_DEFINED(&ret, sizeof(ret));
         CHECK(ret == 1);
         CHECK(secp256k1_musig_nonce_agg(ctx, &aggnonce, pubnonce_ptr, 1));
-        CHECK(secp256k1_musig_nonce_process(ctx, &session_cache, &sig_template, &aggnonce, msg, &agg_pk, &keyagg_cache, NULL) == 1);
+        CHECK(secp256k1_musig_nonce_process(ctx, &session_cache, &aggnonce, msg, &agg_pk, &keyagg_cache, NULL) == 1);
 
         ret = secp256k1_keypair_create(ctx, &keypair, key);
         VALGRIND_MAKE_MEM_DEFINED(&ret, sizeof(ret));

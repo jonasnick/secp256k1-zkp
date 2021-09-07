@@ -60,7 +60,6 @@ int sign(const secp256k1_context* ctx, struct signer_secrets_t *signer_secrets, 
     /* The same for all signers */
     secp256k1_musig_keyagg_cache keyagg_cache;
     secp256k1_musig_session_cache session_cache;
-    secp256k1_musig_template sig_template;
 
     for (i = 0; i < N_SIGNERS; i++) {
         FILE *frand;
@@ -100,7 +99,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets_t *signer_secrets, 
         if(!secp256k1_musig_nonce_agg(ctx, &agg_pubnonce, pubnonces, N_SIGNERS)) {
             return 0;
         }
-        if(!secp256k1_musig_nonce_process(ctx, &session_cache, &sig_template, &agg_pubnonce, msg32, &agg_pk, &keyagg_cache, NULL)) {
+        if(!secp256k1_musig_nonce_process(ctx, &session_cache, &agg_pubnonce, msg32, &agg_pk, &keyagg_cache, NULL)) {
             return 0;
         }
         /* partial_sign will clear the secnonce by setting it 0. That's because
@@ -129,7 +128,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets_t *signer_secrets, 
             return 0;
         }
     }
-    return secp256k1_musig_partial_sig_agg(ctx, sig64, &sig_template, partial_sigs, N_SIGNERS);
+    return secp256k1_musig_partial_sig_agg(ctx, sig64, &session_cache, partial_sigs, N_SIGNERS);
 }
 
  int main(void) {

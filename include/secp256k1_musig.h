@@ -104,22 +104,13 @@ typedef struct {
     unsigned char data[32];
 } secp256k1_musig_partial_sig;
 
-/** Opaque data structure that holds a MuSig signature template.
- *
- *  Guaranteed to be 64 bytes in size. No serialization and parsing functions
- *  (yet).
- */
-typedef struct {
-    unsigned char data[64];
-} secp256k1_musig_template;
-
 /** Opaque data structure that holds a cache for a MuSig session.
  *
- *  Guaranteed to be 65 bytes in size. No serialization and parsing functions
+ *  Guaranteed to be 129 bytes in size. No serialization and parsing functions
  *  (yet).
  */
 typedef struct {
-    unsigned char data[65];
+    unsigned char data[129];
 } secp256k1_musig_session_cache;
 
 /** Serialize an aggregate public nonce
@@ -333,10 +324,7 @@ SECP256K1_API int secp256k1_musig_nonce_agg(
  *           pubnonces, 1 otherwise
  *  Args:         ctx: pointer to a context object, initialized for verification
  *                     (cannot be NULL)
- * Out: session_cache: pointer to a struct to store the session_cache, which is
- *                     used for partial_sign and partial_verify
- *       sig_template: pointer to a struct to store a sig template, which is
- *                     used for partial_sig_agg
+ * Out: session_cache: pointer to a struct to store the session_cache
  * In:       aggnonce: pointer to an the aggregate public nonce object that is
  *                     output of musig_nonce_agg
  *              msg32: the 32-byte message to sign
@@ -350,13 +338,12 @@ SECP256K1_API int secp256k1_musig_nonce_agg(
 SECP256K1_API int secp256k1_musig_nonce_process(
     const secp256k1_context* ctx,
     secp256k1_musig_session_cache *session_cache,
-    secp256k1_musig_template *sig_template,
     const secp256k1_musig_aggnonce  *aggnonce,
     const unsigned char *msg32,
     const secp256k1_xonly_pubkey *agg_pk,
     const secp256k1_musig_keyagg_cache *keyagg_cache,
     const secp256k1_pubkey *adaptor
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6) SECP256K1_ARG_NONNULL(7);
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6);
 
 /** Produces a partial signature
  *
@@ -423,15 +410,15 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_verif
  *           otherwise (which does NOT mean the resulting signature verifies).
  *  Args:         ctx: pointer to a context object (cannot be NULL)
  *  Out:        sig64: complete Schnorr signature (cannot be NULL)
- *  In:  sig_template: pointer to the sig_template that was created with
- *                     musig_nonce_process
+ *  In: session_cache: pointer to the session_cache that was created with
+ *                    musig_nonce_process
  *       partial_sigs: array of pointers to partial signatures to aggregate
  *             n_sigs: number of elements in the partial_sigs array
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_agg(
     const secp256k1_context* ctx,
     unsigned char *sig64,
-    const secp256k1_musig_template *sig_template,
+    const secp256k1_musig_session_cache *session_cache,
     const secp256k1_musig_partial_sig * const* partial_sigs,
     size_t n_sigs
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
