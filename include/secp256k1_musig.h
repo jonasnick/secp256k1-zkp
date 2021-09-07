@@ -327,7 +327,7 @@ SECP256K1_API int secp256k1_musig_nonce_agg(
  *
  *  If the adaptor argument is non-NULL then the output of musig_partial_sig_agg
  *  will be an invalid Schnorr signature, until the signature is given to
- *  musig_partial_sig_adapt with the corresponding secret adaptor.
+ *  musig_adapt with the corresponding secret adaptor.
  *
  *  Returns: 0 if the arguments are invalid or if all signers sent invalid
  *           pubnonces, 1 otherwise
@@ -470,7 +470,7 @@ int secp256k1_musig_nonce_parity(
  *       nonce_parity: the output of `musig_nonce_parity` called with the
  *                     session_cache used for producing sig64
  */
-SECP256K1_API int secp256k1_musig_partial_sig_adapt(
+SECP256K1_API int secp256k1_musig_adapt(
     const secp256k1_context* ctx,
     unsigned char *sig64,
     const unsigned char *sec_adaptor32,
