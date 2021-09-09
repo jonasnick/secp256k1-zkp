@@ -59,7 +59,7 @@ int sign(const secp256k1_context* ctx, struct signer_secrets_t *signer_secrets, 
     const secp256k1_musig_partial_sig *partial_sigs[N_SIGNERS];
     /* The same for all signers */
     secp256k1_musig_keyagg_cache keyagg_cache;
-    secp256k1_musig_session_cache session_cache;
+    secp256k1_musig_session session;
 
     for (i = 0; i < N_SIGNERS; i++) {
         FILE *frand;
@@ -99,14 +99,14 @@ int sign(const secp256k1_context* ctx, struct signer_secrets_t *signer_secrets, 
         if(!secp256k1_musig_nonce_agg(ctx, &agg_pubnonce, pubnonces, N_SIGNERS)) {
             return 0;
         }
-        if(!secp256k1_musig_nonce_process(ctx, &session_cache, &agg_pubnonce, msg32, &agg_pk, &keyagg_cache, NULL)) {
+        if(!secp256k1_musig_nonce_process(ctx, &session, &agg_pubnonce, msg32, &agg_pk, &keyagg_cache, NULL)) {
             return 0;
         }
         /* partial_sign will clear the secnonce by setting it 0. That's because
          * you must _never_ reuse the secnonce (or use the same session_id to
          * create a secnonce). If you do, you effectively reuse the nonce and
          * leak the secret key. */
-        if (!secp256k1_musig_partial_sign(ctx, &signer[i].partial_sig, &signer_secrets[i].secnonce, &signer_secrets[i].keypair, &keyagg_cache, &session_cache)) {
+        if (!secp256k1_musig_partial_sign(ctx, &signer[i].partial_sig, &signer_secrets[i].secnonce, &signer_secrets[i].keypair, &keyagg_cache, &session)) {
             return 0;
         }
         partial_sigs[i] = &signer[i].partial_sig;
@@ -124,11 +124,11 @@ int sign(const secp256k1_context* ctx, struct signer_secrets_t *signer_secrets, 
          * fine to first verify the aggregate sig, and only verify the individual
          * sigs if it does not work.
          */
-        if (!secp256k1_musig_partial_sig_verify(ctx, &signer[i].partial_sig, &signer[i].pubnonce, &signer[i].pubkey, &keyagg_cache, &session_cache)) {
+        if (!secp256k1_musig_partial_sig_verify(ctx, &signer[i].partial_sig, &signer[i].pubnonce, &signer[i].pubkey, &keyagg_cache, &session)) {
             return 0;
         }
     }
-    return secp256k1_musig_partial_sig_agg(ctx, sig64, &session_cache, partial_sigs, N_SIGNERS);
+    return secp256k1_musig_partial_sig_agg(ctx, sig64, &session, partial_sigs, N_SIGNERS);
 }
 
  int main(void) {

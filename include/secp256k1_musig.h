@@ -111,7 +111,7 @@ typedef struct {
  */
 typedef struct {
     unsigned char data[129];
-} secp256k1_musig_session_cache;
+} secp256k1_musig_session;
 
 /** Serialize an aggregate public nonce
  *
@@ -324,7 +324,7 @@ SECP256K1_API int secp256k1_musig_nonce_agg(
  *           pubnonces, 1 otherwise
  *  Args:         ctx: pointer to a context object, initialized for verification
  *                     (cannot be NULL)
- * Out: session_cache: pointer to a struct to store the session_cache
+ * Out:       session: pointer to a struct to store the session
  * In:       aggnonce: pointer to an the aggregate public nonce object that is
  *                     output of musig_nonce_agg
  *              msg32: the 32-byte message to sign
@@ -337,7 +337,7 @@ SECP256K1_API int secp256k1_musig_nonce_agg(
  */
 SECP256K1_API int secp256k1_musig_nonce_process(
     const secp256k1_context* ctx,
-    secp256k1_musig_session_cache *session_cache,
+    secp256k1_musig_session *session,
     const secp256k1_musig_aggnonce  *aggnonce,
     const unsigned char *msg32,
     const secp256k1_xonly_pubkey *agg_pk,
@@ -362,7 +362,7 @@ SECP256K1_API int secp256k1_musig_nonce_process(
  *  In:       keypair: pointer to keypair to sign the message with
  *       keyagg_cache: pointer to the keyagg_cache that was output when the
  *                     aggregate public key for this session
- *      session_cache: pointer to the session_cache that was created with
+ *      session: pointer to the session that was created with
  *                     musig_nonce_process
  */
 SECP256K1_API int secp256k1_musig_partial_sign(
@@ -371,7 +371,7 @@ SECP256K1_API int secp256k1_musig_partial_sign(
     secp256k1_musig_secnonce *secnonce,
     const secp256k1_keypair *keypair,
     const secp256k1_musig_keyagg_cache *keyagg_cache,
-    const secp256k1_musig_session_cache *session_cache
+    const secp256k1_musig_session *session
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6);
 
 /** Checks that an individual partial signature verifies
@@ -392,7 +392,7 @@ SECP256K1_API int secp256k1_musig_partial_sign(
  *            pubkey: public key of the signer who produced the signature
  *      keyagg_cache: pointer to the keyagg_cache that was output when the
  *                    aggregate public key for this session
- *     session_cache: pointer to the session_cache that was created with
+ *           session: pointer to the session that was created with
  *                    musig_nonce_process
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_verify(
@@ -401,7 +401,7 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_verif
     const secp256k1_musig_pubnonce *pubnonce,
     const secp256k1_xonly_pubkey *pubkey,
     const secp256k1_musig_keyagg_cache *keyagg_cache,
-    const secp256k1_musig_session_cache *session_cache
+    const secp256k1_musig_session *session
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6);
 
 /** Aggregates partial signatures
@@ -410,20 +410,20 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_verif
  *           otherwise (which does NOT mean the resulting signature verifies).
  *  Args:         ctx: pointer to a context object (cannot be NULL)
  *  Out:        sig64: complete Schnorr signature (cannot be NULL)
- *  In: session_cache: pointer to the session_cache that was created with
- *                    musig_nonce_process
+ *  In:       session: pointer to the session that was created with
+ *                     musig_nonce_process
  *       partial_sigs: array of pointers to partial signatures to aggregate
  *             n_sigs: number of elements in the partial_sigs array
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_agg(
     const secp256k1_context* ctx,
     unsigned char *sig64,
-    const secp256k1_musig_session_cache *session_cache,
+    const secp256k1_musig_session *session,
     const secp256k1_musig_partial_sig * const* partial_sigs,
     size_t n_sigs
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
-/** Extracts the nonce_parity bit from a session_cache
+/** Extracts the nonce_parity bit from a session
  *
  *  This is used for adaptor signatures.
  *
@@ -432,13 +432,13 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_agg(
  *  Out: nonce_parity: pointer to an integer that indicates the parity
  *                     of the aggregate public nonce. Used for adaptor
  *                     signatures.
- *  In: session_cache: pointer to the session_cache that was created with
+ *  In:       session: pointer to the session that was created with
  *                     musig_nonce_process
  */
 int secp256k1_musig_nonce_parity(
     const secp256k1_context* ctx,
     int *nonce_parity,
-    secp256k1_musig_session_cache *session_cache
+    secp256k1_musig_session *session
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
 /** Converts a pre-signature that misses the adaptor into a full signature
@@ -455,7 +455,7 @@ int secp256k1_musig_nonce_parity(
  *  In: sec_adaptor32: 32-byte secret adaptor to add to the partial signature (cannot
  *                     be NULL)
  *       nonce_parity: the output of `musig_nonce_parity` called with the
- *                     session_cache used for producing sig64
+ *                     session used for producing sig64
  */
 SECP256K1_API int secp256k1_musig_adapt(
     const secp256k1_context* ctx,
@@ -484,7 +484,7 @@ SECP256K1_API int secp256k1_musig_adapt(
  *                     aggregate of partial signatures without the secret
  *                     adaptor (cannot be NULL)
  *       nonce_parity: the output of `musig_nonce_parity` called with the
- *                     session_cache used for producing sig64
+ *                     session used for producing sig64
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_extract_adaptor(
     const secp256k1_context* ctx,
