@@ -276,11 +276,11 @@ void run_tests(secp256k1_context *ctx, unsigned char *key) {
         VALGRIND_MAKE_MEM_UNDEFINED(key, 32);
         VALGRIND_MAKE_MEM_UNDEFINED(session_id, 32);
         VALGRIND_MAKE_MEM_UNDEFINED(extra_input, 32);
-        ret = secp256k1_musig_nonce_gen(ctx, &secnonce, &pubnonce, session_id, key, msg, &agg_pk, extra_input);
+        ret = secp256k1_musig_nonce_gen(ctx, &secnonce, &pubnonce, session_id, key, msg, &keyagg_cache, extra_input);
         VALGRIND_MAKE_MEM_DEFINED(&ret, sizeof(ret));
         CHECK(ret == 1);
         CHECK(secp256k1_musig_nonce_agg(ctx, &aggnonce, pubnonce_ptr, 1));
-        CHECK(secp256k1_musig_nonce_process(ctx, &session, &aggnonce, msg, &agg_pk, &keyagg_cache, NULL) == 1);
+        CHECK(secp256k1_musig_nonce_process(ctx, &session, &aggnonce, msg, &keyagg_cache, NULL) == 1);
 
         ret = secp256k1_keypair_create(ctx, &keypair, key);
         VALGRIND_MAKE_MEM_DEFINED(&ret, sizeof(ret));

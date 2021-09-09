@@ -42,12 +42,11 @@ typedef struct {
     uint32_t magic;
     unsigned char pk_hash[32];
     unsigned char second_pk[32];
-    int pk_parity;
+    secp256k1_pubkey pk;
     int is_tweaked;
     unsigned char tweak[32];
     int internal_key_parity;
 } secp256k1_musig_keyagg_cache;
-
 
 /** Opaque data structures
  *
@@ -201,8 +200,8 @@ SECP256K1_API int secp256k1_musig_pubkey_agg(
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(5);
 
 /** Tweak an x-only public key by adding the generator multiplied with tweak32
- *  to it. The resulting output_pubkey with the given internal_pubkey and tweak
- *  passes `secp256k1_xonly_pubkey_tweak_test`.
+ *  to it. The resulting output_pubkey with the original agg_pk output of
+ *  musig_pubkey_agg and tweak passes `secp256k1_xonly_pubkey_tweak_test`.
  *
  *  This function is only useful before initializing a signing session. If you
  *  are only computing a public key, but not intending to create a signature for
@@ -219,9 +218,6 @@ SECP256K1_API int secp256k1_musig_pubkey_agg(
  *  Out: output_pubkey: pointer to a public key to store the result. Will be set
  *                      to an invalid value if this function returns 0 (cannot
  *                      be NULL)
- *  In: internal_pubkey: pointer to the `agg_pk` from
- *                       `musig_pubkey_agg` to which the tweak is applied.
- *                       (cannot be NULL).
  *              tweak32: pointer to a 32-byte tweak. If the tweak is invalid
  *                       according to secp256k1_ec_seckey_verify, this function
  *                       returns 0. For uniformly random 32-byte arrays the
@@ -232,9 +228,8 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_pubkey_tweak_add(
     const secp256k1_context* ctx,
     secp256k1_musig_keyagg_cache *keyagg_cache,
     secp256k1_pubkey *output_pubkey,
-    const secp256k1_xonly_pubkey *internal_pubkey,
     const unsigned char *tweak32
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
 /** Starts a signing session by generating a nonce
  *
@@ -245,8 +240,8 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_pubkey_tweak_add(
  *  special care to not reuse a nonce. This can be ensured by following these rules:
  *
  *  1. Always provide a unique session_id32. It is a "number used once".
- *  2. If you already know the signing key, message or aggregate public key, they
- *     can be optionally provided to derive the nonce and increase
+ *  2. If you already know the signing key, message or aggregate public key
+ *     cache, they can be optionally provided to derive the nonce and increase
  *     misuse-resistance. The extra_input32 argument can be used to provide
  *     additional data that does not repeat in normal scenarios, such as the
  *     current time.
@@ -272,8 +267,8 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_pubkey_tweak_add(
  *                     already known (can be NULL)
  *              msg32: the 32-byte message that will be signed if already known
  *                     (can be NULL)
- *             agg_pk: the aggregate xonly public key of all signers if already
- *                     known (can be NULL)
+ *       keyagg_cache: pointer to the keyagg_cache that was used to create the aggregate
+ *                     (and tweaked) public key if already known (can be NULL)
  *      extra_input32: an optional 32-byte array that is input to the nonce
  *                     derivation function (can be NULL)
  */
@@ -284,16 +279,16 @@ SECP256K1_API int secp256k1_musig_nonce_gen(
     const unsigned char *session_id32,
     const unsigned char *seckey,
     const unsigned char *msg32,
-    const secp256k1_xonly_pubkey *agg_pk,
+    const secp256k1_musig_keyagg_cache *keyagg_cache,
     const unsigned char *extra_input32
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(4);
 
 /** Aggregates the nonces of every signer into a single nonce
  *
- *  This can be done by a thrid party to reduce the communication between
- *  signers. Instead of everyone sending nonces to everyone else, there can be
- *  one party receiving all nonces, aggregateing the nonces with this function
- *  and then sending only the aggregate nonce back to the signers.
+ *  This can be done by an untrusted third party to reduce the communication
+ *  between signers. Instead of everyone sending nonces to everyone else, there
+ *  can be one party receiving all nonces, aggregating the nonces with this
+ *  function and then sending only the aggregate nonce back to the signers.
  *
  *  Returns: 0 if the arguments are invalid or if all signers sent invalid
  *           pubnonces, 1 otherwise
@@ -328,9 +323,8 @@ SECP256K1_API int secp256k1_musig_nonce_agg(
  * In:       aggnonce: pointer to an the aggregate public nonce object that is
  *                     output of musig_nonce_agg
  *              msg32: the 32-byte message to sign
- *             agg_pk: pointer to aggregate public key of all signers
- *       keyagg_cache: pointer to the keyagg_cache that was output when
- *                     agg_pk was created
+ *       keyagg_cache: pointer to the keyagg_cache that was used to create the
+ *                     aggregate (and tweaked) pubkey
  *            adaptor: optional pointer to an adaptor point encoded as a public
  *                     key if this signing session is part of an adaptor
  *                     signature protocol (can be NULL)
@@ -340,10 +334,9 @@ SECP256K1_API int secp256k1_musig_nonce_process(
     secp256k1_musig_session *session,
     const secp256k1_musig_aggnonce  *aggnonce,
     const unsigned char *msg32,
-    const secp256k1_xonly_pubkey *agg_pk,
     const secp256k1_musig_keyagg_cache *keyagg_cache,
     const secp256k1_pubkey *adaptor
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5) SECP256K1_ARG_NONNULL(6);
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
 
 /** Produces a partial signature
  *
