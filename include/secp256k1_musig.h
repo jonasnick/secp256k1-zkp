@@ -59,9 +59,9 @@ typedef struct {
  */
 
 /** Opaque data structure that holds a signer's secret nonce.
- *  
+ *
  *  Guaranteed to be 68 bytes in size.
- * 
+ *
  *  WARNING: This structure MUST NOT be copied or read or written to directly. A
  *  signer who is online throughout the whole process and can keep this
  *  structure in memory can use the provided API functions for a safe standard
@@ -466,7 +466,7 @@ SECP256K1_API int secp256k1_musig_adapt(
 
 /** Extracts a secret adaptor from a MuSig pre-signature and corresponding
  *  signature
- * 
+ *
  *  This function will not fail unless given grossly invalid data; if it is
  *  merely given signatures that do not verify, the returned value will be
  *  nonsense. It is therefore important that all data be verified at earlier
