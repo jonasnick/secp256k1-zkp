@@ -94,7 +94,8 @@ void musig_api_tests(secp256k1_scratch_space *scratch) {
     secp256k1_scratch_space *scratch_small;
     secp256k1_musig_partial_sig partial_sig[2];
     const secp256k1_musig_partial_sig *partial_sig_ptr[2];
-    secp256k1_musig_partial_sig partial_sig_overflow;
+    secp256k1_musig_partial_sig invalid_partial_sig;
+    const secp256k1_musig_partial_sig *invalid_partial_sig_ptr[2];
     unsigned char final_sig[64];
     unsigned char pre_sig[64];
     unsigned char buf[32];
@@ -150,6 +151,7 @@ void musig_api_tests(secp256k1_scratch_space *scratch) {
     memset(&invalid_keypair, 0, sizeof(invalid_keypair));
     memset(&invalid_pk, 0, sizeof(invalid_pk));
     memset(&invalid_secnonce, 0, sizeof(invalid_secnonce));
+    memset(&invalid_partial_sig, 0, sizeof(invalid_partial_sig));
     pubnonce_summing_to_inf(inf_pubnonce);
     /* Simulate structs being uninitialized by setting it to 0s. We don't want
      * to produce undefined behavior by actually providing uninitialized
@@ -169,11 +171,13 @@ void musig_api_tests(secp256k1_scratch_space *scratch) {
         pubnonce_ptr[i] = &pubnonce[i];
         inf_pubnonce_ptr[i] = &inf_pubnonce[i];
         partial_sig_ptr[i] = &partial_sig[i];
+        invalid_partial_sig_ptr[i] = &partial_sig[i];
         secp256k1_testrand256(session_id[i]);
         secp256k1_testrand256(sk[i]);
         CHECK(create_keypair_and_pk(&keypair[i], &pk[i], sk[i]));
     }
     invalid_pubnonce_ptr[0] = &invalid_pubnonce;
+    invalid_partial_sig_ptr[0] = &invalid_partial_sig;
     /* invalid_pk_ptr3 has two valid, one invalid pk, which is important to test
      * musig_pubkey_agg */
     invalid_pk_ptr3[2] = &invalid_pk;
@@ -421,7 +425,7 @@ void musig_api_tests(secp256k1_scratch_space *scratch) {
     CHECK(secp256k1_musig_partial_sig_parse(none, &partial_sig[0], buf) == 1);
     CHECK(secp256k1_musig_partial_sig_parse(none, NULL, buf) == 0);
     CHECK(ecount == 3);
-    CHECK(secp256k1_musig_partial_sig_parse(none, &partial_sig_overflow, max64) == 0);
+    CHECK(secp256k1_musig_partial_sig_parse(none, &partial_sig[0], max64) == 0);
     CHECK(ecount == 3);
     CHECK(secp256k1_musig_partial_sig_parse(none, &partial_sig[0], NULL) == 0);
     CHECK(ecount == 4);
@@ -436,20 +440,22 @@ void musig_api_tests(secp256k1_scratch_space *scratch) {
     CHECK(ecount == 2);
     CHECK(secp256k1_musig_partial_sig_verify(vrfy, NULL, &pubnonce[0], &pk[0], &keyagg_cache, &session) == 0);
     CHECK(ecount == 3);
-    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &partial_sig[0], NULL, &pk[0], &keyagg_cache, &session) == 0);
+    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &invalid_partial_sig, &pubnonce[0], &pk[0], &keyagg_cache, &session) == 0);
     CHECK(ecount == 4);
-    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &partial_sig[0], &invalid_pubnonce, &pk[0], &keyagg_cache, &session) == 0);
+    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &partial_sig[0], NULL, &pk[0], &keyagg_cache, &session) == 0);
     CHECK(ecount == 5);
-    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &partial_sig[0], &pubnonce[0], NULL, &keyagg_cache, &session) == 0);
+    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &partial_sig[0], &invalid_pubnonce, &pk[0], &keyagg_cache, &session) == 0);
     CHECK(ecount == 6);
-    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &partial_sig[0], &pubnonce[0], &invalid_pk, &keyagg_cache, &session) == 0);
+    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &partial_sig[0], &pubnonce[0], NULL, &keyagg_cache, &session) == 0);
     CHECK(ecount == 7);
-    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &partial_sig[0], &pubnonce[0], &pk[0], NULL, &session) == 0);
+    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &partial_sig[0], &pubnonce[0], &invalid_pk, &keyagg_cache, &session) == 0);
     CHECK(ecount == 8);
-    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &partial_sig[0], &pubnonce[0], &pk[0], &invalid_keyagg_cache, &session) == 0);
+    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &partial_sig[0], &pubnonce[0], &pk[0], NULL, &session) == 0);
     CHECK(ecount == 9);
-    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &partial_sig[0], &pubnonce[0], &pk[0], &keyagg_cache, NULL) == 0);
+    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &partial_sig[0], &pubnonce[0], &pk[0], &invalid_keyagg_cache, &session) == 0);
     CHECK(ecount == 10);
+    CHECK(secp256k1_musig_partial_sig_verify(vrfy, &partial_sig[0], &pubnonce[0], &pk[0], &keyagg_cache, NULL) == 0);
+    CHECK(ecount == 11);
 
     CHECK(secp256k1_musig_partial_sig_verify(vrfy, &partial_sig[0], &pubnonce[0], &pk[0], &keyagg_cache, &session) == 1);
     CHECK(secp256k1_musig_partial_sig_verify(vrfy, &partial_sig[1], &pubnonce[1], &pk[1], &keyagg_cache, &session) == 1);
@@ -463,8 +469,9 @@ void musig_api_tests(secp256k1_scratch_space *scratch) {
     CHECK(ecount == 2);
     CHECK(secp256k1_musig_partial_sig_agg(none, pre_sig, &session, NULL, 2) == 0);
     CHECK(ecount == 3);
+    CHECK(secp256k1_musig_partial_sig_agg(none, pre_sig, &session, invalid_partial_sig_ptr, 2) == 0);
+    CHECK(ecount == 4);
     CHECK(secp256k1_musig_partial_sig_agg(none, pre_sig, &session, partial_sig_ptr, 0) == 1);
-    CHECK(ecount == 3);
 
     CHECK(secp256k1_musig_partial_sig_agg(none, pre_sig, &session, partial_sig_ptr, 2) == 1);
 
@@ -998,9 +1005,8 @@ void musig_test_vectors_sign_helper(secp256k1_musig_keyagg_cache *keyagg_cache, 
     CHECK(secp256k1_musig_nonce_process(ctx, &session, &agg_pubnonce, msg, keyagg_cache, NULL) == 1);
     CHECK(secp256k1_musig_partial_sign(ctx, &partial_sig, &secnonce, &signer_keypair, keyagg_cache, &session) == 1);
     CHECK(secp256k1_musig_nonce_parity(ctx, fin_nonce_parity, &session));
-    memcpy(sig, &partial_sig, 32);
+    memcpy(sig, &partial_sig.data[4], 32);
 }
-
 
 int musig_test_pk_parity(const secp256k1_musig_keyagg_cache *keyagg_cache) {
     secp256k1_keyagg_cache_internal cache_i;

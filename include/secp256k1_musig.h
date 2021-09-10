@@ -80,11 +80,11 @@ typedef struct {
 
 /** Opaque data structure that holds a partial MuSig signature.
  *
- *  Guaranteed to be 32 bytes in size. Serialized and parsed with
+ *  Guaranteed to be 36 bytes in size. Serialized and parsed with
  *  `musig_partial_sig_serialize` and `musig_partial_sig_parse`.
  */
 typedef struct {
-    unsigned char data[32];
+    unsigned char data[36];
 } secp256k1_musig_partial_sig;
 
 /** Opaque data structure that holds a cache for a MuSig session.
