@@ -62,20 +62,20 @@ typedef struct {
 
 /** Opaque data structure that holds a signer's public nonce.
 *
-*  Guaranteed to be 128 bytes in size. Serialized and parsed with
+*  Guaranteed to be 132 bytes in size. Serialized and parsed with
 *  `musig_pubnonce_serialize` and `musig_pubnonce_parse`.
 */
 typedef struct {
-    unsigned char data[128];
+    unsigned char data[132];
 } secp256k1_musig_pubnonce;
 
 /** Opaque data structure that holds an aggregate public nonce.
  *
- *  Guaranteed to be 128 bytes in size. Serialized and parsed with
+ *  Guaranteed to be 132 bytes in size. Serialized and parsed with
  *  `musig_aggnonce_serialize` and `musig_aggnonce_parse`.
  */
 typedef struct {
-    unsigned char data[128];
+    unsigned char data[132];
 } secp256k1_musig_aggnonce;
 
 /** Opaque data structure that holds a partial MuSig signature.

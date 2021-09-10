@@ -74,7 +74,6 @@ static void secp256k1_point_load(secp256k1_ge *ge, const unsigned char *data) {
     }
 }
 
-/* Requires that the saved point is not infinity */
 static void secp256k1_point_save(unsigned char *data, secp256k1_ge *ge) {
     if (sizeof(secp256k1_ge_storage) == 64) {
         secp256k1_ge_storage s;

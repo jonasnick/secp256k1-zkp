@@ -93,16 +93,15 @@ static int secp256k1_musig_secnonce_load(const secp256k1_context* ctx, secp256k1
     return 1;
 }
 
+static const unsigned char secp256k1_musig_pubnonce_magic[4] = { 0xf5, 0x7A, 0x3d, 0xA0 };
+
 /* Works for both musig_pubnonce and musig_aggnonce. The provided group element
  * must not be point at infinity! */
 static void secp256k1_musig_pubnonce_save(secp256k1_musig_pubnonce* nonce, secp256k1_ge* ge) {
     int i;
+    memcpy(&nonce->data[0], secp256k1_musig_pubnonce_magic, 4);
     for (i = 0; i < 2; i++) {
-        VERIFY_CHECK(!secp256k1_ge_is_infinity(&ge[i]));
-        secp256k1_fe_normalize_var(&ge[i].x);
-        secp256k1_fe_normalize_var(&ge[i].y);
-        secp256k1_fe_get_b32(nonce->data + 64*i, &ge[i].x);
-        secp256k1_fe_get_b32(nonce->data + 64*i + 32, &ge[i].y);
+        secp256k1_point_save(nonce->data + 4+64*i, &ge[i]);
     }
 }
 
@@ -110,12 +109,10 @@ static void secp256k1_musig_pubnonce_save(secp256k1_musig_pubnonce* nonce, secp2
  * wasn't properly initialized */
 static int secp256k1_musig_pubnonce_load(const secp256k1_context* ctx, secp256k1_ge* ge, const secp256k1_musig_pubnonce* nonce) {
     int i;
+
+    ARG_CHECK(secp256k1_memcmp_var(&nonce->data[0], secp256k1_musig_pubnonce_magic, 4) == 0);
     for (i = 0; i < 2; i++) {
-        secp256k1_fe x, y;
-        secp256k1_fe_set_b32(&x, nonce->data + 64*i);
-        secp256k1_fe_set_b32(&y, nonce->data + 64*i + 32);
-        secp256k1_ge_set_xy(&ge[i], &x, &y);
-        ARG_CHECK(!secp256k1_fe_is_zero(&ge[i].x));
+        secp256k1_point_load(&ge[i], nonce->data + 4 + 64*i);
     }
     return 1;
 }
