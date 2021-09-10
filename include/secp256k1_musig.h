@@ -166,9 +166,10 @@ SECP256K1_API int secp256k1_musig_partial_sig_parse(
  *                    (cannot be NULL)
  *           scratch: scratch space used to compute the aggregate pubkey by
  *                    multiexponentiation. If NULL, an inefficient algorithm is used.
- *  Out:      agg_pk: the MuSig-aggregated xonly public key (cannot be NULL)
- *      keyagg_cache: if non-NULL, pointer to a musig_keyagg_cache struct to be used in
- *                    `musig_nonce_process` or `musig_pubkey_tweak_add`.
+ *  Out:      agg_pk: the MuSig-aggregated xonly public key. If you do not need it,
+ *                    this arg can be NULL.
+ *      keyagg_cache: if non-NULL, pointer to a musig_keyagg_cache struct that
+ *                    is required for signing (or verifying the MuSig protocol).
  *   In:     pubkeys: input array of pointers to public keys to aggregate. The order
  *                    is important; a different order will result in a different
  *                    aggregate public key (cannot be NULL)
@@ -194,25 +195,25 @@ SECP256K1_API int secp256k1_musig_pubkey_agg(
  *
  *  Returns: 0 if the arguments are invalid or the resulting public key would be
  *           invalid (only when the tweak is the negation of the corresponding
- *           secret key). 1 otherwise.
- *  Args:          ctx: pointer to a context object initialized for verification
- *                      (cannot be NULL)
- *        keyagg_cache: pointer to a `musig_keyagg_cache` struct initialized in
- *                      `musig_pubkey_agg` (cannot be NULL)
- *  Out: output_pubkey: pointer to a public key to store the result. Will be set
- *                      to an invalid value if this function returns 0 (cannot
- *                      be NULL)
- *              tweak32: pointer to a 32-byte tweak. If the tweak is invalid
- *                       according to secp256k1_ec_seckey_verify, this function
- *                       returns 0. For uniformly random 32-byte arrays the
- *                       chance of being invalid is negligible (around 1 in
- *                       2^128) (cannot be NULL).
+ *           secret key) or if the key has already been tweaked. 1 otherwise.
+ *  Args:            ctx: pointer to a context object initialized for verification
+ *                        (cannot be NULL)
+ *  Out:   output_pubkey: pointer to a public key to store the result. Will be set
+ *                        to an invalid value if this function returns 0. If you
+ *                        do not need it, this arg can be NULL.
+ *               tweak32: pointer to a 32-byte tweak. If the tweak is invalid
+ *                        according to secp256k1_ec_seckey_verify, this function
+ *                        returns 0. For uniformly random 32-byte arrays the
+ *                        chance of being invalid is negligible (around 1 in
+ *                        2^128) (cannot be NULL).
+ *  In/Out: keyagg_cache: pointer to a `musig_keyagg_cache` struct initialized in
+ *                       `musig_pubkey_agg` (cannot be NULL)
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_pubkey_tweak_add(
     const secp256k1_context* ctx,
-    secp256k1_musig_keyagg_cache *keyagg_cache,
     secp256k1_pubkey *output_pubkey,
-    const unsigned char *tweak32
+    const unsigned char *tweak32,
+    secp256k1_musig_keyagg_cache *keyagg_cache
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
 /** Starts a signing session by generating a nonce

@@ -77,6 +77,7 @@ static void secp256k1_point_load(secp256k1_ge *ge, const unsigned char *data) {
     }
 }
 
+/* Requires that the saved point is not infinity */
 static void secp256k1_point_save(unsigned char *data, secp256k1_ge *ge) {
     if (sizeof(secp256k1_ge_storage) == 64) {
         secp256k1_ge_storage s;
@@ -129,6 +130,7 @@ static int secp256k1_keyagg_cache_load(const secp256k1_context* ctx, secp256k1_k
     return 1;
 }
 
+/* Requires that cache_i->pk is not infinity */
 static void secp256k1_keyagg_cache_save(secp256k1_musig_keyagg_cache *cache, secp256k1_keyagg_cache_internal *cache_i) {
     unsigned char *ptr = cache->data;
     memcpy(ptr, secp256k1_musig_keyagg_cache_magic, 4);
@@ -198,7 +200,6 @@ int secp256k1_musig_pubkey_agg(const secp256k1_context* ctx, secp256k1_scratch_s
     size_t i;
 
     VERIFY_CHECK(ctx != NULL);
-    ARG_CHECK(agg_pk != NULL);
     ARG_CHECK(secp256k1_ecmult_context_is_built(&ctx->ecmult_ctx));
     ARG_CHECK(pubkeys != NULL);
     ARG_CHECK(n_pubkeys > 0);
@@ -226,7 +227,9 @@ int secp256k1_musig_pubkey_agg(const secp256k1_context* ctx, secp256k1_scratch_s
         return 0;
     }
     secp256k1_ge_set_gej(&pkp, &pkj);
-
+    secp256k1_fe_normalize_var(&pkp.y);
+    /* The resulting public key is infinity with negligible probability */
+    VERIFY_CHECK(!secp256k1_ge_is_infinity(&pkp));
     if (keyagg_cache != NULL) {
         secp256k1_keyagg_cache_internal cache_i = { 0 };
         cache_i.pk = pkp;
@@ -235,19 +238,21 @@ int secp256k1_musig_pubkey_agg(const secp256k1_context* ctx, secp256k1_scratch_s
         secp256k1_keyagg_cache_save(keyagg_cache, &cache_i);
     }
 
-    secp256k1_fe_normalize_var(&pkp.y);
     secp256k1_extrakeys_ge_even_y(&pkp);
-    secp256k1_xonly_pubkey_save(agg_pk, &pkp);
+    if (agg_pk != NULL) {
+        secp256k1_xonly_pubkey_save(agg_pk, &pkp);
+    }
     return 1;
 }
 
-int secp256k1_musig_pubkey_tweak_add(const secp256k1_context* ctx, secp256k1_musig_keyagg_cache *keyagg_cache, secp256k1_pubkey *output_pubkey, const unsigned char *tweak32) {
+int secp256k1_musig_pubkey_tweak_add(const secp256k1_context* ctx, secp256k1_pubkey *output_pubkey, const unsigned char *tweak32, secp256k1_musig_keyagg_cache *keyagg_cache) {
     secp256k1_keyagg_cache_internal cache_i;
     int overflow = 0;
 
     VERIFY_CHECK(ctx != NULL);
-    ARG_CHECK(output_pubkey != NULL);
-    memset(output_pubkey, 0, sizeof(*output_pubkey));
+    if (output_pubkey != NULL) {
+        memset(output_pubkey, 0, sizeof(*output_pubkey));
+    }
     ARG_CHECK(secp256k1_ecmult_context_is_built(&ctx->ecmult_ctx));
     ARG_CHECK(keyagg_cache != NULL);
     ARG_CHECK(tweak32 != NULL);
@@ -265,8 +270,11 @@ int secp256k1_musig_pubkey_tweak_add(const secp256k1_context* ctx, secp256k1_mus
         return 0;
     }
     cache_i.is_tweaked = 1;
+    /* eckey_pubkey_tweak_add fails if cache_i.pk is infinity */
     secp256k1_keyagg_cache_save(keyagg_cache, &cache_i);
-    secp256k1_pubkey_save(output_pubkey, &cache_i.pk);
+    if (output_pubkey != NULL) {
+        secp256k1_pubkey_save(output_pubkey, &cache_i.pk);
+    }
     return 1;
 }
 
