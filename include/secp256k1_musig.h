@@ -23,31 +23,6 @@ extern "C" {
  * in src/modules/musig/musig.md
  */
 
-/** Data structure containing auxiliary data generated in `pubkey_agg` and
- *  required for `session_*_init`.
- *  Fields:
- *        magic: Set during initialization in `pubkey_agg` to allow
- *               detecting an uninitialized object.
- *      pk_hash: The 32-byte hash of the original public keys
- *    second_pk: Serialized x-coordinate of the second public key in the list.
- *               Filled with zeros if there is none.
- *    pk_parity: Whether the MuSig-aggregated point was negated when
- *               converting it to the aggregate xonly pubkey.
- *     is_tweaked: Whether the aggregate pubkey was tweaked
- *          tweak: If is_tweaked, array with the 32-byte tweak
- * internal_key_parity: If is_tweaked, the parity of the aggregate pubkey
- *                 before tweaking
- */
-typedef struct {
-    uint32_t magic;
-    unsigned char pk_hash[32];
-    unsigned char second_pk[32];
-    secp256k1_pubkey pk;
-    int is_tweaked;
-    unsigned char tweak[32];
-    int internal_key_parity;
-} secp256k1_musig_keyagg_cache;
-
 /** Opaque data structures
  *
  *  The exact representation of data inside is implementation defined and not
@@ -56,6 +31,15 @@ typedef struct {
  *  for storage, transmission, or comparison, use the corresponding
  *  serialization and parsing functions.
  */
+
+/** Opaque data structure that caches information about key aggregation.
+ *
+ *  Guaranteed to be 165 bytes in size. No serialization and parsing functions
+ *  (yet).
+ */
+typedef struct {
+    unsigned char data[165];
+} secp256k1_musig_keyagg_cache;
 
 /** Opaque data structure that holds a signer's secret nonce.
  *

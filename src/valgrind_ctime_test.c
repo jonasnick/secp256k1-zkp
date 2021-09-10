@@ -257,7 +257,7 @@ void run_tests(secp256k1_context *ctx, unsigned char *key) {
         secp256k1_musig_pubnonce pubnonce;
         const secp256k1_musig_pubnonce *pubnonce_ptr[1];
         secp256k1_musig_aggnonce aggnonce;
-        secp256k1_musig_keyagg_cache keyagg_cache;
+        secp256k1_musig_keyagg_cache cache;
         secp256k1_musig_session session;
         secp256k1_musig_partial_sig partial_sig;
         unsigned char extra_input[32];
@@ -272,20 +272,20 @@ void run_tests(secp256k1_context *ctx, unsigned char *key) {
 
         CHECK(secp256k1_keypair_create(ctx, &keypair, key));
         CHECK(secp256k1_keypair_xonly_pub(ctx, &pk, NULL, &keypair));
-        CHECK(secp256k1_musig_pubkey_agg(ctx, NULL, &agg_pk, &keyagg_cache, pk_ptr, 1) == 1);
+        CHECK(secp256k1_musig_pubkey_agg(ctx, NULL, &agg_pk, &cache, pk_ptr, 1) == 1);
         VALGRIND_MAKE_MEM_UNDEFINED(key, 32);
         VALGRIND_MAKE_MEM_UNDEFINED(session_id, 32);
         VALGRIND_MAKE_MEM_UNDEFINED(extra_input, 32);
-        ret = secp256k1_musig_nonce_gen(ctx, &secnonce, &pubnonce, session_id, key, msg, &keyagg_cache, extra_input);
+        ret = secp256k1_musig_nonce_gen(ctx, &secnonce, &pubnonce, session_id, key, msg, &cache, extra_input);
         VALGRIND_MAKE_MEM_DEFINED(&ret, sizeof(ret));
         CHECK(ret == 1);
         CHECK(secp256k1_musig_nonce_agg(ctx, &aggnonce, pubnonce_ptr, 1));
-        CHECK(secp256k1_musig_nonce_process(ctx, &session, &aggnonce, msg, &keyagg_cache, NULL) == 1);
+        CHECK(secp256k1_musig_nonce_process(ctx, &session, &aggnonce, msg, &cache, NULL) == 1);
 
         ret = secp256k1_keypair_create(ctx, &keypair, key);
         VALGRIND_MAKE_MEM_DEFINED(&ret, sizeof(ret));
         CHECK(ret == 1);
-        ret = secp256k1_musig_partial_sign(ctx, &partial_sig, &secnonce, &keypair, &keyagg_cache, &session);
+        ret = secp256k1_musig_partial_sign(ctx, &partial_sig, &secnonce, &keypair, &cache, &session);
         VALGRIND_MAKE_MEM_DEFINED(&ret, sizeof(ret));
         CHECK(ret == 1);
     }

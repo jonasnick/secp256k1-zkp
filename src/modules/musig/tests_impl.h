@@ -812,10 +812,10 @@ void musig_tweak_test(secp256k1_scratch_space *scratch) {
 void musig_test_vectors_keyagg_helper(const unsigned char **pk_ser, int n_pks, const unsigned char *agg_pk_expected, int has_second_pk, int second_pk_idx) {
     secp256k1_xonly_pubkey *pk = malloc(n_pks * sizeof(*pk));
     const secp256k1_xonly_pubkey **pk_ptr = malloc(n_pks * sizeof(*pk_ptr));
+    secp256k1_keyagg_cache_internal cache_i;
     secp256k1_xonly_pubkey agg_pk;
     unsigned char agg_pk_ser[32];
     secp256k1_musig_keyagg_cache keyagg_cache;
-    secp256k1_fe second_pk_x;
     int i;
 
     for (i = 0; i < n_pks; i++) {
@@ -824,10 +824,12 @@ void musig_test_vectors_keyagg_helper(const unsigned char **pk_ser, int n_pks, c
     }
 
     CHECK(secp256k1_musig_pubkey_agg(ctx, NULL, &agg_pk, &keyagg_cache, pk_ptr, n_pks) == 1);
-    CHECK(secp256k1_fe_set_b32(&second_pk_x, keyagg_cache.second_pk));
-    CHECK(secp256k1_fe_is_zero(&second_pk_x) == !has_second_pk);
-    if (!secp256k1_fe_is_zero(&second_pk_x)) {
-        CHECK(secp256k1_memcmp_var(pk_ser[second_pk_idx], &keyagg_cache.second_pk, sizeof(keyagg_cache.second_pk)) == 0);
+    CHECK(secp256k1_keyagg_cache_load(ctx, &cache_i, &keyagg_cache));
+    CHECK(secp256k1_fe_is_zero(&cache_i.second_pk_x) == !has_second_pk);
+    if (!secp256k1_fe_is_zero(&cache_i.second_pk_x)) {
+        secp256k1_ge pk_pt;
+        CHECK(secp256k1_xonly_pubkey_load(ctx, &pk_pt, &pk[second_pk_idx]));
+        CHECK(secp256k1_fe_equal_var(&pk_pt.x, &cache_i.second_pk_x));
     }
     CHECK(secp256k1_xonly_pubkey_serialize(ctx, agg_pk_ser, &agg_pk));
     /* TODO: remove when test vectors are not expected to change anymore */
@@ -978,12 +980,21 @@ void musig_test_vectors_sign_helper(secp256k1_musig_keyagg_cache *keyagg_cache, 
     memcpy(sig, &partial_sig, 32);
 }
 
+
+int musig_test_pk_parity(const secp256k1_musig_keyagg_cache *keyagg_cache) {
+    secp256k1_keyagg_cache_internal cache_i;
+    CHECK(secp256k1_keyagg_cache_load(ctx, &cache_i, keyagg_cache));
+    return secp256k1_fe_is_odd(&cache_i.pk.y);
+}
+
 int musig_test_is_second_pk(const secp256k1_musig_keyagg_cache *keyagg_cache, const unsigned char *sk) {
+    secp256k1_ge pkp;
     secp256k1_xonly_pubkey pk;
-    unsigned char pk_ser[32];
+    secp256k1_keyagg_cache_internal cache_i;
     CHECK(create_keypair_and_pk(NULL, &pk, sk));
-    CHECK(secp256k1_xonly_pubkey_serialize(ctx, pk_ser, &pk));
-    return memcmp(keyagg_cache->second_pk, pk_ser, sizeof(pk_ser)) == 0;
+    CHECK(secp256k1_xonly_pubkey_load(ctx, &pkp, &pk));
+    CHECK(secp256k1_keyagg_cache_load(ctx, &cache_i, keyagg_cache));
+    return secp256k1_fe_equal_var(&cache_i.second_pk_x, &pkp.x);
 }
 
 /* TODO: Add test vectors for failed signing */
@@ -1057,7 +1068,7 @@ void musig_test_vectors_sign(void) {
         /* This is a test where the combined public key point has an _odd_ y
          * coordinate, the signer _is not_ the second pubkey in the list and the
          * nonce parity is 1. */
-        CHECK(secp256k1_musig_keyagg_pk_parity(ctx, &keyagg_cache) == 1);
+        CHECK(musig_test_pk_parity(&keyagg_cache) == 1);
         CHECK(!musig_test_is_second_pk(&keyagg_cache, sk));
         CHECK(fin_nonce_parity == 1);
         CHECK(memcmp(sig, sig_expected, 32) == 0);
@@ -1074,7 +1085,7 @@ void musig_test_vectors_sign(void) {
        /* This is a test where the aggregate public key point has an _even_ y
         * coordinate, the signer _is_ the second pubkey in the list and the
         * nonce parity is 0. */
-        CHECK(secp256k1_musig_keyagg_pk_parity(ctx, &keyagg_cache) == 0);
+        CHECK(musig_test_pk_parity(&keyagg_cache) == 0);
         CHECK(musig_test_is_second_pk(&keyagg_cache, sk));
         CHECK(fin_nonce_parity == 0);
         CHECK(memcmp(sig, sig_expected, 32) == 0);

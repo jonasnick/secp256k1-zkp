@@ -61,6 +61,90 @@ static void secp256k1_musig_keyaggcoef_sha256(secp256k1_sha256 *sha) {
     sha->bytes = 64;
 }
 
+static void secp256k1_point_load(secp256k1_ge *ge, const unsigned char *data) {
+    if (sizeof(secp256k1_ge_storage) == 64) {
+        /* When the secp256k1_ge_storage type is exactly 64 byte, use its
+         * representation as conversion is very fast. */
+        secp256k1_ge_storage s;
+        memcpy(&s, data, sizeof(s));
+        secp256k1_ge_from_storage(ge, &s);
+    } else {
+        /* Otherwise, fall back to 32-byte big endian for X and Y. */
+        secp256k1_fe x, y;
+        secp256k1_fe_set_b32(&x, data);
+        secp256k1_fe_set_b32(&y, data + 32);
+        secp256k1_ge_set_xy(ge, &x, &y);
+    }
+}
+
+static void secp256k1_point_save(unsigned char *data, secp256k1_ge *ge) {
+    if (sizeof(secp256k1_ge_storage) == 64) {
+        secp256k1_ge_storage s;
+        secp256k1_ge_to_storage(&s, ge);
+        memcpy(data, &s, sizeof(s));
+    } else {
+        VERIFY_CHECK(!secp256k1_ge_is_infinity(ge));
+        secp256k1_fe_normalize_var(&ge->x);
+        secp256k1_fe_normalize_var(&ge->y);
+        secp256k1_fe_get_b32(data, &ge->x);
+        secp256k1_fe_get_b32(data + 32, &ge->y);
+    }
+}
+
+typedef struct {
+    secp256k1_ge pk;
+    secp256k1_fe second_pk_x;
+    const unsigned char *pk_hash;
+    int is_tweaked;
+    secp256k1_scalar tweak;
+    int internal_key_parity;
+} secp256k1_keyagg_cache_internal;
+
+static const unsigned char secp256k1_musig_keyagg_cache_magic[4] = { 0xf4, 0xad, 0xbb, 0xdf };
+
+/* A keyagg cache consists of
+ * - 4 byte magic set during initialization to allow detecting an uninitialized
+ *   object.
+ * - 64 byte aggregate (and potentially tweaked) public key
+ * - 32 byte X-coordinate of "second" public key (0 if not present)
+ * - 32 byte hash of all public keys
+ * - 1 byte indicating if the public key is tweaked and if so, also the parity
+ *   of the internal key
+ * - 32 byte tweak
+ */
+static int secp256k1_keyagg_cache_load(const secp256k1_context* ctx, secp256k1_keyagg_cache_internal *cache_i, const secp256k1_musig_keyagg_cache *cache) {
+    const unsigned char *ptr = cache->data;
+    ARG_CHECK(secp256k1_memcmp_var(ptr, secp256k1_musig_keyagg_cache_magic, 4) == 0);
+    ptr += 4;
+    secp256k1_point_load(&cache_i->pk, ptr);
+    ptr += 64;
+    secp256k1_fe_set_b32(&cache_i->second_pk_x, ptr);
+    ptr += 32;
+    cache_i->pk_hash = ptr;
+    ptr += 32;
+    cache_i->is_tweaked = *ptr & 1;
+    cache_i->internal_key_parity = *ptr & 2;
+    ptr += 1;
+    secp256k1_scalar_set_b32(&cache_i->tweak, ptr, NULL);
+    return 1;
+}
+
+static void secp256k1_keyagg_cache_save(secp256k1_musig_keyagg_cache *cache, secp256k1_keyagg_cache_internal *cache_i) {
+    unsigned char *ptr = cache->data;
+    memcpy(ptr, secp256k1_musig_keyagg_cache_magic, 4);
+    ptr += 4;
+    secp256k1_point_save(ptr, &cache_i->pk);
+    ptr += 64;
+    secp256k1_fe_get_b32(ptr, &cache_i->second_pk_x);
+    ptr += 32;
+    memmove(ptr, cache_i->pk_hash, 32);
+    ptr += 32;
+    *ptr = cache_i->is_tweaked;
+    *ptr |= cache_i->internal_key_parity << 1;
+    ptr += 1;
+    secp256k1_scalar_get_b32(ptr, &cache_i->tweak);
+}
+
 /* Compute KeyAgg coefficient which is constant 1 for the second pubkey and
  * SHA256(ell, x) where ell is the hash of public keys otherwise. second_pk_x
  * can be 0 in case there is no second_pk. Assumes both field elements x and
@@ -79,15 +163,12 @@ static void secp256k1_musig_keyaggcoef_internal(secp256k1_scalar *r, const unsig
         secp256k1_sha256_finalize(&sha, buf);
         secp256k1_scalar_set_b32(r, buf, NULL);
     }
+
 }
 
 /* Assumes both field elements x and second_pk_x are normalized. */
-static void secp256k1_musig_keyaggcoef(secp256k1_scalar *r, const secp256k1_musig_keyagg_cache *keyagg_cache, secp256k1_fe *x) {
-    secp256k1_fe second_pk_x;
-    int ret;
-    ret = secp256k1_fe_set_b32(&second_pk_x, keyagg_cache->second_pk);
-    VERIFY_CHECK(ret);
-    secp256k1_musig_keyaggcoef_internal(r, keyagg_cache->pk_hash, x, &second_pk_x);
+static void secp256k1_musig_keyaggcoef(secp256k1_scalar *r, const secp256k1_keyagg_cache_internal *cache_i, secp256k1_fe *x) {
+    secp256k1_musig_keyaggcoef_internal(r, cache_i->pk_hash, x, &cache_i->second_pk_x);
 }
 
 typedef struct {
@@ -109,8 +190,6 @@ static int secp256k1_musig_pubkey_agg_callback(secp256k1_scalar *sc, secp256k1_g
     secp256k1_musig_keyaggcoef_internal(sc, ctx->ell, &pt->x, &ctx->second_pk_x);
     return 1;
 }
-
-static const uint32_t keyagg_cache_magic = 0xf4adbbdf;
 
 int secp256k1_musig_pubkey_agg(const secp256k1_context* ctx, secp256k1_scratch_space *scratch, secp256k1_xonly_pubkey *agg_pk, secp256k1_musig_keyagg_cache *keyagg_cache, const secp256k1_xonly_pubkey * const* pubkeys, size_t n_pubkeys) {
     secp256k1_musig_pubkey_agg_ecmult_data ecmult_data;
@@ -149,11 +228,11 @@ int secp256k1_musig_pubkey_agg(const secp256k1_context* ctx, secp256k1_scratch_s
     secp256k1_ge_set_gej(&pkp, &pkj);
 
     if (keyagg_cache != NULL) {
-        keyagg_cache->magic = keyagg_cache_magic;
-        memcpy(keyagg_cache->pk_hash, ecmult_data.ell, 32);
-        secp256k1_pubkey_save(&keyagg_cache->pk, &pkp);
-        keyagg_cache->is_tweaked = 0;
-        secp256k1_fe_get_b32(keyagg_cache->second_pk, &ecmult_data.second_pk_x);
+        secp256k1_keyagg_cache_internal cache_i = { 0 };
+        cache_i.pk = pkp;
+        cache_i.second_pk_x = ecmult_data.second_pk_x;
+        cache_i.pk_hash = ecmult_data.ell;
+        secp256k1_keyagg_cache_save(keyagg_cache, &cache_i);
     }
 
     secp256k1_fe_normalize_var(&pkp.y);
@@ -163,29 +242,31 @@ int secp256k1_musig_pubkey_agg(const secp256k1_context* ctx, secp256k1_scratch_s
 }
 
 int secp256k1_musig_pubkey_tweak_add(const secp256k1_context* ctx, secp256k1_musig_keyagg_cache *keyagg_cache, secp256k1_pubkey *output_pubkey, const unsigned char *tweak32) {
-    secp256k1_ge pk_pt;
+    secp256k1_keyagg_cache_internal cache_i;
+    int overflow = 0;
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(output_pubkey != NULL);
     memset(output_pubkey, 0, sizeof(*output_pubkey));
     ARG_CHECK(secp256k1_ecmult_context_is_built(&ctx->ecmult_ctx));
     ARG_CHECK(keyagg_cache != NULL);
-    ARG_CHECK(keyagg_cache->magic == keyagg_cache_magic);
-    /* This function can only be called once because otherwise signing would not
-     * succeed */
-    ARG_CHECK(keyagg_cache->is_tweaked == 0);
     ARG_CHECK(tweak32 != NULL);
 
-    secp256k1_pubkey_load(ctx, &pk_pt, &keyagg_cache->pk);
-    keyagg_cache->internal_key_parity = secp256k1_extrakeys_ge_even_y(&pk_pt);
-    if(!secp256k1_ec_pubkey_tweak_add_helper(&ctx->ecmult_ctx, &pk_pt, tweak32)) {
+    if(!secp256k1_keyagg_cache_load(ctx, &cache_i, keyagg_cache)) {
         return 0;
     }
-    memcpy(keyagg_cache->tweak, tweak32, 32);
-    keyagg_cache->is_tweaked = 1;
+    /* This function can only be called once because otherwise signing would not
+     * succeed */
+    ARG_CHECK(cache_i.is_tweaked == 0);
 
-    secp256k1_pubkey_save(output_pubkey, &pk_pt);
-    secp256k1_pubkey_save(&keyagg_cache->pk, &pk_pt);
+    cache_i.internal_key_parity = secp256k1_extrakeys_ge_even_y(&cache_i.pk);
+    secp256k1_scalar_set_b32(&cache_i.tweak, tweak32, &overflow);
+    if(overflow || !secp256k1_eckey_pubkey_tweak_add(&ctx->ecmult_ctx, &cache_i.pk, &cache_i.tweak)) {
+        return 0;
+    }
+    cache_i.is_tweaked = 1;
+    secp256k1_keyagg_cache_save(keyagg_cache, &cache_i);
+    secp256k1_pubkey_save(output_pubkey, &cache_i.pk);
     return 1;
 }
 
@@ -236,7 +317,7 @@ static void secp256k1_musig_secnonce_save(secp256k1_musig_secnonce *secnonce, se
 }
 
 static int secp256k1_musig_secnonce_load(const secp256k1_context* ctx, secp256k1_scalar *k, secp256k1_musig_secnonce *secnonce) {
-    ARG_CHECK(memcmp(&secnonce->data[0], secp256k1_musig_secnonce_magic, 4) == 0);
+    ARG_CHECK(secp256k1_memcmp_var(&secnonce->data[0], secp256k1_musig_secnonce_magic, 4) == 0);
     secp256k1_scalar_set_b32(&k[0], &secnonce->data[4], NULL);
     secp256k1_scalar_set_b32(&k[1], &secnonce->data[36], NULL);
     return 1;
@@ -270,6 +351,7 @@ static int secp256k1_musig_pubnonce_load(const secp256k1_context* ctx, secp256k1
 }
 
 int secp256k1_musig_nonce_gen(const secp256k1_context* ctx, secp256k1_musig_secnonce *secnonce, secp256k1_musig_pubnonce *pubnonce, const unsigned char *session_id32, const unsigned char *seckey, const unsigned char *msg32, const secp256k1_musig_keyagg_cache *keyagg_cache, const unsigned char *extra_input32) {
+    secp256k1_keyagg_cache_internal cache_i;
     secp256k1_scalar k[2];
     secp256k1_ge nonce_pt[2];
     int i;
@@ -283,7 +365,7 @@ int secp256k1_musig_nonce_gen(const secp256k1_context* ctx, secp256k1_musig_secn
     memset(pubnonce, 0, sizeof(*pubnonce));
     ARG_CHECK(session_id32 != NULL);
     ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
-    ARG_CHECK(keyagg_cache == NULL || keyagg_cache->magic == keyagg_cache_magic);
+
     /* Check that the seckey is valid to be able to sign for it later. */
     if (seckey != NULL) {
         secp256k1_scalar sk;
@@ -300,11 +382,14 @@ int secp256k1_musig_nonce_gen(const secp256k1_context* ctx, secp256k1_musig_secn
 
     if (keyagg_cache != NULL) {
         size_t outputlen = 33;
-        secp256k1_ge pk_pt;
-        secp256k1_pubkey_load(ctx, &pk_pt, &keyagg_cache->pk);
-        if (!secp256k1_eckey_pubkey_serialize(&pk_pt, pk_ser, &outputlen, 1)) {
+        int ret;
+
+        if (!secp256k1_keyagg_cache_load(ctx, &cache_i, keyagg_cache)) {
             return 0;
         }
+        ret = secp256k1_eckey_pubkey_serialize(&cache_i.pk, pk_ser, &outputlen, 1);
+        /* Serialization can not fail because the loaded point can not be infinity. */
+        VERIFY_CHECK(ret);
     } else {
         pk_ser_ptr = NULL;
     }
@@ -415,15 +500,15 @@ int secp256k1_musig_aggnonce_parse(const secp256k1_context* ctx, secp256k1_musig
     return secp256k1_musig_pubnonce_parse(ctx, (secp256k1_musig_pubnonce*) nonce, in66);
 }
 
-/* A session cache consists of
+/* A session consists of
  * - 1 byte the parity of the aggregate nonce
  * - 32 byte aggregated nonce
  * - 32 byte nonce aggregation coefficient b
  * - 32 byte signature challenge hash e
  * - 32 byte scalar s that is added to the partial signatures of the signers
  */
-static void secp256k1_musig_session_load(int *fin_nonce_parity, unsigned char *r32, secp256k1_scalar *b, secp256k1_scalar *e, secp256k1_scalar *s, const secp256k1_musig_session *cache) {
-    const unsigned char *ptr = cache->data;
+static void secp256k1_musig_session_load(int *fin_nonce_parity, unsigned char *r32, secp256k1_scalar *b, secp256k1_scalar *e, secp256k1_scalar *s, const secp256k1_musig_session *session) {
+    const unsigned char *ptr = session->data;
     if (fin_nonce_parity != NULL) {
         *fin_nonce_parity = *ptr;
     }
@@ -445,8 +530,8 @@ static void secp256k1_musig_session_load(int *fin_nonce_parity, unsigned char *r
     }
 }
 
-static void secp256k1_musig_session_save(secp256k1_musig_session *cache, int fin_nonce_parity, const unsigned char *r32, const secp256k1_scalar *b, const secp256k1_scalar *e, const secp256k1_scalar *s) {
-    unsigned char *ptr = cache->data;
+static void secp256k1_musig_session_save(secp256k1_musig_session *session, int fin_nonce_parity, const unsigned char *r32, const secp256k1_scalar *b, const secp256k1_scalar *e, const secp256k1_scalar *s) {
+    unsigned char *ptr = session->data;
     *ptr = fin_nonce_parity;
     ptr += 1;
     memcpy(ptr, r32, 32);
@@ -457,7 +542,6 @@ static void secp256k1_musig_session_save(secp256k1_musig_session *cache, int fin
     ptr += 32;
     secp256k1_scalar_get_b32(ptr, s);
 }
-
 
 /* Normalizes the x-coordinate of the given group element. */
 static int secp256k1_xonly_ge_serialize(unsigned char *output32, secp256k1_ge *ge) {
@@ -515,7 +599,7 @@ static int secp256k1_musig_nonce_process_internal(const secp256k1_ecmult_context
 }
 
 int secp256k1_musig_nonce_process(const secp256k1_context* ctx, secp256k1_musig_session *session, const secp256k1_musig_aggnonce  *aggnonce, const unsigned char *msg32, const secp256k1_musig_keyagg_cache *keyagg_cache, const secp256k1_pubkey *adaptor) {
-    secp256k1_ge pk_pt;
+    secp256k1_keyagg_cache_internal cache_i;
     secp256k1_ge aggnonce_pt[2];
     secp256k1_gej aggnonce_ptj[2];
     unsigned char fin_nonce[32];
@@ -530,10 +614,11 @@ int secp256k1_musig_nonce_process(const secp256k1_context* ctx, secp256k1_musig_
     ARG_CHECK(aggnonce != NULL);
     ARG_CHECK(msg32 != NULL);
     ARG_CHECK(keyagg_cache != NULL);
-    ARG_CHECK(keyagg_cache->magic == keyagg_cache_magic);
 
-    secp256k1_pubkey_load(ctx, &pk_pt, &keyagg_cache->pk);
-    secp256k1_fe_get_b32(agg_pk32, &pk_pt.x);
+    if (!secp256k1_keyagg_cache_load(ctx, &cache_i, keyagg_cache)) {
+        return 0;
+    }
+    secp256k1_fe_get_b32(agg_pk32, &cache_i.pk.x);
 
     if (!secp256k1_musig_pubnonce_load(ctx, aggnonce_pt, (secp256k1_musig_pubnonce*)aggnonce)) {
         return 0;
@@ -557,18 +642,14 @@ int secp256k1_musig_nonce_process(const secp256k1_context* ctx, secp256k1_musig_
 
     /* If there is a tweak then set `msghash` times `tweak` to the `s`-part.*/
     secp256k1_scalar_clear(&s);
-    if (keyagg_cache->is_tweaked) {
-        secp256k1_scalar scalar_tweak;
-        int overflow = 0;
+    if (cache_i.is_tweaked) {
         secp256k1_scalar e_tmp = e;
-
-        secp256k1_scalar_set_b32(&scalar_tweak, keyagg_cache->tweak, &overflow);
-        if (overflow || !secp256k1_eckey_privkey_tweak_mul(&e_tmp, &scalar_tweak)) {
+        if (!secp256k1_eckey_privkey_tweak_mul(&e_tmp, &cache_i.tweak)) {
             /* This mimics the behavior of secp256k1_ec_seckey_tweak_mul regarding
-             * overflow and tweak being 0. */
+             * tweak being 0. */
             return 0;
         }
-        if (secp256k1_fe_is_odd(&pk_pt.y)) {
+        if (secp256k1_fe_is_odd(&cache_i.pk.y)) {
             secp256k1_scalar_negate(&e_tmp, &e_tmp);
         }
         secp256k1_scalar_add(&s, &s, &e_tmp);
@@ -609,17 +690,12 @@ static void secp256k1_musig_partial_sig_load(secp256k1_scalar *s, const secp256k
     VERIFY_CHECK(!overflow);
 }
 
-static int secp256k1_musig_keyagg_pk_parity(const secp256k1_context* ctx, const secp256k1_musig_keyagg_cache *keyagg_cache) {
-    secp256k1_ge pk;
-    secp256k1_pubkey_load(ctx, &pk, &keyagg_cache->pk);
-    return secp256k1_fe_is_odd(&pk.y);
-}
-
 int secp256k1_musig_partial_sign(const secp256k1_context* ctx, secp256k1_musig_partial_sig *partial_sig, secp256k1_musig_secnonce *secnonce, const secp256k1_keypair *keypair, const secp256k1_musig_keyagg_cache *keyagg_cache, const secp256k1_musig_session *session) {
     secp256k1_scalar sk;
     secp256k1_ge pk;
     secp256k1_scalar e, b, k[2];
     secp256k1_scalar mu;
+    secp256k1_keyagg_cache_internal cache_i;
     int fin_nonce_parity;
 
     VERIFY_CHECK(ctx != NULL);
@@ -627,7 +703,6 @@ int secp256k1_musig_partial_sign(const secp256k1_context* ctx, secp256k1_musig_p
     ARG_CHECK(secnonce != NULL);
     ARG_CHECK(keypair != NULL);
     ARG_CHECK(keyagg_cache != NULL);
-    ARG_CHECK(keyagg_cache->magic == keyagg_cache_magic);
     ARG_CHECK(session != NULL);
 
     /* Fails if the magic doesn't match */
@@ -659,19 +734,21 @@ int secp256k1_musig_partial_sign(const secp256k1_context* ctx, secp256k1_musig_p
     if (!secp256k1_keypair_load(ctx, &sk, &pk, keypair)) {
         return 0;
     }
-
+    if (!secp256k1_keyagg_cache_load(ctx, &cache_i, keyagg_cache)) {
+        return 0;
+    }
     secp256k1_fe_normalize_var(&pk.y);
     if((secp256k1_fe_is_odd(&pk.y)
-            + secp256k1_musig_keyagg_pk_parity(ctx, keyagg_cache)
-            + (keyagg_cache->is_tweaked
-                && keyagg_cache->internal_key_parity))
+            + secp256k1_fe_is_odd(&cache_i.pk.y)
+            + (cache_i.is_tweaked
+                && cache_i.internal_key_parity))
             % 2 == 1) {
         secp256k1_scalar_negate(&sk, &sk);
     }
 
     /* Multiply KeyAgg coefficient */
     secp256k1_fe_normalize_var(&pk.x);
-    secp256k1_musig_keyaggcoef(&mu, keyagg_cache, &pk.x);
+    secp256k1_musig_keyaggcoef(&mu, &cache_i, &pk.x);
     secp256k1_scalar_mul(&sk, &sk, &mu);
 
     secp256k1_musig_session_load(&fin_nonce_parity, NULL, &b, &e, NULL, session);
@@ -693,6 +770,7 @@ int secp256k1_musig_partial_sign(const secp256k1_context* ctx, secp256k1_musig_p
 }
 
 int secp256k1_musig_partial_sig_verify(const secp256k1_context* ctx, const secp256k1_musig_partial_sig *partial_sig, const secp256k1_musig_pubnonce *pubnonce, const secp256k1_xonly_pubkey *pubkey, const secp256k1_musig_keyagg_cache *keyagg_cache, const secp256k1_musig_session *session) {
+    secp256k1_keyagg_cache_internal cache_i;
     secp256k1_scalar mu, b, e, s;
     secp256k1_gej pkj;
     secp256k1_ge nonce_pt[2];
@@ -708,7 +786,6 @@ int secp256k1_musig_partial_sig_verify(const secp256k1_context* ctx, const secp2
     ARG_CHECK(pubnonce != NULL);
     ARG_CHECK(pubkey != NULL);
     ARG_CHECK(keyagg_cache != NULL);
-    ARG_CHECK(keyagg_cache->magic == keyagg_cache_magic);
     ARG_CHECK(session != NULL);
 
     secp256k1_musig_session_load(&fin_nonce_parity, NULL, &b, &e, NULL, session);
@@ -727,10 +804,13 @@ int secp256k1_musig_partial_sig_verify(const secp256k1_context* ctx, const secp2
     if (!secp256k1_xonly_pubkey_load(ctx, &pkp, pubkey)) {
         return 0;
     }
+    if (!secp256k1_keyagg_cache_load(ctx, &cache_i, keyagg_cache)) {
+        return 0;
+    }
     /* Multiplying the messagehash by the KeyAgg coefficient is equivalent
      * to multiplying the signer's public key by the coefficient, except
      * much easier to do. */
-    secp256k1_musig_keyaggcoef(&mu, keyagg_cache, &pkp.x);
+    secp256k1_musig_keyaggcoef(&mu, &cache_i, &pkp.x);
     secp256k1_scalar_mul(&e, &e, &mu);
 
     /* If the MuSig-aggregate point has an odd Y coordinate, the signers will
@@ -738,9 +818,9 @@ int secp256k1_musig_partial_sig_verify(const secp256k1_context* ctx, const secp2
      * aggregate signature is valid for the MuSig aggregated xonly key. If the
      * MuSig-aggregate point was tweaked then `e` is negated if the aggregate key
      * has an odd Y coordinate XOR the internal key has an odd Y coordinate.*/
-    if (secp256k1_musig_keyagg_pk_parity(ctx, keyagg_cache)
-            != (keyagg_cache->is_tweaked
-                && keyagg_cache->internal_key_parity)) {
+    if (secp256k1_fe_is_odd(&cache_i.pk.y)
+            != (cache_i.is_tweaked
+                && cache_i.internal_key_parity)) {
         secp256k1_scalar_negate(&e, &e);
     }
 
