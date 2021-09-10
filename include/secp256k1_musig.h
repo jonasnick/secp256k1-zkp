@@ -163,7 +163,6 @@ SECP256K1_API int secp256k1_musig_partial_sig_parse(
  *
  *  Returns: 1 if the public keys were successfully aggregated, 0 otherwise
  *  Args:        ctx: pointer to a context object initialized for verification
- *                    (cannot be NULL)
  *           scratch: scratch space used to compute the aggregate pubkey by
  *                    multiexponentiation. If NULL, an inefficient algorithm is used.
  *  Out:      agg_pk: the MuSig-aggregated xonly public key. If you do not need it,
@@ -172,7 +171,7 @@ SECP256K1_API int secp256k1_musig_partial_sig_parse(
  *                    is required for signing (or verifying the MuSig protocol).
  *   In:     pubkeys: input array of pointers to public keys to aggregate. The order
  *                    is important; a different order will result in a different
- *                    aggregate public key (cannot be NULL)
+ *                    aggregate public key
  *         n_pubkeys: length of pubkeys array. Must be greater than 0.
  */
 SECP256K1_API int secp256k1_musig_pubkey_agg(
@@ -197,7 +196,6 @@ SECP256K1_API int secp256k1_musig_pubkey_agg(
  *           invalid (only when the tweak is the negation of the corresponding
  *           secret key) or if the key has already been tweaked. 1 otherwise.
  *  Args:            ctx: pointer to a context object initialized for verification
- *                        (cannot be NULL)
  *  Out:   output_pubkey: pointer to a public key to store the result. Will be set
  *                        to an invalid value if this function returns 0. If you
  *                        do not need it, this arg can be NULL.
@@ -205,9 +203,9 @@ SECP256K1_API int secp256k1_musig_pubkey_agg(
  *                        according to secp256k1_ec_seckey_verify, this function
  *                        returns 0. For uniformly random 32-byte arrays the
  *                        chance of being invalid is negligible (around 1 in
- *                        2^128) (cannot be NULL).
+ *                        2^128).
  *  In/Out: keyagg_cache: pointer to a `musig_keyagg_cache` struct initialized in
- *                       `musig_pubkey_agg` (cannot be NULL)
+ *                       `musig_pubkey_agg`
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_pubkey_tweak_add(
     const secp256k1_context* ctx,
@@ -241,8 +239,7 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_pubkey_tweak_add(
  *  Remember that nonce reuse will immediately leak the secret key!
  *
  *  Returns: 0 if the arguments are invalid and 1 otherwise
- *  Args:         ctx: pointer to a context object, initialized for signing (cannot
- *                     be NULL)
+ *  Args:         ctx: pointer to a context object, initialized for signing
  *  Out:     secnonce: pointer to a structure to store the secret nonce
  *           pubnonce: pointer to a structure to store the public nonce
  *  In:  session_id32: a 32-byte session_id32 as explained above. Must be
@@ -277,7 +274,7 @@ SECP256K1_API int secp256k1_musig_nonce_gen(
  *
  *  Returns: 0 if the arguments are invalid or if all signers sent invalid
  *           pubnonces, 1 otherwise
- *  Args:                 ctx: pointer to a context object (cannot be NULL)
+ *  Args:                 ctx: pointer to a context object
  *  Out:       aggnonce: pointer to an the aggregate public nonce object for
  *                       musig_nonce_process
  *  In:       pubnonces: array of pointers to public nonces sent by the
@@ -303,7 +300,6 @@ SECP256K1_API int secp256k1_musig_nonce_agg(
  *  Returns: 0 if the arguments are invalid or if all signers sent invalid
  *           pubnonces, 1 otherwise
  *  Args:         ctx: pointer to a context object, initialized for verification
- *                     (cannot be NULL)
  * Out:       session: pointer to a struct to store the session
  * In:       aggnonce: pointer to an the aggregate public nonce object that is
  *                     output of musig_nonce_agg
@@ -312,7 +308,7 @@ SECP256K1_API int secp256k1_musig_nonce_agg(
  *                     aggregate (and tweaked) pubkey
  *            adaptor: optional pointer to an adaptor point encoded as a public
  *                     key if this signing session is part of an adaptor
- *                     signature protocol (can be NULL)
+ *                     signature protocol
  */
 SECP256K1_API int secp256k1_musig_nonce_process(
     const secp256k1_context* ctx,
@@ -333,7 +329,7 @@ SECP256K1_API int secp256k1_musig_nonce_process(
  *
  *  Returns: 0 if the arguments are invalid or the provided secnonce has already
  *           been used for signing, 1 otherwise
- *  Args:         ctx: pointer to a context object (cannot be NULL)
+ *  Args:         ctx: pointer to a context object
  *  Out:  partial_sig: pointer to struct to store the partial signature
  *  In/Out:  secnonce: pointer to the secnonce struct created in
  *                     musig_nonce_gen
@@ -363,7 +359,6 @@ SECP256K1_API int secp256k1_musig_partial_sign(
  *  Returns: 0 if the arguments are invalid or the partial signature does not
  *           verify
  *  Args         ctx: pointer to a context object, initialized for verification
- *                    (cannot be NULL)
  *  In:  partial_sig: pointer to partial signature to verify
  *          pubnonce: public nonce sent by the signer who produced the
  *                    signature
@@ -386,8 +381,8 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_verif
  *
  *  Returns: 0 if the arguments are invalid or a partial_sig is out of range, 1
  *           otherwise (which does NOT mean the resulting signature verifies).
- *  Args:         ctx: pointer to a context object (cannot be NULL)
- *  Out:        sig64: complete Schnorr signature (cannot be NULL)
+ *  Args:         ctx: pointer to a context object
+ *  Out:        sig64: complete Schnorr signature
  *  In:       session: pointer to the session that was created with
  *                     musig_nonce_process
  *       partial_sigs: array of pointers to partial signatures to aggregate
@@ -406,7 +401,7 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_agg(
  *  This is used for adaptor signatures.
  *
  *  Returns: 0 if one of the arguments was NULL, and 1 otherwise.
- *  Args:         ctx: pointer to a context object (cannot be NULL)
+ *  Args:         ctx: pointer to a context object
  *  Out: nonce_parity: pointer to an integer that indicates the parity
  *                     of the aggregate public nonce. Used for adaptor
  *                     signatures.
@@ -427,11 +422,9 @@ int secp256k1_musig_nonce_parity(
  *  Returns: 1: signature and secret adaptor contained valid values (which does
  *              NOT mean the signature or the adaptor are valid!)
  *           0: otherwise
- *  Args:         ctx: pointer to a context object (cannot be NULL)
+ *  Args:         ctx: pointer to a context object
  *  In/Out:     sig64: 64-byte pre-signature that is adapted to a full signature
- *                     (cannot be NULL)
- *  In: sec_adaptor32: 32-byte secret adaptor to add to the partial signature (cannot
- *                     be NULL)
+ *  In: sec_adaptor32: 32-byte secret adaptor to add to the partial signature
  *       nonce_parity: the output of `musig_nonce_parity` called with the
  *                     session used for producing sig64
  */
@@ -455,12 +448,12 @@ SECP256K1_API int secp256k1_musig_adapt(
  *              extracted (which does NOT mean the signatures or the adaptor are
  *              valid!)
  *           0: otherwise
- *  Args:         ctx: pointer to a context object (cannot be NULL)
- *  Out:sec_adaptor32: 32-byte secret adaptor (cannot be NULL)
- *  In:         sig64: complete, valid 64-byte signature (cannot be NULL)
+ *  Args:         ctx: pointer to a context object
+ *  Out:sec_adaptor32: 32-byte secret adaptor
+ *  In:         sig64: complete, valid 64-byte signature
  *          pre_sig64: the pre-signature corresponding to sig64, i.e., the
  *                     aggregate of partial signatures without the secret
- *                     adaptor (cannot be NULL)
+ *                     adaptor
  *       nonce_parity: the output of `musig_nonce_parity` called with the
  *                     session used for producing sig64
  */
