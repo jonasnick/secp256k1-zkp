@@ -28,8 +28,8 @@ static void secp256k1_musig_keyagglist_sha256(secp256k1_sha256 *sha) {
     sha->bytes = 64;
 }
 
-/* Computes ell = SHA256(pk[0], ..., pk[np-1]) */
-static int secp256k1_musig_compute_ell(const secp256k1_context *ctx, unsigned char *ell, const secp256k1_xonly_pubkey * const* pk, size_t np) {
+/* Computes pk_hash = SHA256(pk[0], ..., pk[np-1]) */
+static int secp256k1_musig_compute_pk_hash(const secp256k1_context *ctx, unsigned char *pk_hash, const secp256k1_xonly_pubkey * const* pk, size_t np) {
     secp256k1_sha256 sha;
     size_t i;
 
@@ -41,7 +41,7 @@ static int secp256k1_musig_compute_ell(const secp256k1_context *ctx, unsigned ch
         }
         secp256k1_sha256_write(&sha, ser, 32);
     }
-    secp256k1_sha256_finalize(&sha, ell);
+    secp256k1_sha256_finalize(&sha, pk_hash);
     return 1;
 }
 
@@ -148,10 +148,10 @@ static void secp256k1_keyagg_cache_save(secp256k1_musig_keyagg_cache *cache, sec
 }
 
 /* Compute KeyAgg coefficient which is constant 1 for the second pubkey and
- * SHA256(ell, x) where ell is the hash of public keys otherwise. second_pk_x
+ * SHA256(pk_hash, x) where pk_hash is the hash of public keys otherwise. second_pk_x
  * can be 0 in case there is no second_pk. Assumes both field elements x and
  * second_pk_x are normalized. */
-static void secp256k1_musig_keyaggcoef_internal(secp256k1_scalar *r, const unsigned char *ell, const secp256k1_fe *x, const secp256k1_fe *second_pk_x) {
+static void secp256k1_musig_keyaggcoef_internal(secp256k1_scalar *r, const unsigned char *pk_hash, const secp256k1_fe *x, const secp256k1_fe *second_pk_x) {
     secp256k1_sha256 sha;
     unsigned char buf[32];
 
@@ -159,7 +159,7 @@ static void secp256k1_musig_keyaggcoef_internal(secp256k1_scalar *r, const unsig
         secp256k1_scalar_set_int(r, 1);
     } else {
         secp256k1_musig_keyaggcoef_sha256(&sha);
-        secp256k1_sha256_write(&sha, ell, 32);
+        secp256k1_sha256_write(&sha, pk_hash, 32);
         secp256k1_fe_get_b32(buf, x);
         secp256k1_sha256_write(&sha, buf, 32);
         secp256k1_sha256_finalize(&sha, buf);
@@ -175,13 +175,13 @@ static void secp256k1_musig_keyaggcoef(secp256k1_scalar *r, const secp256k1_keya
 
 typedef struct {
     const secp256k1_context *ctx;
-    /* ell is the hash of the public keys */
-    unsigned char ell[32];
+    /* pk_hash is the hash of the public keys */
+    unsigned char pk_hash[32];
     const secp256k1_xonly_pubkey * const* pks;
     secp256k1_fe second_pk_x;
 } secp256k1_musig_pubkey_agg_ecmult_data;
 
-/* Callback for batch EC multiplication to compute ell_0*P0 + ell_1*P1 + ...  */
+/* Callback for batch EC multiplication to compute pk_hash_0*P0 + pk_hash_1*P1 + ...  */
 static int secp256k1_musig_pubkey_agg_callback(secp256k1_scalar *sc, secp256k1_ge *pt, size_t idx, void *data) {
     secp256k1_musig_pubkey_agg_ecmult_data *ctx = (secp256k1_musig_pubkey_agg_ecmult_data *) data;
     int ret;
@@ -189,7 +189,7 @@ static int secp256k1_musig_pubkey_agg_callback(secp256k1_scalar *sc, secp256k1_g
     /* pubkey_load can't fail because the same pks have already been loaded (and
      * we test this) */
     VERIFY_CHECK(ret);
-    secp256k1_musig_keyaggcoef_internal(sc, ctx->ell, &pt->x, &ctx->second_pk_x);
+    secp256k1_musig_keyaggcoef_internal(sc, ctx->pk_hash, &pt->x, &ctx->second_pk_x);
     return 1;
 }
 
@@ -219,7 +219,7 @@ int secp256k1_musig_pubkey_agg(const secp256k1_context* ctx, secp256k1_scratch_s
         }
     }
 
-    if (!secp256k1_musig_compute_ell(ctx, ecmult_data.ell, pubkeys, n_pubkeys)) {
+    if (!secp256k1_musig_compute_pk_hash(ctx, ecmult_data.pk_hash, pubkeys, n_pubkeys)) {
         return 0;
     }
     if (!secp256k1_ecmult_multi_var(&ctx->error_callback, &ctx->ecmult_ctx, scratch, &pkj, NULL, secp256k1_musig_pubkey_agg_callback, (void *) &ecmult_data, n_pubkeys)) {
@@ -234,7 +234,7 @@ int secp256k1_musig_pubkey_agg(const secp256k1_context* ctx, secp256k1_scratch_s
         secp256k1_keyagg_cache_internal cache_i = { 0 };
         cache_i.pk = pkp;
         cache_i.second_pk_x = ecmult_data.second_pk_x;
-        cache_i.pk_hash = ecmult_data.ell;
+        cache_i.pk_hash = ecmult_data.pk_hash;
         secp256k1_keyagg_cache_save(keyagg_cache, &cache_i);
     }
 
