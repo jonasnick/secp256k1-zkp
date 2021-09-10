@@ -200,14 +200,19 @@ void musig_api_tests(secp256k1_scratch_space *scratch) {
     CHECK(ecount == 2);
     CHECK(secp256k1_musig_pubkey_agg(vrfy, scratch, &agg_pk, &keyagg_cache, NULL, 2) == 0);
     CHECK(ecount == 3);
+    CHECK(memcmp(&agg_pk, zeros68, sizeof(agg_pk)) == 0);
     CHECK(secp256k1_musig_pubkey_agg(vrfy, scratch, &agg_pk, &keyagg_cache, invalid_pk_ptr2, 2) == 0);
     CHECK(ecount == 4);
+    CHECK(memcmp(&agg_pk, zeros68, sizeof(agg_pk)) == 0);
     CHECK(secp256k1_musig_pubkey_agg(vrfy, scratch, &agg_pk, &keyagg_cache, invalid_pk_ptr3, 3) == 0);
     CHECK(ecount == 5);
+    CHECK(memcmp(&agg_pk, zeros68, sizeof(agg_pk)) == 0);
     CHECK(secp256k1_musig_pubkey_agg(vrfy, scratch, &agg_pk, &keyagg_cache, pk_ptr, 0) == 0);
     CHECK(ecount == 6);
+    CHECK(memcmp(&agg_pk, zeros68, sizeof(agg_pk)) == 0);
     CHECK(secp256k1_musig_pubkey_agg(vrfy, scratch, &agg_pk, &keyagg_cache, NULL, 0) == 0);
     CHECK(ecount == 7);
+    CHECK(memcmp(&agg_pk, zeros68, sizeof(agg_pk)) == 0);
 
     CHECK(secp256k1_musig_pubkey_agg(vrfy, scratch, &agg_pk, &keyagg_cache, pk_ptr, 2) == 1);
     CHECK(secp256k1_musig_pubkey_agg(vrfy, scratch, &agg_pk, &keyagg_cache, pk_ptr, 2) == 1);
@@ -222,9 +227,11 @@ void musig_api_tests(secp256k1_scratch_space *scratch) {
         /* Reset keyagg_cache */
         tmp_keyagg_cache = keyagg_cache;
         CHECK(secp256k1_musig_pubkey_tweak_add(none, &tmp_output_pk, tweak, &tmp_keyagg_cache) == 0);
+        CHECK(memcmp(&tmp_output_pk, zeros68, sizeof(tmp_output_pk)) == 0);
         CHECK(ecount == 1);
         tmp_keyagg_cache = keyagg_cache;
         CHECK(secp256k1_musig_pubkey_tweak_add(sign, &tmp_output_pk, tweak, &tmp_keyagg_cache) == 0);
+        CHECK(memcmp(&tmp_output_pk, zeros68, sizeof(tmp_output_pk)) == 0);
         CHECK(ecount == 2);
         tmp_keyagg_cache = keyagg_cache;
         CHECK(secp256k1_musig_pubkey_tweak_add(vrfy, &tmp_output_pk, tweak, &tmp_keyagg_cache) == 1);
@@ -235,20 +242,25 @@ void musig_api_tests(secp256k1_scratch_space *scratch) {
         tmp_keyagg_cache = keyagg_cache;
         CHECK(secp256k1_musig_pubkey_tweak_add(vrfy, &tmp_output_pk, NULL, &tmp_keyagg_cache) == 0);
         CHECK(ecount == 3);
+        CHECK(memcmp(&tmp_output_pk, zeros68, sizeof(tmp_output_pk)) == 0);
         tmp_keyagg_cache = keyagg_cache;
         CHECK(secp256k1_musig_pubkey_tweak_add(vrfy, &tmp_output_pk, max64, &tmp_keyagg_cache) == 0);
         CHECK(ecount == 3);
+        CHECK(memcmp(&tmp_output_pk, zeros68, sizeof(tmp_output_pk)) == 0);
         tmp_keyagg_cache = keyagg_cache;
         CHECK(secp256k1_musig_pubkey_tweak_add(vrfy, &tmp_output_pk, tweak, NULL) == 0);
         CHECK(ecount == 4);
+        CHECK(memcmp(&tmp_output_pk, zeros68, sizeof(tmp_output_pk)) == 0);
         tmp_keyagg_cache = keyagg_cache;
         /* Uninitialized keyagg_cache */
         CHECK(secp256k1_musig_pubkey_tweak_add(vrfy, &tmp_output_pk, tweak, &invalid_keyagg_cache) == 0);
         CHECK(ecount == 5);
+        CHECK(memcmp(&tmp_output_pk, zeros68, sizeof(tmp_output_pk)) == 0);
         /* Using the same keyagg_cache twice does not work */
         CHECK(secp256k1_musig_pubkey_tweak_add(vrfy, &tmp_output_pk, tweak, &tmp_keyagg_cache) == 1);
         CHECK(secp256k1_musig_pubkey_tweak_add(vrfy, &tmp_output_pk, tweak, &tmp_keyagg_cache) == 0);
         CHECK(ecount == 6);
+        CHECK(memcmp(&tmp_output_pk, zeros68, sizeof(tmp_output_pk)) == 0);
     }
 
     /** Session creation **/

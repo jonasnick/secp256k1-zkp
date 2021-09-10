@@ -200,6 +200,9 @@ int secp256k1_musig_pubkey_agg(const secp256k1_context* ctx, secp256k1_scratch_s
     size_t i;
 
     VERIFY_CHECK(ctx != NULL);
+    if (agg_pk != NULL) {
+        memset(agg_pk, 0, sizeof(*agg_pk));
+    }
     ARG_CHECK(secp256k1_ecmult_context_is_built(&ctx->ecmult_ctx));
     ARG_CHECK(pubkeys != NULL);
     ARG_CHECK(n_pubkeys > 0);
