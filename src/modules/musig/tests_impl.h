@@ -106,6 +106,7 @@ void musig_api_tests(secp256k1_scratch_space *scratch) {
     unsigned char session_id[2][32];
     secp256k1_musig_secnonce secnonce[2];
     secp256k1_musig_secnonce secnonce_tmp;
+    secp256k1_musig_secnonce invalid_secnonce;
     secp256k1_musig_pubnonce pubnonce[2];
     const secp256k1_musig_pubnonce *pubnonce_ptr[2];
     unsigned char pubnonce_ser[66];
@@ -148,6 +149,7 @@ void musig_api_tests(secp256k1_scratch_space *scratch) {
     memset(max64, 0xff, sizeof(max64));
     memset(&invalid_keypair, 0, sizeof(invalid_keypair));
     memset(&invalid_pk, 0, sizeof(invalid_pk));
+    memset(&invalid_secnonce, 0, sizeof(invalid_secnonce));
     pubnonce_summing_to_inf(inf_pubnonce);
     /* Simulate structs being uninitialized by setting it to 0s. We don't want
      * to produce undefined behavior by actually providing uninitialized
@@ -391,19 +393,21 @@ void musig_api_tests(secp256k1_scratch_space *scratch) {
     memcpy(&secnonce_tmp, &secnonce[0], sizeof(secnonce_tmp));
     CHECK(secp256k1_musig_partial_sign(none, &partial_sig[0], NULL, &keypair[0], &keyagg_cache, &session) == 0);
     CHECK(ecount == 3);
+    CHECK(secp256k1_musig_partial_sign(none, &partial_sig[0], &invalid_secnonce, &keypair[0], &keyagg_cache, &session) == 0);
+    CHECK(ecount == 4);
     memcpy(&secnonce_tmp, &secnonce[0], sizeof(secnonce_tmp));
     CHECK(secp256k1_musig_partial_sign(none, &partial_sig[0], &secnonce_tmp, NULL, &keyagg_cache, &session) == 0);
-    CHECK(ecount == 4);
-    CHECK(secp256k1_musig_partial_sign(none, &partial_sig[0], &secnonce_tmp, &invalid_keypair, &keyagg_cache, &session) == 0);
     CHECK(ecount == 5);
+    CHECK(secp256k1_musig_partial_sign(none, &partial_sig[0], &secnonce_tmp, &invalid_keypair, &keyagg_cache, &session) == 0);
+    CHECK(ecount == 6);
     memcpy(&secnonce_tmp, &secnonce[0], sizeof(secnonce_tmp));
     CHECK(secp256k1_musig_partial_sign(none, &partial_sig[0], &secnonce_tmp, &keypair[0], NULL, &session) == 0);
-    CHECK(ecount == 6);
-    CHECK(secp256k1_musig_partial_sign(none, &partial_sig[0], &secnonce_tmp, &keypair[0], &invalid_keyagg_cache, &session) == 0);
     CHECK(ecount == 7);
+    CHECK(secp256k1_musig_partial_sign(none, &partial_sig[0], &secnonce_tmp, &keypair[0], &invalid_keyagg_cache, &session) == 0);
+    CHECK(ecount == 8);
     memcpy(&secnonce_tmp, &secnonce[0], sizeof(secnonce_tmp));
     CHECK(secp256k1_musig_partial_sign(none, &partial_sig[0], &secnonce_tmp, &keypair[0], &keyagg_cache, NULL) == 0);
-    CHECK(ecount == 8);
+    CHECK(ecount == 9);
 
     CHECK(secp256k1_musig_partial_sign(none, &partial_sig[0], &secnonce[0], &keypair[0], &keyagg_cache, &session) == 1);
     CHECK(secp256k1_musig_partial_sign(none, &partial_sig[1], &secnonce[1], &keypair[1], &keyagg_cache, &session) == 1);
