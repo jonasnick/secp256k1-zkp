@@ -78,6 +78,15 @@ typedef struct {
     unsigned char data[132];
 } secp256k1_musig_aggnonce;
 
+/** Opaque data structure that holds a cache for a MuSig session.
+ *
+ *  Guaranteed to be 133 bytes in size. No serialization and parsing functions
+ *  (yet).
+ */
+typedef struct {
+    unsigned char data[133];
+} secp256k1_musig_session;
+
 /** Opaque data structure that holds a partial MuSig signature.
  *
  *  Guaranteed to be 36 bytes in size. Serialized and parsed with
@@ -87,14 +96,44 @@ typedef struct {
     unsigned char data[36];
 } secp256k1_musig_partial_sig;
 
-/** Opaque data structure that holds a cache for a MuSig session.
+/** Parse a signers public nonce.
  *
- *  Guaranteed to be 133 bytes in size. No serialization and parsing functions
- *  (yet).
+ *  Returns: 1 when the nonce could be parsed, 0 otherwise.
+ *  Args:    ctx: a secp256k1 context object
+ *  Out:   nonce: pointer to a nonce object
+ *  In:     in66: pointer to the 66-byte nonce to be parsed
  */
-typedef struct {
-    unsigned char data[133];
-} secp256k1_musig_session;
+SECP256K1_API int secp256k1_musig_pubnonce_parse(
+    const secp256k1_context* ctx,
+    secp256k1_musig_pubnonce* nonce,
+    const unsigned char *in66
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
+/** Serialize a signer's public nonce
+ *
+ *  Returns: 1 when the nonce could be serialized, 0 otherwise
+ *  Args:    ctx: a secp256k1 context object
+ *  Out:   out32: pointer to a 66-byte array to store the serialized nonce
+ *  In:    nonce: pointer to the nonce
+ */
+SECP256K1_API int secp256k1_musig_pubnonce_serialize(
+    const secp256k1_context* ctx,
+    unsigned char *out66,
+    const secp256k1_musig_pubnonce* nonce
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
+/** Parse an aggregate public nonce.
+ *
+ *  Returns: 1 when the nonce could be parsed, 0 otherwise.
+ *  Args:    ctx: a secp256k1 context object
+ *  Out:   nonce: pointer to a nonce object
+ *  In:     in66: pointer to the 66-byte nonce to be parsed
+ */
+SECP256K1_API int secp256k1_musig_aggnonce_parse(
+    const secp256k1_context* ctx,
+    secp256k1_musig_aggnonce* nonce,
+    const unsigned char *in66
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
 /** Serialize an aggregate public nonce
  *

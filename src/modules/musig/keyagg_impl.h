@@ -9,6 +9,83 @@
 
 #include "keyagg.h"
 
+
+static void secp256k1_point_save(unsigned char *data, secp256k1_ge *ge) {
+    if (sizeof(secp256k1_ge_storage) == 64) {
+        secp256k1_ge_storage s;
+        secp256k1_ge_to_storage(&s, ge);
+        memcpy(data, &s, sizeof(s));
+    } else {
+        VERIFY_CHECK(!secp256k1_ge_is_infinity(ge));
+        secp256k1_fe_normalize_var(&ge->x);
+        secp256k1_fe_normalize_var(&ge->y);
+        secp256k1_fe_get_b32(data, &ge->x);
+        secp256k1_fe_get_b32(data + 32, &ge->y);
+    }
+}
+
+static void secp256k1_point_load(secp256k1_ge *ge, const unsigned char *data) {
+    if (sizeof(secp256k1_ge_storage) == 64) {
+        /* When the secp256k1_ge_storage type is exactly 64 byte, use its
+         * representation as conversion is very fast. */
+        secp256k1_ge_storage s;
+        memcpy(&s, data, sizeof(s));
+        secp256k1_ge_from_storage(ge, &s);
+    } else {
+        /* Otherwise, fall back to 32-byte big endian for X and Y. */
+        secp256k1_fe x, y;
+        secp256k1_fe_set_b32(&x, data);
+        secp256k1_fe_set_b32(&y, data + 32);
+        secp256k1_ge_set_xy(ge, &x, &y);
+    }
+}
+
+static const unsigned char secp256k1_musig_keyagg_cache_magic[4] = { 0xf4, 0xad, 0xbb, 0xdf };
+
+/* A keyagg cache consists of
+ * - 4 byte magic set during initialization to allow detecting an uninitialized
+ *   object.
+ * - 64 byte aggregate (and potentially tweaked) public key
+ * - 32 byte X-coordinate of "second" public key (0 if not present)
+ * - 32 byte hash of all public keys
+ * - 1 byte indicating if the public key is tweaked and if so, also the parity
+ *   of the internal key
+ * - 32 byte tweak
+ */
+/* Requires that cache_i->pk is not infinity */
+static void secp256k1_keyagg_cache_save(secp256k1_musig_keyagg_cache *cache, secp256k1_keyagg_cache_internal *cache_i) {
+    unsigned char *ptr = cache->data;
+    memcpy(ptr, secp256k1_musig_keyagg_cache_magic, 4);
+    ptr += 4;
+    secp256k1_point_save(ptr, &cache_i->pk);
+    ptr += 64;
+    secp256k1_fe_get_b32(ptr, &cache_i->second_pk_x);
+    ptr += 32;
+    memmove(ptr, cache_i->pk_hash, 32);
+    ptr += 32;
+    *ptr = cache_i->is_tweaked;
+    *ptr |= cache_i->internal_key_parity << 1;
+    ptr += 1;
+    secp256k1_scalar_get_b32(ptr, &cache_i->tweak);
+}
+
+static int secp256k1_keyagg_cache_load(const secp256k1_context* ctx, secp256k1_keyagg_cache_internal *cache_i, const secp256k1_musig_keyagg_cache *cache) {
+    const unsigned char *ptr = cache->data;
+    ARG_CHECK(secp256k1_memcmp_var(ptr, secp256k1_musig_keyagg_cache_magic, 4) == 0);
+    ptr += 4;
+    secp256k1_point_load(&cache_i->pk, ptr);
+    ptr += 64;
+    secp256k1_fe_set_b32(&cache_i->second_pk_x, ptr);
+    ptr += 32;
+    cache_i->pk_hash = ptr;
+    ptr += 32;
+    cache_i->is_tweaked = *ptr & 1;
+    cache_i->internal_key_parity = *ptr & 2;
+    ptr += 1;
+    secp256k1_scalar_set_b32(&cache_i->tweak, ptr, NULL);
+    return 1;
+}
+
 /* Initializes SHA256 with fixed midstate. This midstate was computed by applying
  * SHA256 to SHA256("KeyAgg list")||SHA256("KeyAgg list"). */
 static void secp256k1_musig_keyagglist_sha256(secp256k1_sha256 *sha) {
@@ -56,82 +133,6 @@ static void secp256k1_musig_keyaggcoef_sha256(secp256k1_sha256 *sha) {
     sha->s[6] = 0xf280d9d4ul;
     sha->s[7] = 0x4484be15ul;
     sha->bytes = 64;
-}
-
-static void secp256k1_point_load(secp256k1_ge *ge, const unsigned char *data) {
-    if (sizeof(secp256k1_ge_storage) == 64) {
-        /* When the secp256k1_ge_storage type is exactly 64 byte, use its
-         * representation as conversion is very fast. */
-        secp256k1_ge_storage s;
-        memcpy(&s, data, sizeof(s));
-        secp256k1_ge_from_storage(ge, &s);
-    } else {
-        /* Otherwise, fall back to 32-byte big endian for X and Y. */
-        secp256k1_fe x, y;
-        secp256k1_fe_set_b32(&x, data);
-        secp256k1_fe_set_b32(&y, data + 32);
-        secp256k1_ge_set_xy(ge, &x, &y);
-    }
-}
-
-static void secp256k1_point_save(unsigned char *data, secp256k1_ge *ge) {
-    if (sizeof(secp256k1_ge_storage) == 64) {
-        secp256k1_ge_storage s;
-        secp256k1_ge_to_storage(&s, ge);
-        memcpy(data, &s, sizeof(s));
-    } else {
-        VERIFY_CHECK(!secp256k1_ge_is_infinity(ge));
-        secp256k1_fe_normalize_var(&ge->x);
-        secp256k1_fe_normalize_var(&ge->y);
-        secp256k1_fe_get_b32(data, &ge->x);
-        secp256k1_fe_get_b32(data + 32, &ge->y);
-    }
-}
-
-static const unsigned char secp256k1_musig_keyagg_cache_magic[4] = { 0xf4, 0xad, 0xbb, 0xdf };
-
-/* A keyagg cache consists of
- * - 4 byte magic set during initialization to allow detecting an uninitialized
- *   object.
- * - 64 byte aggregate (and potentially tweaked) public key
- * - 32 byte X-coordinate of "second" public key (0 if not present)
- * - 32 byte hash of all public keys
- * - 1 byte indicating if the public key is tweaked and if so, also the parity
- *   of the internal key
- * - 32 byte tweak
- */
-static int secp256k1_keyagg_cache_load(const secp256k1_context* ctx, secp256k1_keyagg_cache_internal *cache_i, const secp256k1_musig_keyagg_cache *cache) {
-    const unsigned char *ptr = cache->data;
-    ARG_CHECK(secp256k1_memcmp_var(ptr, secp256k1_musig_keyagg_cache_magic, 4) == 0);
-    ptr += 4;
-    secp256k1_point_load(&cache_i->pk, ptr);
-    ptr += 64;
-    secp256k1_fe_set_b32(&cache_i->second_pk_x, ptr);
-    ptr += 32;
-    cache_i->pk_hash = ptr;
-    ptr += 32;
-    cache_i->is_tweaked = *ptr & 1;
-    cache_i->internal_key_parity = *ptr & 2;
-    ptr += 1;
-    secp256k1_scalar_set_b32(&cache_i->tweak, ptr, NULL);
-    return 1;
-}
-
-/* Requires that cache_i->pk is not infinity */
-static void secp256k1_keyagg_cache_save(secp256k1_musig_keyagg_cache *cache, secp256k1_keyagg_cache_internal *cache_i) {
-    unsigned char *ptr = cache->data;
-    memcpy(ptr, secp256k1_musig_keyagg_cache_magic, 4);
-    ptr += 4;
-    secp256k1_point_save(ptr, &cache_i->pk);
-    ptr += 64;
-    secp256k1_fe_get_b32(ptr, &cache_i->second_pk_x);
-    ptr += 32;
-    memmove(ptr, cache_i->pk_hash, 32);
-    ptr += 32;
-    *ptr = cache_i->is_tweaked;
-    *ptr |= cache_i->internal_key_parity << 1;
-    ptr += 1;
-    secp256k1_scalar_get_b32(ptr, &cache_i->tweak);
 }
 
 /* Compute KeyAgg coefficient which is constant 1 for the second pubkey and
