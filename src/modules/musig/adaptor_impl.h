@@ -14,8 +14,7 @@ int secp256k1_musig_nonce_parity(const secp256k1_context* ctx, int *nonce_parity
     ARG_CHECK(nonce_parity != NULL);
     ARG_CHECK(session != NULL);
 
-    secp256k1_musig_session_load(nonce_parity, NULL, NULL, NULL, NULL, session);
-    return 1;
+    return secp256k1_musig_session_load(ctx, nonce_parity, NULL, NULL, NULL, NULL, session);
 }
 
 int secp256k1_musig_adapt(const secp256k1_context* ctx, unsigned char *sig64, const unsigned char *sec_adaptor32, int nonce_parity) {

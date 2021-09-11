@@ -10,15 +10,21 @@
 #include "keyagg.h"
 #include "session.h"
 
+static const unsigned char secp256k1_musig_session_cache_magic[4] = { 0x9d, 0xed, 0xe9, 0x17 };
+
 /* A session consists of
+ * - 4 byte session cache
  * - 1 byte the parity of the aggregate nonce
  * - 32 byte aggregated nonce
  * - 32 byte nonce aggregation coefficient b
  * - 32 byte signature challenge hash e
  * - 32 byte scalar s that is added to the partial signatures of the signers
  */
-static void secp256k1_musig_session_load(int *fin_nonce_parity, unsigned char *r32, secp256k1_scalar *b, secp256k1_scalar *e, secp256k1_scalar *s, const secp256k1_musig_session *session) {
+static int secp256k1_musig_session_load(const secp256k1_context* ctx, int *fin_nonce_parity, unsigned char *r32, secp256k1_scalar *b, secp256k1_scalar *e, secp256k1_scalar *s, const secp256k1_musig_session *session) {
     const unsigned char *ptr = session->data;
+
+    ARG_CHECK(secp256k1_memcmp_var(ptr, secp256k1_musig_session_cache_magic, 4) == 0);
+    ptr += 4;
     if (fin_nonce_parity != NULL) {
         *fin_nonce_parity = *ptr;
     }
@@ -38,6 +44,23 @@ static void secp256k1_musig_session_load(int *fin_nonce_parity, unsigned char *r
     if (s != NULL) {
         secp256k1_scalar_set_b32(s, ptr, NULL);
     }
+    return 1;
+}
+
+static void secp256k1_musig_session_save(secp256k1_musig_session *session, int fin_nonce_parity, const unsigned char *r32, const secp256k1_scalar *b, const secp256k1_scalar *e, const secp256k1_scalar *s) {
+    unsigned char *ptr = session->data;
+
+    memcpy(ptr, secp256k1_musig_session_cache_magic, 4);
+    ptr += 4;
+    *ptr = fin_nonce_parity;
+    ptr += 1;
+    memcpy(ptr, r32, 32);
+    ptr += 32;
+    secp256k1_scalar_get_b32(ptr, b);
+    ptr += 32;
+    secp256k1_scalar_get_b32(ptr, e);
+    ptr += 32;
+    secp256k1_scalar_get_b32(ptr, s);
 }
 
 static void secp256k1_nonce_function_musig(secp256k1_scalar *k, const unsigned char *session_id, const unsigned char *key32, const unsigned char *msg32, const unsigned char *agg_pk, const unsigned char *extra_input32) {
@@ -267,19 +290,6 @@ int secp256k1_musig_aggnonce_parse(const secp256k1_context* ctx, secp256k1_musig
     return secp256k1_musig_pubnonce_parse(ctx, (secp256k1_musig_pubnonce*) nonce, in66);
 }
 
-static void secp256k1_musig_session_save(secp256k1_musig_session *session, int fin_nonce_parity, const unsigned char *r32, const secp256k1_scalar *b, const secp256k1_scalar *e, const secp256k1_scalar *s) {
-    unsigned char *ptr = session->data;
-    *ptr = fin_nonce_parity;
-    ptr += 1;
-    memcpy(ptr, r32, 32);
-    ptr += 32;
-    secp256k1_scalar_get_b32(ptr, b);
-    ptr += 32;
-    secp256k1_scalar_get_b32(ptr, e);
-    ptr += 32;
-    secp256k1_scalar_get_b32(ptr, s);
-}
-
 /* Normalizes the x-coordinate of the given group element. */
 static int secp256k1_xonly_ge_serialize(unsigned char *output32, secp256k1_ge *ge) {
     if (secp256k1_ge_is_infinity(ge)) {
@@ -501,7 +511,9 @@ int secp256k1_musig_partial_sign(const secp256k1_context* ctx, secp256k1_musig_p
     secp256k1_musig_keyaggcoef(&mu, &cache_i, &pk.x);
     secp256k1_scalar_mul(&sk, &sk, &mu);
 
-    secp256k1_musig_session_load(&fin_nonce_parity, NULL, &b, &e, NULL, session);
+    if (!secp256k1_musig_session_load(ctx, &fin_nonce_parity, NULL, &b, &e, NULL, session)) {
+        return 0;
+    }
     if (fin_nonce_parity) {
         secp256k1_scalar_negate(&k[0], &k[0]);
         secp256k1_scalar_negate(&k[1], &k[1]);
@@ -538,7 +550,9 @@ int secp256k1_musig_partial_sig_verify(const secp256k1_context* ctx, const secp2
     ARG_CHECK(keyagg_cache != NULL);
     ARG_CHECK(session != NULL);
 
-    secp256k1_musig_session_load(&fin_nonce_parity, NULL, &b, &e, NULL, session);
+    if (!secp256k1_musig_session_load(ctx, &fin_nonce_parity, NULL, &b, &e, NULL, session)) {
+        return 0;
+    }
 
     /* Compute "effective" nonce rj = aggnonce[0] + b*aggnonce[1] */
     /* TODO: use multiexp */
@@ -598,7 +612,9 @@ int secp256k1_musig_partial_sig_agg(const secp256k1_context* ctx, unsigned char 
     ARG_CHECK(session != NULL);
     ARG_CHECK(partial_sigs != NULL);
 
-    secp256k1_musig_session_load(NULL, &sig64[0], NULL, NULL, &s, session);
+    if (!secp256k1_musig_session_load(ctx, NULL, &sig64[0], NULL, NULL, &s, session)) {
+        return 0;
+    }
     for (i = 0; i < n_sigs; i++) {
         secp256k1_scalar term;
         if (!secp256k1_musig_partial_sig_load(ctx, &term, partial_sigs[i])) {

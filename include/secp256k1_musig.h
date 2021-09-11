@@ -89,11 +89,11 @@ typedef struct {
 
 /** Opaque data structure that holds a cache for a MuSig session.
  *
- *  Guaranteed to be 129 bytes in size. No serialization and parsing functions
+ *  Guaranteed to be 133 bytes in size. No serialization and parsing functions
  *  (yet).
  */
 typedef struct {
-    unsigned char data[129];
+    unsigned char data[133];
 } secp256k1_musig_session;
 
 /** Serialize an aggregate public nonce
