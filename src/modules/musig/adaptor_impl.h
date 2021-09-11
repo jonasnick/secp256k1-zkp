@@ -10,11 +10,16 @@
 #include "session.h"
 
 int secp256k1_musig_nonce_parity(const secp256k1_context* ctx, int *nonce_parity, secp256k1_musig_session *session) {
+    secp256k1_musig_session_internal session_i;
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(nonce_parity != NULL);
     ARG_CHECK(session != NULL);
 
-    return secp256k1_musig_session_load(ctx, nonce_parity, NULL, NULL, NULL, NULL, session);
+    if (!secp256k1_musig_session_load(ctx, &session_i, session)) {
+        return 0;
+    }
+    *nonce_parity = session_i.fin_nonce_parity;
+    return 1;
 }
 
 int secp256k1_musig_adapt(const secp256k1_context* ctx, unsigned char *sig64, const unsigned char *sec_adaptor32, int nonce_parity) {
