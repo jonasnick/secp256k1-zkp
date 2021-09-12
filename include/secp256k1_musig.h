@@ -41,7 +41,7 @@ typedef struct {
     unsigned char data[165];
 } secp256k1_musig_keyagg_cache;
 
-/** Opaque data structure that holds a signer's secret nonce.
+/** Opaque data structure that holds a signer's _secret_ nonce.
  *
  *  Guaranteed to be 68 bytes in size.
  *
@@ -80,8 +80,8 @@ typedef struct {
 
 /** Opaque data structure that holds a cache for a MuSig session.
  *
- *  Guaranteed to be 133 bytes in size. No serialization and parsing functions
- *  (yet).
+ *  This structure is not necessarily required to be kept secret. Guaranteed to
+ *  be 133 bytes in size. No serialization and parsing functions (yet).
  */
 typedef struct {
     unsigned char data[133];
