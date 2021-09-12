@@ -262,6 +262,7 @@ int secp256k1_musig_pubkey_tweak_add(const secp256k1_context* ctx, secp256k1_pub
     }
     cache_i.is_tweaked = 1;
     /* eckey_pubkey_tweak_add fails if cache_i.pk is infinity */
+    VERIFY_CHECK(!secp256k1_ge_is_infinity(&cache_i.pk));
     secp256k1_keyagg_cache_save(keyagg_cache, &cache_i);
     if (output_pubkey != NULL) {
         secp256k1_pubkey_save(output_pubkey, &cache_i.pk);

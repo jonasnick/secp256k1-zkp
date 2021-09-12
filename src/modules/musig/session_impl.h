@@ -27,8 +27,8 @@ static int secp256k1_musig_secnonce_load(const secp256k1_context* ctx, secp256k1
 
 static const unsigned char secp256k1_musig_pubnonce_magic[4] = { 0xf5, 0x7a, 0x3d, 0xa0 };
 
-/* Works for both musig_pubnonce and musig_aggnonce. The provided group element
- * must not be point at infinity! */
+/* Requires that none of the provided group elements is infinity. Works for both
+ * musig_pubnonce and musig_aggnonce. */
 static void secp256k1_musig_pubnonce_save(secp256k1_musig_pubnonce* nonce, secp256k1_ge* ge) {
     int i;
     memcpy(&nonce->data[0], secp256k1_musig_pubnonce_magic, 4);
@@ -147,6 +147,7 @@ int secp256k1_musig_pubnonce_parse(const secp256k1_context* ctx, secp256k1_musig
             return 0;
         }
     }
+    /* The group elements can not be infinity because they were just parsed */
     secp256k1_musig_pubnonce_save(nonce, ge);
     secp256k1_ge_clear(&ge[0]);
     secp256k1_ge_clear(&ge[1]);
@@ -183,6 +184,16 @@ int secp256k1_musig_partial_sig_parse(const secp256k1_context* ctx, secp256k1_mu
     }
     secp256k1_musig_partial_sig_save(sig, &tmp);
     secp256k1_scalar_clear(&tmp);
+    return 1;
+}
+
+/* Normalizes the x-coordinate of the given group element. */
+static int secp256k1_xonly_ge_serialize(unsigned char *output32, secp256k1_ge *ge) {
+    if (secp256k1_ge_is_infinity(ge)) {
+        return 0;
+    }
+    secp256k1_fe_normalize_var(&ge->x);
+    secp256k1_fe_get_b32(output32, &ge->x);
     return 1;
 }
 
@@ -229,8 +240,8 @@ int secp256k1_musig_nonce_gen(const secp256k1_context* ctx, secp256k1_musig_secn
     secp256k1_scalar k[2];
     secp256k1_ge nonce_pt[2];
     int i;
-    unsigned char pk_ser[33];
-    unsigned char *pk_ser_ptr = &pk_ser[1];
+    unsigned char pk_ser[32];
+    unsigned char *pk_ser_ptr = NULL;
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(secnonce != NULL);
@@ -255,19 +266,18 @@ int secp256k1_musig_nonce_gen(const secp256k1_context* ctx, secp256k1_musig_secn
     }
 
     if (keyagg_cache != NULL) {
-        size_t outputlen = 33;
         int ret;
-
         if (!secp256k1_keyagg_cache_load(ctx, &cache_i, keyagg_cache)) {
             return 0;
         }
-        ret = secp256k1_eckey_pubkey_serialize(&cache_i.pk, pk_ser, &outputlen, 1);
+        ret = secp256k1_xonly_ge_serialize(pk_ser, &cache_i.pk);
         /* Serialization can not fail because the loaded point can not be infinity. */
         VERIFY_CHECK(ret);
-    } else {
-        pk_ser_ptr = NULL;
+        pk_ser_ptr = pk_ser;
     }
     secp256k1_nonce_function_musig(k, session_id32, seckey, msg32, pk_ser_ptr, extra_input32);
+    VERIFY_CHECK(!secp256k1_scalar_is_zero(&k[0]));
+    VERIFY_CHECK(!secp256k1_scalar_is_zero(&k[1]));
     secp256k1_musig_secnonce_save(secnonce, k);
 
     for (i = 0; i < 2; i++) {
@@ -277,6 +287,7 @@ int secp256k1_musig_nonce_gen(const secp256k1_context* ctx, secp256k1_musig_secn
         secp256k1_declassify(ctx, &nonce_pt[i], sizeof(nonce_pt));
         secp256k1_scalar_clear(&k[i]);
     }
+    /* nonce_pt can't be infinity because k != 0 */
     secp256k1_musig_pubnonce_save(pubnonce, nonce_pt);
     return 1;
 }
@@ -319,16 +330,6 @@ int secp256k1_musig_nonce_agg(const secp256k1_context* ctx, secp256k1_musig_aggn
         secp256k1_ge_set_gej(&aggnonce_pt[i], &aggnonce_ptj[i]);
     }
     secp256k1_musig_pubnonce_save((secp256k1_musig_pubnonce*)aggnonce, aggnonce_pt);
-    return 1;
-}
-
-/* Normalizes the x-coordinate of the given group element. */
-static int secp256k1_xonly_ge_serialize(unsigned char *output32, secp256k1_ge *ge) {
-    if (secp256k1_ge_is_infinity(ge)) {
-        return 0;
-    }
-    secp256k1_fe_normalize_var(&ge->x);
-    secp256k1_fe_get_b32(output32, &ge->x);
     return 1;
 }
 
