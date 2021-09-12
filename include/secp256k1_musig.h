@@ -18,9 +18,8 @@ extern "C" {
  * signatures as described in
  * https://github.com/ElementsProject/scriptless-scripts/pull/24
  *
- * The documentation in this include file is for reference and may not be sufficient
- * for users to begin using the library. A full description of API usage can be found
- * in src/modules/musig/musig.md
+ * It is recommended to read the documention in this include file carefully.
+ * Further notes on API usage can be found in src/modules/musig/musig.md
  */
 
 /** Opaque data structures
@@ -32,7 +31,7 @@ extern "C" {
  *  serialization and parsing functions.
  */
 
-/** Opaque data structure that caches information about key aggregation.
+/** Opaque data structure that caches information about public key aggregation.
  *
  *  Guaranteed to be 165 bytes in size. No serialization and parsing functions
  *  (yet).
