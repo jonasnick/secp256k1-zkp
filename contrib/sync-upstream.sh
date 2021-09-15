@@ -104,7 +104,7 @@ BASEDIR=$(dirname "$0")
 FNAME="$BASEDIR/gh-pr-create.sh"
 cat <<EOT > "$FNAME"
 #!/bin/sh
-gh pr create -t "$TITLE" -b "$BODY" --web
+gh pr create -t '$TITLE' -b '$BODY' --web
 # Remove temporary branch
 git checkout master
 git branch -D temp-merge-"$PRNUM"
