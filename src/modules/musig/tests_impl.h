@@ -612,21 +612,21 @@ void musig_nonce_test(void) {
 
     /* Check that a bitflip in an argument results in different nonces. */
     args[0] = session_id;
-    args[1] = sk;
-    args[2] = msg;
+    args[1] = msg;
+    args[2] = sk;
     args[3] = agg_pk;
     args[4] = extra_input;
     for (i = 0; i < count; i++) {
         musig_nonce_bitflip(args, 0, sizeof(session_id));
-        musig_nonce_bitflip(args, 1, sizeof(sk));
-        musig_nonce_bitflip(args, 2, sizeof(msg));
+        musig_nonce_bitflip(args, 1, sizeof(msg));
+        musig_nonce_bitflip(args, 2, sizeof(sk));
         musig_nonce_bitflip(args, 3, sizeof(agg_pk));
         musig_nonce_bitflip(args, 4, sizeof(extra_input));
     }
     /* Check that if any argument is NULL, a different nonce is produced than if
      * any other argument is NULL. */
-    memcpy(sk, session_id, sizeof(sk));
     memcpy(msg, session_id, sizeof(msg));
+    memcpy(sk, session_id, sizeof(sk));
     memcpy(agg_pk, session_id, sizeof(agg_pk));
     memcpy(extra_input, session_id, sizeof(extra_input));
     secp256k1_nonce_function_musig(k[0], args[0], args[1], args[2], args[3], args[4]);
@@ -1017,7 +1017,97 @@ void musig_test_vectors_keyagg(void) {
         musig_test_vectors_keyagg_helper(pk, n_pks, agg_pk_expected[i], has_second_pk, second_pk_idx);
     }
 }
-void musig_test_vectors_sign_helper(secp256k1_musig_keyagg_cache *keyagg_cache, int *fin_nonce_parity, unsigned char *sig, const unsigned char state[2][32], const unsigned char *agg_pubnonce_ser, const unsigned char *sk, const unsigned char *msg, const unsigned char **pk_ser, int signer_pos) {
+
+void musig_test_vectors_noncegen(void) {
+    enum { N = 3 };
+    secp256k1_scalar k[N][2];
+    const unsigned char k32_expected[N][2][32] = {
+        {
+            {
+                0x8D, 0xD0, 0x99, 0x51, 0x79, 0x50, 0x5E, 0xB1,
+                0x27, 0x3A, 0x07, 0x11, 0x58, 0x23, 0xC8, 0x6E,
+                0xF7, 0x14, 0x39, 0x0F, 0xDE, 0x2D, 0xEE, 0xB6,
+                0xF9, 0x31, 0x6A, 0xEE, 0xBE, 0x5C, 0x71, 0xFC,
+            },
+            {
+                0x73, 0x29, 0x2E, 0x47, 0x11, 0x34, 0x7D, 0xD3,
+                0x9E, 0x36, 0x05, 0xEE, 0xD6, 0x45, 0x65, 0x49,
+                0xB3, 0x0F, 0x3B, 0xC7, 0x16, 0x22, 0x5A, 0x18,
+                0x65, 0xBA, 0xE1, 0xD9, 0x84, 0xEF, 0xF8, 0x9D,
+            },
+        },
+        /* msg32 is NULL */
+        {
+            {
+                0x67, 0x02, 0x5A, 0xF2, 0xA3, 0x56, 0x0B, 0xFC,
+                0x1D, 0x95, 0xBD, 0xA6, 0xB2, 0x0B, 0x21, 0x50,
+                0x97, 0x63, 0xDB, 0x17, 0x3B, 0xD9, 0x37, 0x30,
+                0x17, 0x24, 0x66, 0xEC, 0xAF, 0xA2, 0x60, 0x3B,
+            },
+            {
+                0x0B, 0x1D, 0x9E, 0x8F, 0x43, 0xBD, 0xAE, 0x69,
+                0x99, 0x6E, 0x0E, 0x3A, 0xBC, 0x30, 0x06, 0x4C,
+                0x52, 0x37, 0x3E, 0x05, 0x3E, 0x70, 0xC6, 0xD6,
+                0x18, 0x4B, 0xFA, 0xDA, 0xE0, 0xF0, 0xE2, 0xD9,
+            },
+        },
+        /* All fields except session_id are NULL */
+        {
+            {
+                0xA6, 0xC3, 0x24, 0xC7, 0xE8, 0xD1, 0x8A, 0xAA,
+                0x59, 0xD7, 0xB4, 0x74, 0xDD, 0x73, 0x82, 0x6D,
+                0x7E, 0x74, 0x91, 0x3F, 0x9B, 0x36, 0x12, 0xE4,
+                0x4F, 0x28, 0x6E, 0x07, 0x54, 0x14, 0x58, 0x21,
+            },
+            {
+                0x4E, 0x75, 0xD3, 0x81, 0xCD, 0xB7, 0x3C, 0x68,
+                0xA0, 0x7E, 0x64, 0x15, 0xE0, 0x0E, 0x89, 0x32,
+                0x44, 0x21, 0x87, 0x4F, 0x4E, 0x03, 0xE8, 0x67,
+                0x73, 0x4E, 0x33, 0x20, 0xCE, 0x24, 0xBA, 0x8E,
+            },
+        },
+    };
+    unsigned char args[5][32];
+    int i, j;
+
+    for (i = 0; i < 5; i++) {
+        memset(args[i], i, sizeof(args[i]));
+    }
+
+    secp256k1_nonce_function_musig(k[0], args[0], args[1], args[2], args[3], args[4]);
+    secp256k1_nonce_function_musig(k[1], args[0], NULL, args[2], args[3], args[4]);
+    secp256k1_nonce_function_musig(k[2], args[0], NULL, NULL, NULL, NULL);
+    /* TODO: remove when test vectors are not expected to change anymore */
+    /* int t, u; */
+    /* printf("const unsigned char k32_expected[N][2][32] = {\n"); */
+    /* for (i = 0; i < N; i++) { */
+    /*     printf("    {\n"); */
+    /*     for (j = 0; j < 2; j++) { */
+    /*         unsigned char k32[32]; */
+    /*         secp256k1_scalar_get_b32(k32, &k[i][j]); */
+    /*         printf("        {\n"); */
+    /*         for (t = 0; t < 4; t++) { */
+    /*             printf("            "); */
+    /*             for (u = 0; u < 8; u++) { */
+    /*                 printf("0x%02X, ", k32[t*8+u]); */
+    /*             } */
+    /*             printf("\n"); */
+    /*         } */
+    /*         printf("        },\n"); */
+    /*     } */
+    /*     printf("    },\n"); */
+    /* } */
+    /* printf("};\n"); */
+    for (i = 0; i < N; i++) {
+        for (j = 0; j < 2; j++) {
+            unsigned char k32[32];
+            secp256k1_scalar_get_b32(k32, &k[i][j]);
+            CHECK(memcmp(k32, k32_expected[i][j], 32) == 0);
+        }
+    }
+}
+
+void musig_test_vectors_sign_helper(secp256k1_musig_keyagg_cache *keyagg_cache, int *fin_nonce_parity, unsigned char *sig, const unsigned char *secnonce_bytes, const unsigned char *agg_pubnonce_ser, const unsigned char *sk, const unsigned char *msg, const unsigned char *tweak, const secp256k1_pubkey *adaptor, const unsigned char **pk_ser, int signer_pos) {
     secp256k1_keypair signer_keypair;
     secp256k1_musig_secnonce secnonce;
     secp256k1_xonly_pubkey pk[3];
@@ -1037,10 +1127,13 @@ void musig_test_vectors_sign_helper(secp256k1_musig_keyagg_cache *keyagg_cache, 
         pk_ptr[i] = &pk[i];
     }
     CHECK(secp256k1_musig_pubkey_agg(ctx, NULL, &agg_pk, keyagg_cache, pk_ptr, 3) == 1);
+    if (tweak != NULL) {
+        CHECK(secp256k1_musig_pubkey_tweak_add(ctx, NULL, keyagg_cache, tweak) == 1);
+    }
     memcpy(&secnonce.data[0], secp256k1_musig_secnonce_magic, 4);
-    memcpy(&secnonce.data[4], state, sizeof(secnonce.data) - 4);
+    memcpy(&secnonce.data[4], secnonce_bytes, sizeof(secnonce.data) - 4);
     CHECK(secp256k1_musig_aggnonce_parse(ctx, &agg_pubnonce, agg_pubnonce_ser) == 1);
-    CHECK(secp256k1_musig_nonce_process(ctx, &session, &agg_pubnonce, msg, keyagg_cache, NULL) == 1);
+    CHECK(secp256k1_musig_nonce_process(ctx, &session, &agg_pubnonce, msg, keyagg_cache, adaptor) == 1);
     CHECK(secp256k1_musig_partial_sign(ctx, &partial_sig, &secnonce, &signer_keypair, keyagg_cache, &session) == 1);
     CHECK(secp256k1_musig_nonce_parity(ctx, fin_nonce_parity, &session) == 1);
     memcpy(sig, &partial_sig.data[4], 32);
@@ -1062,74 +1155,20 @@ int musig_test_is_second_pk(const secp256k1_musig_keyagg_cache *keyagg_cache, co
     return secp256k1_fe_equal_var(&cache_i.second_pk_x, &pkp.x);
 }
 
-
-void musig_test_vectors_noncegen(void) {
-    secp256k1_scalar k[2];
-    unsigned char k32[2][32];
-    const unsigned char k32_expected[2][32] = {
-        {
-            0x91, 0x2C, 0x7C, 0xCD, 0x01, 0xDD, 0x80, 0x2F,
-            0x84, 0xAD, 0x61, 0xD8, 0xB9, 0x5F, 0x03, 0xAE,
-            0x33, 0x44, 0xD4, 0x08, 0x3F, 0x2F, 0x41, 0xF4,
-            0x05, 0x27, 0xD0, 0x31, 0x4B, 0x4D, 0x0B, 0x3E,
-        },
-        {
-            0xD7, 0x44, 0x7D, 0xBF, 0x3B, 0x50, 0x4F, 0x96,
-            0xC3, 0x49, 0xA5, 0x22, 0xA3, 0x07, 0x67, 0x28,
-            0x18, 0xC9, 0x2C, 0x87, 0x56, 0xFB, 0x10, 0x98,
-            0x0A, 0x3F, 0x91, 0x8D, 0xF7, 0xA2, 0xDD, 0xAB,
-        },
-    };
-    unsigned char args[5][32];
-    int i;
-
-    for (i = 0; i < 5; i++) {
-        memset(args[i], i, sizeof(args[i]));
-    }
-    secp256k1_nonce_function_musig(k, args[0], args[1], args[2], args[3], args[4]);
-    /* TODO: remove when test vectors are not expected to change anymore */
-    /* int x, y, z; */
-    /* printf("const unsigned char k32_expected[2][32] = {\n"); */
-    /* for (x = 0; x < 2; x++) { */
-    /*     secp256k1_scalar_get_b32(k32[x], &k[x]); */
-    /*     printf("    {\n"); */
-    /*     for (y = 0; y < 4; y++) { */
-    /*         printf("        "); */
-    /*         for (z = 0; z < 8; z++) { */
-    /*             printf("0x%02X, ", k32[x][y*8+z]); */
-    /*         } */
-    /*         printf("\n"); */
-    /*     } */
-    /*     printf("    },\n"); */
-    /* } */
-    /* printf("};\n"); */
-
-    for (i = 0; i < 2; i++) {
-        secp256k1_scalar_get_b32(k32[i], &k[i]);
-        CHECK(memcmp(k32[i], k32_expected[i], 32) == 0);
-    }
-}
-
 /* TODO: Add test vectors for failed signing */
 void musig_test_vectors_sign(void) {
     unsigned char sig[32];
     secp256k1_musig_keyagg_cache keyagg_cache;
     int fin_nonce_parity;
-    /* The state corresponds to the two scalars that constitute the secret
-     * nonce. */
-    const unsigned char state[2][32] = {
-        {
-            0x50, 0x8B, 0x81, 0xA6, 0x11, 0xF1, 0x00, 0xA6,
-            0xB2, 0xB6, 0xB2, 0x96, 0x56, 0x59, 0x08, 0x98,
-            0xAF, 0x48, 0x8B, 0xCF, 0x2E, 0x1F, 0x55, 0xCF,
-            0x22, 0xE5, 0xCF, 0xB8, 0x44, 0x21, 0xFE, 0x61,
-        },
-        {
-            0xFA, 0x27, 0xFD, 0x49, 0xB1, 0xD5, 0x00, 0x85,
-            0xB4, 0x81, 0x28, 0x5E, 0x1C, 0xA2, 0x05, 0xD5,
-            0x5C, 0x82, 0xCC, 0x1B, 0x31, 0xFF, 0x5C, 0xD5,
-            0x4A, 0x48, 0x98, 0x29, 0x35, 0x59, 0x01, 0xF7,
-        }
+    const unsigned char secnonce[64] = {
+        0x50, 0x8B, 0x81, 0xA6, 0x11, 0xF1, 0x00, 0xA6,
+        0xB2, 0xB6, 0xB2, 0x96, 0x56, 0x59, 0x08, 0x98,
+        0xAF, 0x48, 0x8B, 0xCF, 0x2E, 0x1F, 0x55, 0xCF,
+        0x22, 0xE5, 0xCF, 0xB8, 0x44, 0x21, 0xFE, 0x61,
+        0xFA, 0x27, 0xFD, 0x49, 0xB1, 0xD5, 0x00, 0x85,
+        0xB4, 0x81, 0x28, 0x5E, 0x1C, 0xA2, 0x05, 0xD5,
+        0x5C, 0x82, 0xCC, 0x1B, 0x31, 0xFF, 0x5C, 0xD5,
+        0x4A, 0x48, 0x98, 0x29, 0x35, 0x59, 0x01, 0xF7,
     };
     /* The nonces are already aggregated */
     const unsigned char agg_pubnonce[66] = {
@@ -1159,13 +1198,16 @@ void musig_test_vectors_sign(void) {
     const unsigned char *pk[2] = { vec_pk[0], vec_pk[1] };
 
     {
+        /* This is a test where the combined public key point has an _odd_ y
+         * coordinate, the signer _is not_ the second pubkey in the list and the
+         * nonce parity is 1. */
         const unsigned char sig_expected[32] = {
             0x68, 0x53, 0x7C, 0xC5, 0x23, 0x4E, 0x50, 0x5B,
             0xD1, 0x40, 0x61, 0xF8, 0xDA, 0x9E, 0x90, 0xC2,
             0x20, 0xA1, 0x81, 0x85, 0x5F, 0xD8, 0xBD, 0xB7,
             0xF1, 0x27, 0xBB, 0x12, 0x40, 0x3B, 0x4D, 0x3B,
         };
-        musig_test_vectors_sign_helper(&keyagg_cache, &fin_nonce_parity, sig, state, agg_pubnonce, sk, msg, pk, 0);
+        musig_test_vectors_sign_helper(&keyagg_cache, &fin_nonce_parity, sig, secnonce, agg_pubnonce, sk, msg, NULL, NULL, pk, 0);
         /* TODO: remove when test vectors are not expected to change anymore */
         /* int k, l; */
         /* printf("const unsigned char sig_expected[32] = {\n"); */
@@ -1178,29 +1220,87 @@ void musig_test_vectors_sign(void) {
         /* } */
         /* printf("};\n"); */
 
-        /* This is a test where the combined public key point has an _odd_ y
-         * coordinate, the signer _is not_ the second pubkey in the list and the
-         * nonce parity is 1. */
+        /* Check that the description of the test vector is correct */
         CHECK(musig_test_pk_parity(&keyagg_cache) == 1);
         CHECK(!musig_test_is_second_pk(&keyagg_cache, sk));
         CHECK(fin_nonce_parity == 1);
         CHECK(memcmp(sig, sig_expected, 32) == 0);
     }
     {
+       /* This is a test where the aggregate public key point has an _even_ y
+        * coordinate, the signer _is_ the second pubkey in the list and the
+        * nonce parity is 0. */
         const unsigned char sig_expected[32] = {
             0x2D, 0xF6, 0x7B, 0xFF, 0xF1, 0x8E, 0x3D, 0xE7,
             0x97, 0xE1, 0x3C, 0x64, 0x75, 0xC9, 0x63, 0x04,
             0x81, 0x38, 0xDA, 0xEC, 0x5C, 0xB2, 0x0A, 0x35,
             0x7C, 0xEC, 0xA7, 0xC8, 0x42, 0x42, 0x95, 0xEA,
         };
-        musig_test_vectors_sign_helper(&keyagg_cache, &fin_nonce_parity, sig, state, agg_pubnonce, sk, msg, pk, 1);
-
-       /* This is a test where the aggregate public key point has an _even_ y
-        * coordinate, the signer _is_ the second pubkey in the list and the
-        * nonce parity is 0. */
+        musig_test_vectors_sign_helper(&keyagg_cache, &fin_nonce_parity, sig, secnonce, agg_pubnonce, sk, msg, NULL, NULL, pk, 1);
+        /* Check that the description of the test vector is correct */
         CHECK(musig_test_pk_parity(&keyagg_cache) == 0);
         CHECK(musig_test_is_second_pk(&keyagg_cache, sk));
         CHECK(fin_nonce_parity == 0);
+        CHECK(memcmp(sig, sig_expected, 32) == 0);
+    }
+    {
+       /* This is a test where the parity of aggregate public key point (1) is unequal to the
+        * nonce parity (0). */
+        const unsigned char sig_expected[32] = {
+            0x0D, 0x5B, 0x65, 0x1E, 0x6D, 0xE3, 0x4A, 0x29,
+            0xA1, 0x2D, 0xE7, 0xA8, 0xB4, 0x18, 0x3B, 0x4A,
+            0xE6, 0xA7, 0xF7, 0xFB, 0xE1, 0x5C, 0xDC, 0xAF,
+            0xA4, 0xA3, 0xD1, 0xBC, 0xAA, 0xBC, 0x75, 0x17,
+        };
+        musig_test_vectors_sign_helper(&keyagg_cache, &fin_nonce_parity, sig, secnonce, agg_pubnonce, sk, msg, NULL, NULL, pk, 2);
+        /* Check that the description of the test vector is correct */
+        CHECK(musig_test_pk_parity(&keyagg_cache) == 1);
+        CHECK(fin_nonce_parity == 0);
+        CHECK(!musig_test_is_second_pk(&keyagg_cache, sk));
+        CHECK(memcmp(sig, sig_expected, 32) == 0);
+    }
+    {
+       /* This is a test that includes a public key tweak. */
+        const unsigned char sig_expected[32] = {
+            0x5E, 0x24, 0xC7, 0x49, 0x6B, 0x56, 0x5D, 0xEB,
+            0xC3, 0xB9, 0x63, 0x9E, 0x6F, 0x13, 0x04, 0xA2,
+            0x15, 0x97, 0xF9, 0x60, 0x3D, 0x3A, 0xB0, 0x5B,
+            0x49, 0x13, 0x64, 0x17, 0x75, 0xE1, 0x37, 0x5B,
+        };
+        const unsigned char tweak[32] = {
+            0xE8, 0xF7, 0x91, 0xFF, 0x92, 0x25, 0xA2, 0xAF,
+            0x01, 0x02, 0xAF, 0xFF, 0x4A, 0x9A, 0x72, 0x3D,
+            0x96, 0x12, 0xA6, 0x82, 0xA2, 0x5E, 0xBE, 0x79,
+            0x80, 0x2B, 0x26, 0x3C, 0xDF, 0xCD, 0x83, 0xBB,
+        };
+        musig_test_vectors_sign_helper(&keyagg_cache, &fin_nonce_parity, sig, secnonce, agg_pubnonce, sk, msg, tweak, NULL, pk, 2);
+
+        CHECK(musig_test_pk_parity(&keyagg_cache) == 1);
+        CHECK(!musig_test_is_second_pk(&keyagg_cache, sk));
+        CHECK(fin_nonce_parity == 1);
+        CHECK(memcmp(sig, sig_expected, 32) == 0);
+    }
+    {
+       /* This is a test that includes an adaptor. */
+        const unsigned char sig_expected[32] = {
+            0xD7, 0x67, 0xD0, 0x7D, 0x9A, 0xB8, 0x19, 0x8C,
+            0x9F, 0x64, 0xE3, 0xFD, 0x9F, 0x7B, 0x8B, 0xAA,
+            0xC6, 0x05, 0xF1, 0x8D, 0xFF, 0x18, 0x95, 0x24,
+            0x2D, 0x93, 0x95, 0xD9, 0xC8, 0xE6, 0xDD, 0x7C,
+        };
+        const unsigned char sec_adaptor[32] = {
+            0xD5, 0x6A, 0xD1, 0x85, 0x00, 0xF2, 0xD7, 0x8A,
+            0xB9, 0x54, 0x80, 0x53, 0x76, 0xF3, 0x9D, 0x1B,
+            0x6D, 0x62, 0x04, 0x95, 0x12, 0x39, 0x04, 0x6D,
+            0x99, 0x3A, 0x9C, 0x31, 0xE0, 0xF4, 0x78, 0x71,
+        };
+        secp256k1_pubkey pub_adaptor;
+        CHECK(secp256k1_ec_pubkey_create(ctx, &pub_adaptor, sec_adaptor) == 1);
+        musig_test_vectors_sign_helper(&keyagg_cache, &fin_nonce_parity, sig, secnonce, agg_pubnonce, sk, msg, NULL, &pub_adaptor, pk, 2);
+
+        CHECK(musig_test_pk_parity(&keyagg_cache) == 1);
+        CHECK(!musig_test_is_second_pk(&keyagg_cache, sk));
+        CHECK(fin_nonce_parity == 1);
         CHECK(memcmp(sig, sig_expected, 32) == 0);
     }
 }

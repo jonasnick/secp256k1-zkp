@@ -140,9 +140,9 @@ static void secp256k1_musig_keyaggcoef_sha256(secp256k1_sha256 *sha) {
 }
 
 /* Compute KeyAgg coefficient which is constant 1 for the second pubkey and
- * SHA256(pk_hash, x) where pk_hash is the hash of public keys otherwise. second_pk_x
- * can be 0 in case there is no second_pk. Assumes both field elements x and
- * second_pk_x are normalized. */
+ * tagged_hash(pk_hash, x) where pk_hash is the hash of public keys otherwise.
+ * second_pk_x can be 0 in case there is no second_pk. Assumes both field
+ * elements x and second_pk_x are normalized. */
 static void secp256k1_musig_keyaggcoef_internal(secp256k1_scalar *r, const unsigned char *pk_hash, const secp256k1_fe *x, const secp256k1_fe *second_pk_x) {
     secp256k1_sha256 sha;
     unsigned char buf[32];

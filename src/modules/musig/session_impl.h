@@ -226,7 +226,7 @@ static int secp256k1_xonly_ge_serialize(unsigned char *output32, secp256k1_ge *g
     return 1;
 }
 
-static void secp256k1_nonce_function_musig(secp256k1_scalar *k, const unsigned char *session_id, const unsigned char *key32, const unsigned char *msg32, const unsigned char *agg_pk32, const unsigned char *extra_input32) {
+static void secp256k1_nonce_function_musig(secp256k1_scalar *k, const unsigned char *session_id, const unsigned char *msg32, const unsigned char *key32, const unsigned char *agg_pk32, const unsigned char *extra_input32) {
     secp256k1_sha256 sha;
     unsigned char seed[32];
     unsigned char i;
@@ -239,19 +239,19 @@ static void secp256k1_nonce_function_musig(secp256k1_scalar *k, const unsigned c
     /* Subtract one from `sizeof` to avoid hashing the implicit null byte */
     secp256k1_sha256_initialize_tagged(&sha, (unsigned char*)"MuSig/nonce", sizeof("MuSig/nonce") - 1);
     secp256k1_sha256_write(&sha, session_id, 32);
-    extra_in[0] = key32;
-    extra_in[1] = agg_pk32;
-    extra_in[2] = msg32;
+    extra_in[0] = msg32;
+    extra_in[1] = key32;
+    extra_in[2] = agg_pk32;
     extra_in[3] = extra_input32;
     for (i = 0; i < n_extra_in; i++) {
-        unsigned char marker;
+        unsigned char len;
         if (extra_in[i] != NULL) {
-            marker = 1;
-            secp256k1_sha256_write(&sha, &marker, 1);
+            len = 32;
+            secp256k1_sha256_write(&sha, &len, 1);
             secp256k1_sha256_write(&sha, extra_in[i], 32);
         } else {
-            marker = 0;
-            secp256k1_sha256_write(&sha, &marker, 1);
+            len = 0;
+            secp256k1_sha256_write(&sha, &len, 1);
         }
     }
     secp256k1_sha256_finalize(&sha, seed);
@@ -310,7 +310,7 @@ int secp256k1_musig_nonce_gen(const secp256k1_context* ctx, secp256k1_musig_secn
         VERIFY_CHECK(ret_tmp);
         pk_ser_ptr = pk_ser;
     }
-    secp256k1_nonce_function_musig(k, session_id32, seckey, msg32, pk_ser_ptr, extra_input32);
+    secp256k1_nonce_function_musig(k, session_id32, msg32, seckey, pk_ser_ptr, extra_input32);
     VERIFY_CHECK(!secp256k1_scalar_is_zero(&k[0]));
     VERIFY_CHECK(!secp256k1_scalar_is_zero(&k[1]));
     VERIFY_CHECK(!secp256k1_scalar_eq(&k[0], &k[1]));
