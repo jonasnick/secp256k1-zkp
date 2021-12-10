@@ -178,8 +178,8 @@ static int secp256k1_musig_pubkey_agg_callback(secp256k1_scalar *sc, secp256k1_g
     secp256k1_musig_pubkey_agg_ecmult_data *ctx = (secp256k1_musig_pubkey_agg_ecmult_data *) data;
     int ret;
     ret = secp256k1_xonly_pubkey_load(ctx->ctx, pt, ctx->pks[idx]);
-    /* pubkey_load can't fail because the same pks have already been loaded (and
-     * we test this) */
+    /* pubkey_load can't fail because the same pks have already been loaded in
+     * `musig_compute_pk_hash` (and we test this). */
     VERIFY_CHECK(ret);
     secp256k1_musig_keyaggcoef_internal(sc, ctx->pk_hash, &pt->x, &ctx->second_pk_x);
     return 1;
@@ -203,11 +203,11 @@ int secp256k1_musig_pubkey_agg(const secp256k1_context* ctx, secp256k1_scratch_s
     /* No point on the curve has an X coordinate equal to 0 */
     secp256k1_fe_set_int(&ecmult_data.second_pk_x, 0);
     for (i = 1; i < n_pubkeys; i++) {
-        secp256k1_ge pt;
-        if (!secp256k1_xonly_pubkey_load(ctx, &pt, pubkeys[i])) {
-            return 0;
-        }
         if (secp256k1_memcmp_var(pubkeys[0], pubkeys[i], sizeof(*pubkeys[0])) != 0) {
+            secp256k1_ge pt;
+            if (!secp256k1_xonly_pubkey_load(ctx, &pt, pubkeys[i])) {
+                return 0;
+            }
             ecmult_data.second_pk_x = pt.x;
             break;
         }

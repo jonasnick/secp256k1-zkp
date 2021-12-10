@@ -29,21 +29,21 @@ static void secp256k1_musig_secnonce_save(secp256k1_musig_secnonce *secnonce, se
 }
 
 static int secp256k1_musig_secnonce_load(const secp256k1_context* ctx, secp256k1_scalar *k, secp256k1_musig_secnonce *secnonce) {
+    int is_zero;
     ARG_CHECK(secp256k1_memcmp_var(&secnonce->data[0], secp256k1_musig_secnonce_magic, 4) == 0);
     secp256k1_scalar_set_b32(&k[0], &secnonce->data[4], NULL);
     secp256k1_scalar_set_b32(&k[1], &secnonce->data[36], NULL);
+    /* We make very sure that the nonce isn't invalidated by checking the values
+     * in addition to the magic. */
+    is_zero = secp256k1_scalar_is_zero(&k[0]) & secp256k1_scalar_is_zero(&k[1]);
+    secp256k1_declassify(ctx, &is_zero, sizeof(is_zero));
+    ARG_CHECK(!is_zero);
     return 1;
 }
 
 /* If flag is true, invalidate the secnonce; otherwise leave it. Constant-time. */
 static void secp256k1_musig_secnonce_invalidate(const secp256k1_context* ctx, secp256k1_musig_secnonce *secnonce, int flag) {
-    size_t i;
-    int zero = 0;
-    for (i = 0; i < sizeof(secnonce->data); i++) {
-        int val = secnonce->data[i];
-        secp256k1_int_cmov(&val, &zero, flag);
-        secnonce->data[i] = (unsigned char)val;
-    }
+    secp256k1_memczero(secnonce->data, sizeof(secnonce->data), flag);
     /* The flag argument is usually classified. So, above code makes the magic
      * classified. However, we need the magic to be declassified to be able to
      * compare it during secnonce_load. */
@@ -87,7 +87,7 @@ static const unsigned char secp256k1_musig_session_cache_magic[4] = { 0x9d, 0xed
 /* A session consists of
  * - 4 byte session cache magic
  * - 1 byte the parity of the final nonce
- * - 32 byte final nonce
+ * - 32 byte serialized x-only final nonce
  * - 32 byte nonce coefficient b
  * - 32 byte signature challenge hash e
  * - 32 byte scalar s that is added to the partial signatures of the signers
@@ -386,7 +386,7 @@ int secp256k1_musig_nonce_agg(const secp256k1_context* ctx, secp256k1_musig_aggn
     return 1;
 }
 
-/* hash(aggnonce[0], aggnonce[1], agg_pk, msg) */
+/* tagged_hash(aggnonce[0], aggnonce[1], agg_pk, msg) */
 static int secp256k1_musig_compute_noncehash(unsigned char *noncehash, secp256k1_ge *aggnonce, const unsigned char *agg_pk32, const unsigned char *msg) {
     unsigned char buf[33];
     secp256k1_sha256 sha;
@@ -518,47 +518,6 @@ int secp256k1_musig_partial_sign(const secp256k1_context* ctx, secp256k1_musig_p
     ARG_CHECK(keyagg_cache != NULL);
     ARG_CHECK(session != NULL);
 
-    /* Obtain the signer's public key point and determine if the sk
-     * should be negated before signing.
-     *
-     * We use the following notation:
-     * - |.| is a function that normalizes a point to an even Y by negating
-     *       if necessary, similar to secp256k1_extrakeys_ge_even_y
-     * - mu_i is the i-th KeyAgg coefficient
-     * - t is the tweak
-     *
-     * The following public keys arise as intermediate steps:
-     * - P_i is the i-th public key with corresponding secret key x_i
-     *   P_i := x_i*G
-     * - P_agg is the aggregate public key
-     *   P_agg := mu_1*|P_1| + ... + mu_n*|P_n|
-     * - P_tweak is the tweaked aggregate public key
-     *   P_tweak := |P_agg| + t*G
-     *
-     * Note that our goal is to produce a partial signature corresponding to
-     * the final public key P_final = |P_tweak|.
-     *
-     * Define d_i, d_agg, and d_tweak so that:
-     * - |P_i| = d_i*P_i
-     * - |P_agg| = d_agg*P_agg
-     * - |P_tweak| = d_tweak*P_tweak
-     *
-     * In other words, d_i = 1 if P_i has even y coordinate, -1 otherwise;
-     * similarly for d_agg and d_tweak.
-     *
-     * The (xonly) final public key is P_final = |P_tweak|
-     *   = d_tweak*P_tweak
-     *   = d_tweak*(|P_agg| + t*G)
-     *   = d_tweak*(d_agg*P_agg + t*G)
-     *   = d_tweak*(d_agg*(mu_1*|P_1| + ... + mu_n*|P_n|) + t*G)
-     *   = d_tweak*(d_agg*(d_1*mu_1*P_1 + ... + d_n*mu_n*P_n) + t*G)
-     *   = (sum((d_tweak*d_agg*d_i)*mu_i*x_i) + d_tweak*t)*G
-     *
-     * Thus whether signer i should use the negated x_i depends on the product
-     * d_tweak*d_agg*d_i. In other words, negate if and only if the following
-     * holds:
-     *   (P_i has odd y) XOR (P_agg has odd y) XOR (P_tweak has odd y)
-     */
     if (!secp256k1_keypair_load(ctx, &sk, &pk, keypair)) {
         secp256k1_musig_partial_sign_clear(&sk, k);
         return 0;
@@ -568,6 +527,69 @@ int secp256k1_musig_partial_sign(const secp256k1_context* ctx, secp256k1_musig_p
         return 0;
     }
     secp256k1_fe_normalize_var(&pk.y);
+    /* Determine if the secret key sk should be negated before signing.
+     *
+     * We use the following notation:
+     * - |.| is a function that normalizes a point to an even Y by negating
+     *       if necessary, similar to secp256k1_extrakeys_ge_even_y
+     * - mu[i] is the i-th KeyAgg coefficient
+     * - t[i] is the i-th tweak
+     *
+     * The following public keys arise as intermediate steps:
+     * - P[i] is the i-th public key with corresponding secret key x[i]
+     *   P[i] := x[i]*G
+     * - P_agg is the aggregate public key
+     *   P_agg := mu[0]*|P[0]| + ... + mu[n-1]*|P[n-1]|
+     * - P_tweak[i] is the tweaked public key after the i-th tweaking operation
+     *   P_tweak[0] := P_agg
+     *   P_tweak[i] := |P_tweak[i-1]| + t[i]*G for i = 1, ..., m
+     *
+     * Note that our goal is to produce a partial signature corresponding to
+     * the final public key after m tweaking operations P_final = |P_tweak[m]|.
+     *
+     * Define d[i], d_agg, and d_tweak[i] so that:
+     * - |P[i]| = d[i]*P[i]
+     * - |P_agg| = d_agg*P_agg
+     * - |P_tweak[i]| = d_tweak[i]*P_tweak[i]
+     *
+     * In other words, d[i] = 1 if P[i] has even y coordinate, -1 otherwise;
+     * similarly for d_agg and d_tweak[i].
+     *
+     * The (xonly) final public key is P_final = |P_tweak[m]|
+     *   = d_tweak[m]*P_tweak[m]
+     *   = d_tweak[m]*(|P_tweak[m-1]| + t[m]*G)
+     *   = d_tweak[m]*(d_tweak[m-1]*(|P_tweak[m-2]| + t[m-1]*G) + t[m]*G)
+     *   = d_tweak[m]*...*d_tweak[1]*|P_agg| + (d_tweak[m]*t[m]+...+*d_tweak[1]*t[1])*G.
+     * To simplify the equation let us define
+     *   t := d_tweak[m]*t[m]+...+*d_tweak[1]*t[1]
+     *   d_tweak := d_tweak[m]*...*d_tweak[1].
+     * Then we have
+     *   P_final - t*G
+     *   = d_tweak*|P_agg|
+     *   = d_tweak*d_agg*P_agg
+     *   = d_tweak*d_agg*(mu[0]*|P[0]| + ... + mu[n-1]*|P[n-1]|)
+     *   = d_tweak*d_agg*(d[0]*mu[0]*P[0] + ... + d[n-1]*mu[n-1]*P[n-1])
+     *   = sum((d_tweak*d_agg*d[i])*mu[i]*x[i])*G.
+     *
+     * Thus whether signer i should use the negated x[i] depends on the product
+     * d_tweak[m]*...*d_tweak[1]*d_agg*d[i]. In other words, negate if and only
+     * if the following holds:
+     *   (P[i] has odd y) XOR (P_agg has odd y)
+     *     XOR (P_tweak[1] has odd y) XOR ... XOR (P_tweak[m] has odd y)
+     *
+     * Let us now look at how the terms in the equation correspond to the if
+     * condition below for some values of m:
+     * m = 0: P_i has odd y = secp256k1_fe_is_odd(&pk.y)
+     *        P_agg has odd y = secp256k1_fe_is_odd(&cache_i.pk.y)
+     *        cache_i.internal_key_parity = 0
+     * m = 1: P_i has odd y = secp256k1_fe_is_odd(&pk.y)
+     *        P_agg has odd y = cache_i.internal_key_parity
+     *        P_tweak[1] has odd y = secp256k1_fe_is_odd(&cache_i.pk.y)
+     * m = 2: P_i has odd y = secp256k1_fe_is_odd(&pk.y)
+     *        P_agg has odd y XOR P_tweak[1] has odd y = cache_i.internal_key_parity
+     *        P_tweak[2] has odd y = secp256k1_fe_is_odd(&cache_i.pk.y)
+     * etc.
+     */
     if ((secp256k1_fe_is_odd(&pk.y)
          != secp256k1_fe_is_odd(&cache_i.pk.y))
          != cache_i.internal_key_parity) {
@@ -584,6 +606,7 @@ int secp256k1_musig_partial_sign(const secp256k1_context* ctx, secp256k1_musig_p
         secp256k1_musig_partial_sign_clear(&sk, k);
         return 0;
     }
+
     if (session_i.fin_nonce_parity) {
         secp256k1_scalar_negate(&k[0], &k[0]);
         secp256k1_scalar_negate(&k[1], &k[1]);
@@ -621,7 +644,7 @@ int secp256k1_musig_partial_sig_verify(const secp256k1_context* ctx, const secp2
     }
 
     /* Compute "effective" nonce rj = aggnonce[0] + b*aggnonce[1] */
-    /* TODO: use multiexp to compute -s*G + e*pubkey + aggnonce[0] + b*aggnonce[1] */
+    /* TODO: use multiexp to compute -s*G + e*mu*pubkey + aggnonce[0] + b*aggnonce[1] */
     if (!secp256k1_musig_pubnonce_load(ctx, nonce_pt, pubnonce)) {
         return 0;
     }
@@ -647,6 +670,43 @@ int secp256k1_musig_partial_sig_verify(const secp256k1_context* ctx, const secp2
      * negated exactly when the aggregate key parity is odd. If the aggregate
      * key is tweaked, then negation happens when the aggregate key has an odd Y
      * coordinate XOR the internal key has an odd Y coordinate.*/
+
+    /* When producing a partial signature, signer i uses a possibly
+     * negated secret key:
+     *
+     *   sk[i] = (d_tweak*d_agg*d[i])*x[i]
+     *
+     * to ensure that the aggregate signature will correspond to
+     * an aggregate public key with even Y coordinate (see the
+     * notation and explanation in musig_partial_sign).
+     *
+     * We use the following additional notation:
+     * - e is the (Schnorr signature) challenge
+     * - r[i] is the i-th signer's secret nonce
+     * - R[i] = r[i]*G is the i-th signer's public nonce
+     * - R is the aggregated public nonce
+     * - d_nonce is chosen so that |R| = d_nonce*R
+     *
+     * The i-th partial signature is:
+     *
+     *   s[i] = d_nonce*r[i] + mu[i]*e*sk[i]
+     *
+     * In order to verify this partial signature, we need to check:
+     *
+     *   s[i]*G = d_nonce*R[i] + mu[i]*e*sk[i]*G
+     *
+     * The verifier doesn't have access to sk[i]*G, but can construct
+     * it using the xonly public key |P[i]| as follows:
+     *
+     *   sk[i]*G = d_tweak*d_agg*d[i]*x[i]*G
+     *           = d_tweak*d_agg*d[i]*P[i]
+     *           = d_tweak*d_agg*|P[i]|
+     *
+     * The if condition below is true whenever d_tweak*d_agg is
+     * negative (again, see the explanation in musig_partial_sign). In
+     * this case, the verifier negates e which will have the same end
+     * result as negating |P[i]|, since they are multiplied later anyway.
+     */
     if (secp256k1_fe_is_odd(&cache_i.pk.y)
             != cache_i.internal_key_parity) {
         secp256k1_scalar_negate(&e, &e);
@@ -655,7 +715,7 @@ int secp256k1_musig_partial_sig_verify(const secp256k1_context* ctx, const secp2
     if (!secp256k1_musig_partial_sig_load(ctx, &s, partial_sig)) {
         return 0;
     }
-    /* Compute -s*G + e*pkj + rj */
+    /* Compute -s*G + e*pkj + rj (e already includes the keyagg coefficient mu) */
     secp256k1_scalar_negate(&s, &s);
     secp256k1_gej_set_ge(&pkj, &pkp);
     secp256k1_ecmult(&tmp, &pkj, &e, &s);

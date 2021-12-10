@@ -104,7 +104,7 @@ void pubnonce_summing_to_inf(secp256k1_musig_pubnonce *pubnonce) {
 int memcmp_and_randomize(unsigned char *value, const unsigned char *expected, size_t len) {
     int ret;
     size_t i;
-    ret = memcmp(value, expected, len);
+    ret = secp256k1_memcmp_var(value, expected, len);
     for (i = 0; i < len; i++) {
         value[i] = secp256k1_testrand_bits(8);
     }
@@ -439,18 +439,22 @@ void musig_api_tests(secp256k1_scratch_space *scratch) {
     CHECK(ecount == 4);
     CHECK(secp256k1_musig_partial_sign(none, &partial_sig[0], &secnonce_tmp, NULL, &keyagg_cache, &session) == 0);
     CHECK(ecount == 5);
+    memcpy(&secnonce_tmp, &secnonce[0], sizeof(secnonce_tmp));
     CHECK(secp256k1_musig_partial_sign(none, &partial_sig[0], &secnonce_tmp, &invalid_keypair, &keyagg_cache, &session) == 0);
     CHECK(ecount == 6);
     memcpy(&secnonce_tmp, &secnonce[0], sizeof(secnonce_tmp));
     CHECK(secp256k1_musig_partial_sign(none, &partial_sig[0], &secnonce_tmp, &keypair[0], NULL, &session) == 0);
     CHECK(ecount == 7);
+    memcpy(&secnonce_tmp, &secnonce[0], sizeof(secnonce_tmp));
     CHECK(secp256k1_musig_partial_sign(none, &partial_sig[0], &secnonce_tmp, &keypair[0], &invalid_keyagg_cache, &session) == 0);
     CHECK(ecount == 8);
     memcpy(&secnonce_tmp, &secnonce[0], sizeof(secnonce_tmp));
     CHECK(secp256k1_musig_partial_sign(none, &partial_sig[0], &secnonce_tmp, &keypair[0], &keyagg_cache, NULL) == 0);
     CHECK(ecount == 9);
+    memcpy(&secnonce_tmp, &secnonce[0], sizeof(secnonce_tmp));
     CHECK(secp256k1_musig_partial_sign(none, &partial_sig[0], &secnonce_tmp, &keypair[0], &keyagg_cache, &invalid_session) == 0);
     CHECK(ecount == 10);
+    memcpy(&secnonce_tmp, &secnonce[0], sizeof(secnonce_tmp));
 
     CHECK(secp256k1_musig_partial_sign(none, &partial_sig[0], &secnonce[0], &keypair[0], &keyagg_cache, &session) == 1);
     CHECK(secp256k1_musig_partial_sign(none, &partial_sig[1], &secnonce[1], &keypair[1], &keyagg_cache, &session) == 1);
@@ -830,18 +834,15 @@ void musig_tweak_test_helper(const secp256k1_xonly_pubkey* agg_pk, const unsigne
     CHECK(secp256k1_schnorrsig_verify(ctx, final_sig, msg, sizeof(msg), agg_pk) == 1);
 }
 
-/* Create aggregate public key P, tweak multiple times and test signing */
+/* Create aggregate public key P[0], tweak multiple times and test signing. */
 void musig_tweak_test(secp256k1_scratch_space *scratch) {
     unsigned char sk[2][32];
     secp256k1_xonly_pubkey pk[2];
     const secp256k1_xonly_pubkey *pk_ptr[2];
     secp256k1_musig_keyagg_cache keyagg_cache;
-    secp256k1_xonly_pubkey P, *internal_key;
-    secp256k1_pubkey Q[2];
-    int Q_parity[2];
-    secp256k1_xonly_pubkey Q_xonly[2];
-    unsigned char Q_serialized[2][32];
-    unsigned char ec_commit_tweak[2][32];
+    enum { N_TWEAKS = 8 };
+    secp256k1_pubkey P[N_TWEAKS + 1];
+    secp256k1_xonly_pubkey P_xonly[N_TWEAKS + 1];
     int i;
 
     /* Key Setup */
@@ -850,24 +851,27 @@ void musig_tweak_test(secp256k1_scratch_space *scratch) {
         secp256k1_testrand256(sk[i]);
         CHECK(create_keypair_and_pk(NULL, &pk[i], sk[i]) == 1);
     }
-    /* Compute P = keyagg(pk0, pk1) and test signing for it */
-    CHECK(secp256k1_musig_pubkey_agg(ctx, scratch, &P, &keyagg_cache, pk_ptr, 2) == 1);
-    musig_tweak_test_helper(&P, sk[0], sk[1], &keyagg_cache);
+    /* Compute P0 = keyagg(pk0, pk1) and test signing for it */
+    CHECK(secp256k1_musig_pubkey_agg(ctx, scratch, &P_xonly[0], &keyagg_cache, pk_ptr, 2) == 1);
+    musig_tweak_test_helper(&P_xonly[0], sk[0], sk[1], &keyagg_cache);
 
-    /* Compute Qi = Qj + tweaki*G where Qj = P if i = 0 and j = i-1 otherwise.
-     * Also test signing for it. */
-    internal_key = &P;
-    for (i = 0; i < 2; i++) {
-        secp256k1_testrand256(ec_commit_tweak[i]);
-        CHECK(secp256k1_musig_pubkey_tweak_add(ctx, &Q[i], &keyagg_cache, ec_commit_tweak[i]) == 1);
-        CHECK(secp256k1_xonly_pubkey_from_pubkey(ctx, &Q_xonly[i], &Q_parity[i], &Q[i]) == 1);
-        CHECK(secp256k1_xonly_pubkey_serialize(ctx, Q_serialized[i], &Q_xonly[i]) == 1);
+    /* Compute Pi = |Pj| + tweaki*G where where j = i-1 and try signing for
+     * that key. The function |.| normalizes the point to have an even
+     * X-coordinate. This results in ordinary "xonly-tweaking". */
+    for (i = 1; i < N_TWEAKS; i++) {
+        unsigned char tweak[32];
+        int P_parity;
+        unsigned char P_serialized[32];
+
+        secp256k1_testrand256(tweak);
+        CHECK(secp256k1_musig_pubkey_tweak_add(ctx, &P[i], &keyagg_cache, tweak) == 1);
+        CHECK(secp256k1_xonly_pubkey_from_pubkey(ctx, &P_xonly[i], &P_parity, &P[i]));
+        CHECK(secp256k1_xonly_pubkey_serialize(ctx, P_serialized, &P_xonly[i]));
         /* Check that musig_pubkey_tweak_add produces same result as
         * xonly_pubkey_tweak_add. */
-        if (i > 0) internal_key = &Q_xonly[i-1];
-        CHECK(secp256k1_xonly_pubkey_tweak_add_check(ctx, Q_serialized[i], Q_parity[i], internal_key, ec_commit_tweak[i]) == 1);
-        /* Test signing for Q[i] */
-        musig_tweak_test_helper(&Q_xonly[i], sk[0], sk[1], &keyagg_cache);
+        CHECK(secp256k1_xonly_pubkey_tweak_add_check(ctx, P_serialized, P_parity, &P_xonly[i-1], tweak) == 1);
+        /* Test signing for P[i] */
+        musig_tweak_test_helper(&P_xonly[i], sk[0], sk[1], &keyagg_cache);
     }
 }
 

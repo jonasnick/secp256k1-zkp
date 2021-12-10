@@ -2,7 +2,7 @@ Notes on the musig module API
 ===========================
 
 The following sections contain additional notes on the API of the musig module (`include/secp256k1_musig.h`).
-A usage example can be found in `src/modules/musig/example.c`.
+A usage example can be found in `examples/musig.c`.
 
 # API misuse
 
@@ -27,7 +27,7 @@ A (Taproot) tweak can be added to the resulting public key with `secp256k1_xonly
 
 # Signing
 
-This is covered by `src/modules/musig/example.c`.
+This is covered by `examples/musig.c`.
 Essentially, the protocol proceeds in the following steps:
 
 1. Generate a keypair with `secp256k1_keypair_create` and obtain the xonly public key with `secp256k1_keypair_xonly_pub`.
@@ -49,7 +49,7 @@ Similarly, the API supports an alternative protocol flow where generating the ag
 
 # Verification
 
-A participant who wants to verify the partial signatures, but does not sign itself may do so using the above instructions except that the verifier does _not_ generate a nonce with `secp256k1_musig_nonce_gen`.
+A participant who wants to verify the partial signatures, but does not sign itself may do so using the above instructions except that the verifier skips steps 1, 4 and 7.
 
 # Atomic Swaps
 

@@ -44,6 +44,16 @@ int secp256k1_musig_adapt(const secp256k1_context* ctx, unsigned char *sig64, co
     secp256k1_scalar_set_b32(&t, sec_adaptor32, &overflow);
     ret &= !overflow;
 
+    /* Determine if the secret adaptor should be negated.
+     *
+     * The musig_session stores the X-coordinate and the parity of the "final nonce"
+     * (r + t)*G, where r*G is the aggregate public nonce and t is the secret adaptor.
+     *
+     * Since a BIP340 signature requires an x-only public nonce, in the case where
+     * (r + t)*G has odd Y-coordinate (i.e. nonce_parity == 1), the x-only public nonce
+     * corresponding to the signature is actually (-r - t)*G. Thus adapting a
+     * presignature requires negating t in this case.
+     */
     if (nonce_parity) {
         secp256k1_scalar_negate(&t, &t);
     }
