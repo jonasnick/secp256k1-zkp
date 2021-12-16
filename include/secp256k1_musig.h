@@ -432,7 +432,8 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_partial_sig_verif
  *  In:       session: pointer to the session that was created with
  *                     musig_nonce_process
  *       partial_sigs: array of pointers to partial signatures to aggregate
- *             n_sigs: number of elements in the partial_sigs array
+ *             n_sigs: number of elements in the partial_sigs array. Must be
+ *                     greater than 0.
  */
 SECP256K1_API int secp256k1_musig_partial_sig_agg(
     const secp256k1_context* ctx,
@@ -460,26 +461,29 @@ SECP256K1_API int secp256k1_musig_nonce_parity(
     const secp256k1_musig_session *session
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
-/** Converts a pre-signature that misses the adaptor into a full signature
+/** Creates a signature from a pre-signature and an adaptor.
  *
- *  If the sec_adaptor32 argument is incorrect, the adapted signature will be
- *  invalid. This function does not verify the adapted signature.
+ *  If the sec_adaptor32 argument is incorrect, the output signature will be
+ *  invalid. This function does not verify the signature.
  *
- *  Returns: 0 if the arguments are invalid, or sig64 or sec_adaptor32 contain
+ *  Returns: 0 if the arguments are invalid, or pre_sig64 or sec_adaptor32 contain
  *           invalid (overflowing) values. 1 otherwise (which does NOT mean the
  *           signature or the adaptor are valid!)
  *  Args:         ctx: pointer to a context object
- *  In/Out:     sig64: 64-byte pre-signature that is adapted to a complete signature
- *  In: sec_adaptor32: 32-byte secret adaptor to add to the partial signature
+ *  Out:        sig64: 64-byte signature. This pointer may point to the same
+ *                     memory area as `pre_sig`.
+ *  In:     pre_sig64: 64-byte pre-signature
+ *      sec_adaptor32: 32-byte secret adaptor to add to the pre-signature
  *       nonce_parity: the output of `musig_nonce_parity` called with the
- *                     session used for producing sig64
+ *                     session used for producing the pre-signature
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_adapt(
     const secp256k1_context* ctx,
     unsigned char *sig64,
+    const unsigned char *pre_sig64,
     const unsigned char *sec_adaptor32,
     int nonce_parity
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
 /** Extracts a secret adaptor from a MuSig pre-signature and corresponding
  *  signature

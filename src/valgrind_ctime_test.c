@@ -304,8 +304,7 @@ void run_tests(secp256k1_context *ctx, unsigned char *key) {
         VALGRIND_MAKE_MEM_DEFINED(pre_sig, sizeof(pre_sig));
 
         CHECK(secp256k1_musig_nonce_parity(ctx, &nonce_parity, &session));
-        memcpy(sig, pre_sig, sizeof(pre_sig));
-        ret = secp256k1_musig_adapt(ctx, sig, sec_adaptor, nonce_parity);
+        ret = secp256k1_musig_adapt(ctx, sig, pre_sig, sec_adaptor, nonce_parity);
         VALGRIND_MAKE_MEM_DEFINED(&ret, sizeof(ret));
         CHECK(ret == 1);
         ret = secp256k1_musig_extract_adaptor(ctx, sec_adaptor, sig, pre_sig, nonce_parity);

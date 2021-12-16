@@ -7,6 +7,8 @@
 #ifndef SECP256K1_MODULE_MUSIG_ADAPTOR_IMPL_H
 #define SECP256K1_MODULE_MUSIG_ADAPTOR_IMPL_H
 
+#include <string.h>
+
 #include "../../../include/secp256k1.h"
 #include "../../../include/secp256k1_musig.h"
 
@@ -26,7 +28,7 @@ int secp256k1_musig_nonce_parity(const secp256k1_context* ctx, int *nonce_parity
     return 1;
 }
 
-int secp256k1_musig_adapt(const secp256k1_context* ctx, unsigned char *sig64, const unsigned char *sec_adaptor32, int nonce_parity) {
+int secp256k1_musig_adapt(const secp256k1_context* ctx, unsigned char *sig64, const unsigned char *pre_sig64, const unsigned char *sec_adaptor32, int nonce_parity) {
     secp256k1_scalar s;
     secp256k1_scalar t;
     int overflow;
@@ -34,10 +36,11 @@ int secp256k1_musig_adapt(const secp256k1_context* ctx, unsigned char *sig64, co
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(sig64 != NULL);
+    ARG_CHECK(pre_sig64 != NULL);
     ARG_CHECK(sec_adaptor32 != NULL);
     ARG_CHECK(nonce_parity == 0 || nonce_parity == 1);
 
-    secp256k1_scalar_set_b32(&s, &sig64[32], &overflow);
+    secp256k1_scalar_set_b32(&s, &pre_sig64[32], &overflow);
     if (overflow) {
         return 0;
     }
@@ -52,7 +55,7 @@ int secp256k1_musig_adapt(const secp256k1_context* ctx, unsigned char *sig64, co
      * Since a BIP340 signature requires an x-only public nonce, in the case where
      * (r + t)*G has odd Y-coordinate (i.e. nonce_parity == 1), the x-only public nonce
      * corresponding to the signature is actually (-r - t)*G. Thus adapting a
-     * presignature requires negating t in this case.
+     * pre-signature requires negating t in this case.
      */
     if (nonce_parity) {
         secp256k1_scalar_negate(&t, &t);
@@ -60,6 +63,7 @@ int secp256k1_musig_adapt(const secp256k1_context* ctx, unsigned char *sig64, co
 
     secp256k1_scalar_add(&s, &s, &t);
     secp256k1_scalar_get_b32(&sig64[32], &s);
+    memmove(sig64, pre_sig64, 32);
     secp256k1_scalar_clear(&t);
     return ret;
 }
