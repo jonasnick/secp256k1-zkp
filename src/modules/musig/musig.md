@@ -41,7 +41,11 @@ Essentially, the protocol proceeds in the following steps:
 9. Someone (not necessarily the signer) obtains all partial signatures and aggregates them into the final Schnorr signature using `secp256k1_musig_partial_sig_agg`.
 
 The aggregate signature can be verified with `secp256k1_schnorrsig_verify`.
-Note that steps 1 to 3 can happen after generating the nonce in step 4, but this disables some of the defense-in-depth measures.
+
+Note that steps 1 to 6 can happen before the message to be signed is known to the signers.
+Therefore, the communication round to exchange nonces can be viewed as a pre-processing step that is run whenever convenient to the signers.
+This disables some of the defense-in-depth measures that may protect against API misuse in some cases.
+Similarly, the API supports an alternative protocol flow where generating the aggregate key (steps 1 to 3) is allowed to happen after exchanging nonces (steps 4 to 6).
 
 # Verification
 

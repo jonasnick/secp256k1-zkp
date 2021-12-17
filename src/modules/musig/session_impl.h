@@ -1,14 +1,24 @@
-/**********************************************************************
- * Copyright (c) 2021 Jonas Nick                                      *
- * Distributed under the MIT software license, see the accompanying   *
- * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
- **********************************************************************/
+/***********************************************************************
+ * Copyright (c) 2021 Jonas Nick                                       *
+ * Distributed under the MIT software license, see the accompanying    *
+ * file COPYING or https://www.opensource.org/licenses/mit-license.php.*
+ ***********************************************************************/
 
-#ifndef SECP256K1_MODULE_MUSIG_SESSION_IMPL
-#define SECP256K1_MODULE_MUSIG_SESSION_IMPL
+#ifndef SECP256K1_MODULE_MUSIG_SESSION_IMPL_H
+#define SECP256K1_MODULE_MUSIG_SESSION_IMPL_H
+
+#include <string.h>
+
+#include "../../../include/secp256k1.h"
+#include "../../../include/secp256k1_extrakeys.h"
+#include "../../../include/secp256k1_musig.h"
 
 #include "keyagg.h"
 #include "session.h"
+#include "../../eckey.h"
+#include "../../hash.h"
+#include "../../scalar.h"
+#include "../../util.h"
 
 static const unsigned char secp256k1_musig_secnonce_magic[4] = { 0x22, 0x0e, 0xdc, 0xf1 };
 
@@ -23,6 +33,21 @@ static int secp256k1_musig_secnonce_load(const secp256k1_context* ctx, secp256k1
     secp256k1_scalar_set_b32(&k[0], &secnonce->data[4], NULL);
     secp256k1_scalar_set_b32(&k[1], &secnonce->data[36], NULL);
     return 1;
+}
+
+/* If flag is true, invalidate the secnonce; otherwise leave it. Constant-time. */
+static void secp256k1_musig_secnonce_invalidate(const secp256k1_context* ctx, secp256k1_musig_secnonce *secnonce, int flag) {
+    size_t i;
+    int zero = 0;
+    for (i = 0; i < sizeof(secnonce->data); i++) {
+        int val = secnonce->data[i];
+        secp256k1_int_cmov(&val, &zero, flag);
+        secnonce->data[i] = (unsigned char)val;
+    }
+    /* The flag argument is usually classified. So, above code makes the magic
+     * classified. However, we need the magic to be declassified to be able to
+     * compare it during secnonce_load. */
+    secp256k1_declassify(ctx, secnonce->data, sizeof(secp256k1_musig_secnonce_magic));
 }
 
 static const unsigned char secp256k1_musig_pubnonce_magic[4] = { 0xf5, 0x7a, 0x3d, 0xa0 };
@@ -49,13 +74,21 @@ static int secp256k1_musig_pubnonce_load(const secp256k1_context* ctx, secp256k1
     return 1;
 }
 
+static void secp256k1_musig_aggnonce_save(secp256k1_musig_aggnonce* nonce, secp256k1_ge* ge) {
+    secp256k1_musig_pubnonce_save((secp256k1_musig_pubnonce *) nonce, ge);
+}
+
+static int secp256k1_musig_aggnonce_load(const secp256k1_context* ctx, secp256k1_ge* ge, const secp256k1_musig_aggnonce* nonce) {
+    return secp256k1_musig_pubnonce_load(ctx, ge, (secp256k1_musig_pubnonce *) nonce);
+}
+
 static const unsigned char secp256k1_musig_session_cache_magic[4] = { 0x9d, 0xed, 0xe9, 0x17 };
 
 /* A session consists of
- * - 4 byte session cache
- * - 1 byte the parity of the aggregate nonce
- * - 32 byte aggregated nonce
- * - 32 byte nonce aggregation coefficient b
+ * - 4 byte session cache magic
+ * - 1 byte the parity of the final nonce
+ * - 32 byte final nonce
+ * - 32 byte nonce coefficient b
  * - 32 byte signature challenge hash e
  * - 32 byte scalar s that is added to the partial signatures of the signers
  */
@@ -66,7 +99,7 @@ static void secp256k1_musig_session_save(secp256k1_musig_session *session, const
     ptr += 4;
     *ptr = session_i->fin_nonce_parity;
     ptr += 1;
-    memmove(ptr, session_i->fin_nonce, 32);
+    memcpy(ptr, session_i->fin_nonce, 32);
     ptr += 32;
     secp256k1_scalar_get_b32(ptr, &session_i->noncecoef);
     ptr += 32;
@@ -82,7 +115,7 @@ static int secp256k1_musig_session_load(const secp256k1_context* ctx, secp256k1_
     ptr += 4;
     session_i->fin_nonce_parity = *ptr;
     ptr += 1;
-    session_i->fin_nonce = ptr;
+    memcpy(session_i->fin_nonce, ptr, 32);
     ptr += 32;
     secp256k1_scalar_set_b32(&session_i->noncecoef, ptr, NULL);
     ptr += 32;
@@ -126,7 +159,7 @@ int secp256k1_musig_pubnonce_serialize(const secp256k1_context* ctx, unsigned ch
         size_t size = 33;
         ret = secp256k1_eckey_pubkey_serialize(&ge[i], &out66[33*i], &size, 1);
         /* serialize must succeed because the point was just loaded */
-        VERIFY_CHECK(ret);
+        VERIFY_CHECK(ret && size == 33);
     }
     return 1;
 }
@@ -149,8 +182,6 @@ int secp256k1_musig_pubnonce_parse(const secp256k1_context* ctx, secp256k1_musig
     }
     /* The group elements can not be infinity because they were just parsed */
     secp256k1_musig_pubnonce_save(nonce, ge);
-    secp256k1_ge_clear(&ge[0]);
-    secp256k1_ge_clear(&ge[1]);
     return 1;
 }
 
@@ -179,11 +210,9 @@ int secp256k1_musig_partial_sig_parse(const secp256k1_context* ctx, secp256k1_mu
 
     secp256k1_scalar_set_b32(&tmp, in32, &overflow);
     if (overflow) {
-        secp256k1_scalar_clear(&tmp);
         return 0;
     }
     secp256k1_musig_partial_sig_save(sig, &tmp);
-    secp256k1_scalar_clear(&tmp);
     return 1;
 }
 
@@ -206,7 +235,9 @@ static void secp256k1_nonce_function_musig(secp256k1_scalar *k, const unsigned c
 
     /* TODO: this doesn't have the same sidechannel resistance as the BIP340
      * nonce function because the seckey feeds directly into SHA. */
-    secp256k1_sha256_initialize_tagged(&sha, (unsigned char*)"MuSig/nonce", sizeof("MuSig/nonce"));
+
+    /* Subtract one from `sizeof` to avoid hashing the implicit null byte */
+    secp256k1_sha256_initialize_tagged(&sha, (unsigned char*)"MuSig/nonce", sizeof("MuSig/nonce") - 1);
     secp256k1_sha256_write(&sha, session_id, 32);
     extra_in[0] = key32;
     extra_in[1] = agg_pk32;
@@ -229,7 +260,7 @@ static void secp256k1_nonce_function_musig(secp256k1_scalar *k, const unsigned c
         unsigned char buf[32];
         secp256k1_sha256_initialize(&sha);
         secp256k1_sha256_write(&sha, seed, 32);
-        secp256k1_sha256_write(&sha, &i, 1);
+        secp256k1_sha256_write(&sha, &i, sizeof(i));
         secp256k1_sha256_finalize(&sha, buf);
         secp256k1_scalar_set_b32(&k[i], buf, NULL);
     }
@@ -242,6 +273,7 @@ int secp256k1_musig_nonce_gen(const secp256k1_context* ctx, secp256k1_musig_secn
     int i;
     unsigned char pk_ser[32];
     unsigned char *pk_ser_ptr = NULL;
+    int ret = 1;
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(secnonce != NULL);
@@ -250,35 +282,40 @@ int secp256k1_musig_nonce_gen(const secp256k1_context* ctx, secp256k1_musig_secn
     memset(pubnonce, 0, sizeof(*pubnonce));
     ARG_CHECK(session_id32 != NULL);
     ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
+    if (seckey == NULL) {
+        /* Check in constant time that the session_id is not 0 as a
+         * defense-in-depth measure that may protect against a faulty RNG. */
+        unsigned char acc = 0;
+        for (i = 0; i < 32; i++) {
+            acc |= session_id32[i];
+        }
+        ret &= !!acc;
+        memset(&acc, 0, sizeof(acc));
+    }
 
     /* Check that the seckey is valid to be able to sign for it later. */
     if (seckey != NULL) {
         secp256k1_scalar sk;
-        int ret;
-        ret = secp256k1_scalar_set_b32_seckey(&sk, seckey);
-        /* The declassified return value indicates the validity of the seckey.
-         * If this function is called correctly it is always 1. (Note:
-         * declassify was only required for valgrind_ctime_test build with
-         * USE_ASM_X86_64=no. */
-        secp256k1_declassify(ctx, &ret, sizeof(ret));
-        ARG_CHECK(ret);
+        ret &= secp256k1_scalar_set_b32_seckey(&sk, seckey);
         secp256k1_scalar_clear(&sk);
     }
 
     if (keyagg_cache != NULL) {
-        int ret;
+        int ret_tmp;
         if (!secp256k1_keyagg_cache_load(ctx, &cache_i, keyagg_cache)) {
             return 0;
         }
-        ret = secp256k1_xonly_ge_serialize(pk_ser, &cache_i.pk);
+        ret_tmp = secp256k1_xonly_ge_serialize(pk_ser, &cache_i.pk);
         /* Serialization can not fail because the loaded point can not be infinity. */
-        VERIFY_CHECK(ret);
+        VERIFY_CHECK(ret_tmp);
         pk_ser_ptr = pk_ser;
     }
     secp256k1_nonce_function_musig(k, session_id32, seckey, msg32, pk_ser_ptr, extra_input32);
     VERIFY_CHECK(!secp256k1_scalar_is_zero(&k[0]));
     VERIFY_CHECK(!secp256k1_scalar_is_zero(&k[1]));
+    VERIFY_CHECK(!secp256k1_scalar_eq(&k[0], &k[1]));
     secp256k1_musig_secnonce_save(secnonce, k);
+    secp256k1_musig_secnonce_invalidate(ctx, secnonce, !ret);
 
     for (i = 0; i < 2; i++) {
         secp256k1_gej nonce_ptj;
@@ -287,9 +324,9 @@ int secp256k1_musig_nonce_gen(const secp256k1_context* ctx, secp256k1_musig_secn
         secp256k1_declassify(ctx, &nonce_pt[i], sizeof(nonce_pt));
         secp256k1_scalar_clear(&k[i]);
     }
-    /* nonce_pt can't be infinity because k != 0 */
+    /* nonce_pt won't be infinity because k != 0 with overwhelming probability */
     secp256k1_musig_pubnonce_save(pubnonce, nonce_pt);
-    return 1;
+    return ret;
 }
 
 static int secp256k1_musig_sum_nonces(const secp256k1_context* ctx, secp256k1_gej *summed_nonces, const secp256k1_musig_pubnonce * const* pubnonces, size_t n_pubnonces) {
@@ -315,7 +352,7 @@ int secp256k1_musig_nonce_agg(const secp256k1_context* ctx, secp256k1_musig_aggn
     secp256k1_gej aggnonce_ptj[2];
     secp256k1_ge aggnonce_pt[2];
     int i;
-
+    VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(aggnonce != NULL);
     ARG_CHECK(pubnonces != NULL);
     ARG_CHECK(n_pubnonces > 0);
@@ -345,7 +382,7 @@ int secp256k1_musig_nonce_agg(const secp256k1_context* ctx, secp256k1_musig_aggn
             secp256k1_ge_set_gej(&aggnonce_pt[i], &aggnonce_ptj[i]);
         }
     }
-    secp256k1_musig_pubnonce_save((secp256k1_musig_pubnonce*)aggnonce, aggnonce_pt);
+    secp256k1_musig_aggnonce_save(aggnonce, aggnonce_pt);
     return 1;
 }
 
@@ -357,10 +394,11 @@ static int secp256k1_musig_compute_noncehash(unsigned char *noncehash, secp256k1
 
     secp256k1_sha256_initialize(&sha);
     for (i = 0; i < 2; i++) {
-        size_t size = sizeof(buf);
+        size_t size;
         if (!secp256k1_eckey_pubkey_serialize(&aggnonce[i], buf, &size, 1)) {
             return 0;
         }
+        VERIFY_CHECK(size == sizeof(buf));
         secp256k1_sha256_write(&sha, buf, sizeof(buf));
     }
     secp256k1_sha256_write(&sha, agg_pk32, 32);
@@ -380,7 +418,7 @@ static int secp256k1_musig_nonce_process_internal(int *fin_nonce_parity, unsigne
     if (!secp256k1_musig_compute_noncehash(noncehash, aggnonce, agg_pk32, msg)) {
         return 0;
     }
-    /* aggnonce = aggnonces[0] + b*aggnonces[1] */
+    /* fin_nonce = aggnonce[0] + b*aggnonce[1] */
     secp256k1_scalar_set_b32(b, noncehash, NULL);
     secp256k1_ecmult(&fin_nonce_ptj, &aggnoncej[1], b, NULL);
     secp256k1_gej_add_ge(&fin_nonce_ptj, &fin_nonce_ptj, &aggnonce[0]);
@@ -413,7 +451,7 @@ int secp256k1_musig_nonce_process(const secp256k1_context* ctx, secp256k1_musig_
     }
     secp256k1_fe_get_b32(agg_pk32, &cache_i.pk.x);
 
-    if (!secp256k1_musig_pubnonce_load(ctx, aggnonce_pt, (secp256k1_musig_pubnonce*)aggnonce)) {
+    if (!secp256k1_musig_aggnonce_load(ctx, aggnonce_pt, aggnonce)) {
         return 0;
     }
     secp256k1_gej_set_ge(&aggnonce_ptj[0], &aggnonce_pt[0]);
@@ -430,26 +468,27 @@ int secp256k1_musig_nonce_process(const secp256k1_context* ctx, secp256k1_musig_
         return 0;
     }
 
-    /* Compute messagehash and store in session cache */
     secp256k1_schnorrsig_challenge(&session_i.challenge, fin_nonce, msg32, 32, agg_pk32);
 
-    /* If there is a tweak then set `msghash` times `tweak` to the `s`-part.*/
+    /* If there is a tweak then set `challenge` times `tweak` to the `s`-part.*/
     secp256k1_scalar_set_int(&session_i.s_part, 0);
     if (!secp256k1_scalar_is_zero(&cache_i.tweak)) {
-        secp256k1_scalar e_tmp = session_i.challenge;
-        if (!secp256k1_eckey_privkey_tweak_mul(&e_tmp, &cache_i.tweak)) {
-            /* This mimics the behavior of secp256k1_ec_seckey_tweak_mul regarding
-                * tweak being 0. */
-            return 0;
-        }
+        secp256k1_scalar e_tmp;
+        secp256k1_scalar_mul(&e_tmp, &session_i.challenge, &cache_i.tweak);
         if (secp256k1_fe_is_odd(&cache_i.pk.y)) {
             secp256k1_scalar_negate(&e_tmp, &e_tmp);
         }
         secp256k1_scalar_add(&session_i.s_part, &session_i.s_part, &e_tmp);
     }
-    session_i.fin_nonce = fin_nonce;
+    memcpy(session_i.fin_nonce, fin_nonce, sizeof(session_i.fin_nonce));
     secp256k1_musig_session_save(session, &session_i);
     return 1;
+}
+
+void secp256k1_musig_partial_sign_clear(secp256k1_scalar *sk, secp256k1_scalar *k) {
+    secp256k1_scalar_clear(sk);
+    secp256k1_scalar_clear(&k[0]);
+    secp256k1_scalar_clear(&k[1]);
 }
 
 int secp256k1_musig_partial_sign(const secp256k1_context* ctx, secp256k1_musig_partial_sig *partial_sig, secp256k1_musig_secnonce *secnonce, const secp256k1_keypair *keypair, const secp256k1_musig_keyagg_cache *keyagg_cache, const secp256k1_musig_session *session) {
@@ -462,60 +501,87 @@ int secp256k1_musig_partial_sign(const secp256k1_context* ctx, secp256k1_musig_p
     int ret;
 
     VERIFY_CHECK(ctx != NULL);
-    ARG_CHECK(partial_sig != NULL);
-    ARG_CHECK(secnonce != NULL);
-    ARG_CHECK(keypair != NULL);
-    ARG_CHECK(keyagg_cache != NULL);
-    ARG_CHECK(session != NULL);
 
+    ARG_CHECK(secnonce != NULL);
     /* Fails if the magic doesn't match */
     ret = secp256k1_musig_secnonce_load(ctx, k, secnonce);
     /* Set nonce to zero to avoid nonce reuse. This will cause subsequent calls
      * of this function to fail */
     memset(secnonce, 0, sizeof(*secnonce));
     if (!ret) {
+        secp256k1_musig_partial_sign_clear(&sk, k);
         return 0;
     }
 
-    /* Obtain the signer's public key point and determine if the sk is
-     * negated before signing. That happens if the signer's pubkey has an odd
-     * Y coordinate XOR the MuSig-aggregate pubkey has an odd Y coordinate XOR
-     * (if tweaked) the internal key has an odd Y coordinate.
+    ARG_CHECK(partial_sig != NULL);
+    ARG_CHECK(keypair != NULL);
+    ARG_CHECK(keyagg_cache != NULL);
+    ARG_CHECK(session != NULL);
+
+    /* Obtain the signer's public key point and determine if the sk
+     * should be negated before signing.
      *
-     * This can be seen by looking at the sk key belonging to `agg_pk`.
-     * Let's define
-     * P' := mu_0*|P_0| + ... + mu_n*|P_n| where P_i is the i-th public key
-     * point x_i*G, mu_i is the i-th KeyAgg coefficient and |.| is a function
-     * that normalizes a point to an even Y by negating if necessary similar to
-     * secp256k1_extrakeys_ge_even_y. Then we have
-     * P := |P'| + t*G where t is the tweak.
-     * And the aggregate xonly public key is
-     * |P| = x*G
-     *      where x = sum_i(b_i*mu_i*x_i) + b'*t
-     *            b' = -1 if P != |P|, 1 otherwise
-     *            b_i = -1 if (P_i != |P_i| XOR P' != |P'| XOR P != |P|) and 1
-     *                otherwise.
+     * We use the following notation:
+     * - |.| is a function that normalizes a point to an even Y by negating
+     *       if necessary, similar to secp256k1_extrakeys_ge_even_y
+     * - mu_i is the i-th KeyAgg coefficient
+     * - t is the tweak
+     *
+     * The following public keys arise as intermediate steps:
+     * - P_i is the i-th public key with corresponding secret key x_i
+     *   P_i := x_i*G
+     * - P_agg is the aggregate public key
+     *   P_agg := mu_1*|P_1| + ... + mu_n*|P_n|
+     * - P_tweak is the tweaked aggregate public key
+     *   P_tweak := |P_agg| + t*G
+     *
+     * Note that our goal is to produce a partial signature corresponding to
+     * the final public key P_final = |P_tweak|.
+     *
+     * Define d_i, d_agg, and d_tweak so that:
+     * - |P_i| = d_i*P_i
+     * - |P_agg| = d_agg*P_agg
+     * - |P_tweak| = d_tweak*P_tweak
+     *
+     * In other words, d_i = 1 if P_i has even y coordinate, -1 otherwise;
+     * similarly for d_agg and d_tweak.
+     *
+     * The (xonly) final public key is P_final = |P_tweak|
+     *   = d_tweak*P_tweak
+     *   = d_tweak*(|P_agg| + t*G)
+     *   = d_tweak*(d_agg*P_agg + t*G)
+     *   = d_tweak*(d_agg*(mu_1*|P_1| + ... + mu_n*|P_n|) + t*G)
+     *   = d_tweak*(d_agg*(d_1*mu_1*P_1 + ... + d_n*mu_n*P_n) + t*G)
+     *   = (sum((d_tweak*d_agg*d_i)*mu_i*x_i) + d_tweak*t)*G
+     *
+     * Thus whether signer i should use the negated x_i depends on the product
+     * d_tweak*d_agg*d_i. In other words, negate if and only if the following
+     * holds:
+     *   (P_i has odd y) XOR (P_agg has odd y) XOR (P_tweak has odd y)
      */
     if (!secp256k1_keypair_load(ctx, &sk, &pk, keypair)) {
+        secp256k1_musig_partial_sign_clear(&sk, k);
         return 0;
     }
     if (!secp256k1_keyagg_cache_load(ctx, &cache_i, keyagg_cache)) {
+        secp256k1_musig_partial_sign_clear(&sk, k);
         return 0;
     }
     secp256k1_fe_normalize_var(&pk.y);
-    if((secp256k1_fe_is_odd(&pk.y)
-            + secp256k1_fe_is_odd(&cache_i.pk.y)
-            + cache_i.internal_key_parity)
-            % 2 == 1) {
+    if ((secp256k1_fe_is_odd(&pk.y)
+         != secp256k1_fe_is_odd(&cache_i.pk.y))
+         != cache_i.internal_key_parity) {
         secp256k1_scalar_negate(&sk, &sk);
     }
 
     /* Multiply KeyAgg coefficient */
     secp256k1_fe_normalize_var(&pk.x);
+    /* TODO Cache mu */
     secp256k1_musig_keyaggcoef(&mu, &cache_i, &pk.x);
     secp256k1_scalar_mul(&sk, &sk, &mu);
 
     if (!secp256k1_musig_session_load(ctx, &session_i, session)) {
+        secp256k1_musig_partial_sign_clear(&sk, k);
         return 0;
     }
     if (session_i.fin_nonce_parity) {
@@ -529,9 +595,7 @@ int secp256k1_musig_partial_sign(const secp256k1_context* ctx, secp256k1_musig_p
     secp256k1_scalar_add(&k[0], &k[0], &k[1]);
     secp256k1_scalar_add(&s, &s, &k[0]);
     secp256k1_musig_partial_sig_save(partial_sig, &s);
-    secp256k1_scalar_clear(&sk);
-    secp256k1_scalar_clear(&k[0]);
-    secp256k1_scalar_clear(&k[1]);
+    secp256k1_musig_partial_sign_clear(&sk, k);
     return 1;
 }
 
@@ -544,7 +608,6 @@ int secp256k1_musig_partial_sig_verify(const secp256k1_context* ctx, const secp2
     secp256k1_gej rj;
     secp256k1_gej tmp;
     secp256k1_ge pkp;
-    int i;
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(partial_sig != NULL);
@@ -558,11 +621,9 @@ int secp256k1_musig_partial_sig_verify(const secp256k1_context* ctx, const secp2
     }
 
     /* Compute "effective" nonce rj = aggnonce[0] + b*aggnonce[1] */
-    /* TODO: use multiexp */
-    for (i = 0; i < 2; i++) {
-        if (!secp256k1_musig_pubnonce_load(ctx, nonce_pt, pubnonce)) {
-            return 0;
-        }
+    /* TODO: use multiexp to compute -s*G + e*pubkey + aggnonce[0] + b*aggnonce[1] */
+    if (!secp256k1_musig_pubnonce_load(ctx, nonce_pt, pubnonce)) {
+        return 0;
     }
     secp256k1_gej_set_ge(&rj, &nonce_pt[1]);
     secp256k1_ecmult(&rj, &rj, &session_i.noncecoef, NULL);
@@ -574,17 +635,18 @@ int secp256k1_musig_partial_sig_verify(const secp256k1_context* ctx, const secp2
     if (!secp256k1_keyagg_cache_load(ctx, &cache_i, keyagg_cache)) {
         return 0;
     }
-    /* Multiplying the messagehash by the KeyAgg coefficient is equivalent
+    /* Multiplying the challenge by the KeyAgg coefficient is equivalent
      * to multiplying the signer's public key by the coefficient, except
      * much easier to do. */
     secp256k1_musig_keyaggcoef(&mu, &cache_i, &pkp.x);
     secp256k1_scalar_mul(&e, &session_i.challenge, &mu);
 
     /* If the MuSig-aggregate point has an odd Y coordinate, the signers will
-     * sign for the negation of their individual xonly public key such that the
-     * aggregate signature is valid for the MuSig aggregated xonly key. If the
-     * MuSig-aggregate point was tweaked then `e` is negated if the aggregate key
-     * has an odd Y coordinate XOR the internal key has an odd Y coordinate.*/
+     * sign for the negation of their individual xonly public key. If the
+     * aggregate key is untweaked, then internal_key_parity is 0, so `e` is
+     * negated exactly when the aggregate key parity is odd. If the aggregate
+     * key is tweaked, then negation happens when the aggregate key has an odd Y
+     * coordinate XOR the internal key has an odd Y coordinate.*/
     if (secp256k1_fe_is_odd(&cache_i.pk.y)
             != cache_i.internal_key_parity) {
         secp256k1_scalar_negate(&e, &e);

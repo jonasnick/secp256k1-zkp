@@ -7,6 +7,13 @@
 #ifndef SECP256K1_MODULE_MUSIG_KEYAGG_H
 #define SECP256K1_MODULE_MUSIG_KEYAGG_H
 
+#include "../../../include/secp256k1.h"
+#include "../../../include/secp256k1_musig.h"
+
+#include "../../field.h"
+#include "../../group.h"
+#include "../../scalar.h"
+
 typedef struct {
     secp256k1_ge pk;
     secp256k1_fe second_pk_x;

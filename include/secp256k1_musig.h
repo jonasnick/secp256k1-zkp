@@ -17,7 +17,7 @@ extern "C" {
  *
  * The module also supports BIP-341 ("Taproot") public key tweaking and adaptor
  * signatures as described in
- * https://github.com/ElementsProject/scriptless-scripts/pull/24
+ * https://github.com/ElementsProject/scriptless-scripts/pull/24.
  *
  * It is recommended to read the documentation in this include file carefully.
  * Further notes on API usage can be found in src/modules/musig/musig.md
@@ -33,16 +33,15 @@ extern "C" {
 /** Opaque data structures
  *
  *  The exact representation of data inside is implementation defined and not
- *  guaranteed to be portable between different platforms or versions. It can,
- *  however, be safely copied/moved. If you need to convert to a format suitable
- *  for storage, transmission, or comparison, use the corresponding
- *  serialization and parsing functions.
+ *  guaranteed to be portable between different platforms or versions. If you
+ *  need to convert to a format suitable for storage, transmission, or
+ *  comparison, use the corresponding serialization and parsing functions.
  */
 
 /** Opaque data structure that caches information about public key aggregation.
  *
- *  Guaranteed to be 165 bytes in size. No serialization and parsing functions
- *  (yet).
+ *  Guaranteed to be 165 bytes in size. It can be safely copied/moved. No
+ *  serialization and parsing functions (yet).
  */
 typedef struct {
     unsigned char data[165];
@@ -69,8 +68,8 @@ typedef struct {
 
 /** Opaque data structure that holds a signer's public nonce.
 *
-*  Guaranteed to be 132 bytes in size. Serialized and parsed with
-*  `musig_pubnonce_serialize` and `musig_pubnonce_parse`.
+*  Guaranteed to be 132 bytes in size. It can be safely copied/moved. Serialized
+*  and parsed with `musig_pubnonce_serialize` and `musig_pubnonce_parse`.
 */
 typedef struct {
     unsigned char data[132];
@@ -78,17 +77,19 @@ typedef struct {
 
 /** Opaque data structure that holds an aggregate public nonce.
  *
- *  Guaranteed to be 132 bytes in size. Serialized and parsed with
- *  `musig_aggnonce_serialize` and `musig_aggnonce_parse`.
+ *  Guaranteed to be 132 bytes in size. It can be safely copied/moved.
+ *  Serialized and parsed with `musig_aggnonce_serialize` and
+ *  `musig_aggnonce_parse`.
  */
 typedef struct {
     unsigned char data[132];
 } secp256k1_musig_aggnonce;
 
-/** Opaque data structure that holds a cache for a MuSig session.
+/** Opaque data structure that holds a MuSig session.
  *
- *  This structure is not necessarily required to be kept secret. Guaranteed to
- *  be 133 bytes in size. No serialization and parsing functions (yet).
+ *  This structure is not required to be kept secret for the signing protocol to
+ *  be secure. Guaranteed to be 133 bytes in size. It can be safely
+ *  copied/moved. No serialization and parsing functions (yet).
  */
 typedef struct {
     unsigned char data[133];
@@ -155,7 +156,7 @@ SECP256K1_API int secp256k1_musig_aggnonce_serialize(
     const secp256k1_musig_aggnonce* nonce
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
-/** Serialize a MuSig partial signature or adaptor signature
+/** Serialize a MuSig partial signature
  *
  *  Returns: 1 when the signature could be serialized, 0 otherwise
  *  Args:    ctx: a secp256k1 context object
@@ -267,11 +268,12 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_pubkey_tweak_add(
  *  MuSig differs from regular Schnorr signing in that implementers _must_ take
  *  special care to not reuse a nonce. This can be ensured by following these rules:
  *
- *  1. Each call to this function must have a unique session_id32.
- *     If you do not provide a seckey, session_id32 _must_ be UNIFORMLY RANDOM.
- *     If you do provide a seckey, session_id32 can instead be a counter (that
- *     must never repeat!). However, it is recommended to always choose
- *     session_id32 uniformly at random.
+ *  1. Each call to this function must have a UNIQUE session_id32 that must NOT BE
+ *     REUSED in subsequent calls to this function.
+ *     If you do not provide a seckey, session_id32 _must_ be UNIFORMLY RANDOM
+ *     AND KEPT SECRET (even from other signers). If you do provide a seckey,
+ *     session_id32 can instead be a counter (that must never repeat!). However,
+ *     it is recommended to always choose session_id32 uniformly at random.
  *  2. If you already know the seckey, message or aggregate public key
  *     cache, they can be optionally provided to derive the nonce and increase
  *     misuse-resistance. The extra_input32 argument can be used to provide
@@ -287,9 +289,9 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_pubkey_tweak_add(
  *  Args:         ctx: pointer to a context object, initialized for signing
  *  Out:     secnonce: pointer to a structure to store the secret nonce
  *           pubnonce: pointer to a structure to store the public nonce
- *  In:  session_id32: a 32-byte session_id32 as explained above. Must be
- *                     uniformly random unless you really know what you are
- *                     doing.
+ *  In:  session_id32: a 32-byte session_id32 as explained above. Must be unique to this
+ *                     call to secp256k1_musig_nonce_gen and must be uniformly random
+ *                     unless you really know what you are doing.
  *             seckey: the 32-byte secret key that will later be used for signing, if
  *                     already known (can be NULL)
  *              msg32: the 32-byte message that will later be signed, if already known
@@ -375,11 +377,12 @@ SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_nonce_process(
  *  Args:         ctx: pointer to a context object
  *  Out:  partial_sig: pointer to struct to store the partial signature
  *  In/Out:  secnonce: pointer to the secnonce struct created in
- *                     musig_nonce_gen
+ *                     musig_nonce_gen that has been never used in a
+ *                     partial_sign call before
  *  In:       keypair: pointer to keypair to sign the message with
  *       keyagg_cache: pointer to the keyagg_cache that was output when the
  *                     aggregate public key for this session
- *      session: pointer to the session that was created with
+ *            session: pointer to the session that was created with
  *                     musig_nonce_process
  */
 SECP256K1_API int secp256k1_musig_partial_sign(
