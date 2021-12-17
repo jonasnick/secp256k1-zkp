@@ -392,7 +392,7 @@ static int secp256k1_musig_compute_noncehash(unsigned char *noncehash, secp256k1
     secp256k1_sha256 sha;
     int i;
 
-    secp256k1_sha256_initialize(&sha);
+    secp256k1_sha256_initialize_tagged(&sha, (unsigned char*)"MuSig/noncecoef", sizeof("MuSig/noncecoef") - 1);
     for (i = 0; i < 2; i++) {
         size_t size;
         if (!secp256k1_eckey_pubkey_serialize(&aggnonce[i], buf, &size, 1)) {
