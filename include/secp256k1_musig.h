@@ -245,19 +245,19 @@ SECP256K1_API int secp256k1_musig_pubkey_agg(
  *  Out:   output_pubkey: pointer to a public key to store the result. Will be set
  *                        to an invalid value if this function returns 0. If you
  *                        do not need it, this arg can be NULL.
- *               tweak32: pointer to a 32-byte tweak. If the tweak is invalid
+ *  In/Out: keyagg_cache: pointer to a `musig_keyagg_cache` struct initialized by
+ *                       `musig_pubkey_agg`
+ *  In:          tweak32: pointer to a 32-byte tweak. If the tweak is invalid
  *                        according to secp256k1_ec_seckey_verify, this function
  *                        returns 0. For uniformly random 32-byte arrays the
  *                        chance of being invalid is negligible (around 1 in
  *                        2^128).
- *  In/Out: keyagg_cache: pointer to a `musig_keyagg_cache` struct initialized by
- *                       `musig_pubkey_agg`
  */
 SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_musig_pubkey_tweak_add(
     const secp256k1_context* ctx,
     secp256k1_pubkey *output_pubkey,
-    const unsigned char *tweak32,
-    secp256k1_musig_keyagg_cache *keyagg_cache
+    secp256k1_musig_keyagg_cache *keyagg_cache,
+    const unsigned char *tweak32
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
 /** Starts a signing session by generating a nonce
@@ -456,7 +456,7 @@ SECP256K1_API int secp256k1_musig_partial_sig_agg(
 SECP256K1_API int secp256k1_musig_nonce_parity(
     const secp256k1_context* ctx,
     int *nonce_parity,
-    secp256k1_musig_session *session
+    const secp256k1_musig_session *session
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
 /** Converts a pre-signature that misses the adaptor into a full signature

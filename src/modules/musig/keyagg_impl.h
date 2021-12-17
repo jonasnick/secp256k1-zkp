@@ -241,7 +241,7 @@ int secp256k1_musig_pubkey_agg(const secp256k1_context* ctx, secp256k1_scratch_s
     return 1;
 }
 
-int secp256k1_musig_pubkey_tweak_add(const secp256k1_context* ctx, secp256k1_pubkey *output_pubkey, const unsigned char *tweak32, secp256k1_musig_keyagg_cache *keyagg_cache) {
+int secp256k1_musig_pubkey_tweak_add(const secp256k1_context* ctx, secp256k1_pubkey *output_pubkey, secp256k1_musig_keyagg_cache *keyagg_cache, const unsigned char *tweak32) {
     secp256k1_keyagg_cache_internal cache_i;
     int overflow = 0;
     secp256k1_scalar tweak;
