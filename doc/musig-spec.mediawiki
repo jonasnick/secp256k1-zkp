@@ -115,6 +115,13 @@ The algorithm ''NonceAgg(pubnonce<sub>1..u</sub>)'' is defined as:
 ** Let ''R<sub>i</sub> = R'<sub>i</sub>'' if not ''is_infinite(R'<sub>i</sub>)'', otherwise let R<sub>i</sub> = G''
 * Return ''aggnonce = cbytes(R<sub>1</sub>) || cbytes(R<sub>2</sub>)''
 
+Note: If ''is_infinite(R'<sub>i</sub>)'' there is at least one dishonest signer.
+If we would fail here, we will never be able to determine who it is.
+Therefore, we should continue such that the culprit is revealed when collecting and verifying partial signatures.
+However, dealing with the point at infinity requires defining a serialization and may require extra code complexity in implementations.
+Instead, we set the aggregate nonce to some arbitrary point, the generator.
+This is secure, because it only restricts the abilities of the attacker: an attacker that forces the sum of nonces to be infinity by sending some maliciously generated nonce pairs can be turned into an attacker that forces the sum to be the generator (by simply adding the generator to one of the malicious nonces), and this does not change the winning condition of the signature security game (EUF-CMA).
+
 ==== Signing ====
 
 Input:
