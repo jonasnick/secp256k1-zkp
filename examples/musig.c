@@ -56,7 +56,7 @@ int create_keypair(const secp256k1_context* ctx, struct signer_secrets *signer_s
  * and return the tweaked aggregate pk. */
 int tweak(const secp256k1_context* ctx, secp256k1_xonly_pubkey *agg_pk, secp256k1_musig_keyagg_cache *cache) {
     secp256k1_pubkey output_pk;
-    unsigned char ordinary_tweak[32] = "this could be a BIP32 tweak..";
+    unsigned char ordinary_tweak[32] = "this could be a BIP32 tweak....";
     unsigned char xonly_tweak[32] = "this could be a taproot tweak..";
 
 
@@ -76,7 +76,7 @@ int tweak(const secp256k1_context* ctx, secp256k1_xonly_pubkey *agg_pk, secp256k
     if (!secp256k1_musig_pubkey_xonly_tweak_add(ctx, &output_pk, cache, xonly_tweak)) {
         return 0;
     }
-    /* Note that if we wouldn't care about signing, we can arraive at the same
+    /* Note that if we wouldn't care about signing, we can arrive at the same
      * output_pk by providing the untweaked public key to
      * `secp256k1_xonly_pubkey_tweak_add` (after converting it to an xonly ubkey
      * if necessary with `secp256k1_xonly_pubkey_from_pubkey`). */

@@ -877,12 +877,12 @@ void musig_tweak_test(secp256k1_scratch_space *scratch) {
 
     /* Compute Pi = f(Pj) + tweaki*G where where j = i-1 and try signing for
      * that key. If xonly is set to true, the function f is normalizes the input
-     * point to have an even X-coordinate (ordinary "xonly-tweaking").
+     * point to have an even X-coordinate ("xonly-tweaking").
      * Otherwise, the function f is the identity function. */
     for (i = 1; i < N_TWEAKS; i++) {
         unsigned char tweak[32];
         int P_parity;
-        int xonly = secp256k1_testrand_int(2);
+        int xonly = secp256k1_testrand_bits(1);
 
         secp256k1_testrand256(tweak);
         if (xonly) {
