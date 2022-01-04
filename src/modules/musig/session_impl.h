@@ -553,7 +553,7 @@ int secp256k1_musig_partial_sign(const secp256k1_context* ctx, secp256k1_musig_p
      * Note that our goal is to produce a partial signature corresponding to
      * the final public key after m tweaking operations P_final = |P_agg[m]|.
      *
-     * Define d[i] for 1 <= i <= n-1 and d_agg[i] for 0 <= i <= m so that:
+     * Define d[i] for 0 <= i <= n-1 and d_agg[i] for 0 <= i <= m so that:
      * - |P[i]| = d[i]*P[i]
      * - f(i+1, P_agg[i]) = d_agg[i]*P_agg[i] for 0 <= i <= m - 1
      * - |P_agg[m]| = d_agg[m]*P_agg[m]
