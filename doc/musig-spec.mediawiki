@@ -162,7 +162,8 @@ The algorithm ''Sign(secnonce, sk, aggnonce, pk<sub>1..u</sub>, m)'' is defined 
 * Let ''mu = KeyAggCoeff(pk<sub>1..u</sub>, bytes(P))''
 * Let ''s = (k<sub>1</sub> + b⋅k<sub>2</sub> + e⋅mu⋅d) mod n''
 * Let ''psig = bytes(s)''
-* If ''PartialSigVerify(psig, pk<sub>1..u</sub>, pubnonce<sub>1..u</sub>, m, bytes(P))'' (see below) returns failure, abort<ref>Verifying the signature before leaving the signer prevents random or attacker provoked computation errors. This prevents publishing invalid signatures which may leak information about the secret key. It is recommended, but can be omitted if the computation cost is prohibitive.</ref>.
+* Let ''pubnonce = cbytes(cbytes(k'<sub>1</sub>⋅G) || cbytes(k'<sub>1</sub>⋅G))''
+* If ''PartialSigVerifyInternal(psig, pubnonce, aggnonce, pk<sub>1..u</sub>, bytes(P), m)'' (see below) returns failure, abort<ref>Verifying the signature before leaving the signer prevents random or attacker provoked computation errors. This prevents publishing invalid signatures which may leak information about the secret key. It is recommended, but can be omitted if the computation cost is prohibitive.</ref>.
 * Return partial signature ''psig
 
 ==== Partial Signature Verification ====
@@ -172,17 +173,30 @@ Input:
 * The number ''u'' of public nonces and public keys with ''0 < u < 2^32''
 * The public nonces ''pubnonce<sub>1..u</sub>'': ''u'' 66-byte arrays
 * The public keys ''pk<sub>1..u</sub>'': ''u'' 32-byte arrays
+* The message ''m'': a 32-byte array
+* The index of the signer ''i'' in the public nonces and public keys with ''0 < i <= u''
+
+The algorithm ''PartialSigVerify(psig, pubnonce<sub>1..u</sub>, pk<sub>1..u</sub>, m, i)'' is defined as:
+* Let ''aggnonce = NonceAgg(pubnonce<sub>1..u</sub>)''; fail if that fails
+* Ren ''PartialSigVerifyInternal(psig, pubnonce<sub>i</sub>, aggnonce, pk<sub>1..u</sub>, pk<sub>i</sub>, m)''
+* Return success iff no failure occurred before reaching this point.
+
+Input:
+* The partial signature ''psig'': a 32-byte array
+* The public nonce of the signer ''pubnonce'': a 66-byte array
+* The aggregate public nonce ''aggnonce'': a 66-byte array
+* The number ''u'' of public keys with ''0 < u < 2^32''
+* The public keys ''pk<sub>1..u</sub>'': ''u'' 32-byte arrays
 * The public key of the signer ''pk<sup>*</sup>'' (in ''pk<sub>1..u</sub>''): a 32-byte array
 * The message ''m'': a 32-byte array
 
-The algorithm ''PartialSigVerify(psig, pubnonce<sub>1..u</sub>, pk<sub>1..u</sub>, pk<sup>*</sup>, m)'' is defined as:
+The algorithm ''PartialSigVerifyInternal(psig, pubnonce, aggnonce, pk<sub>1..u</sub>, pk<sup>*</sup>, m)'' is defined as:
 * Let ''s = int(psig)''; fail if ''s &ge; n''
-* Let ''aggnonce = NonceAgg(pubnonce<sub>1..u</sub>)''; fail if that fails
 * Let ''R<sub>1</sub> = pointc(aggnonce[0:33]), R<sub>2</sub> = pointc(aggnonce[33:66])''; fail if that fails
 * Let ''Q = KeyAgg(pk<sub>1..u</sub>)''; fail if that fails
 * Let ''b = int(hash<sub>MuSig/noncecoef</sub>(aggnonce || bytes(Q) || m)) mod n''
 * Let ''R = R<sub>1</sub> + b⋅R<sub>2</sub>''
-* Let ''R<sup>*</sup><sub>1</sub> = pointc(pubnonce<sub>i</sub>[0:33]), R<sup>*</sup><sub>2</sub> = pointc(pubnonce<sub>i</sub>[33:66])''
+* Let ''R<sup>*</sup><sub>1</sub> = pointc(pubnonce[0:33]), R<sup>*</sup><sub>2</sub> = pointc(pubnonce[33:66])''
 * Let ''R<sup>*</sup>' = R<sup>*</sup><sub>1</sub> + b⋅R<sup>*</sup><sub>2</sub>''
 * Let ''R<sup>*</sup> = R<sup>*</sup>' '' if ''has_even_y(R)'', otherwise let ''R<sup>*</sup> = -R<sup>*</sup>' ''
 * Let ''e = int(hash<sub>BIP0340/challenge</sub>(bytes(R) || bytes(Q) || m)) mod n''
