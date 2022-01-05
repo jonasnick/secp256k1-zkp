@@ -117,7 +117,7 @@ The algorithm ''NonceGen()'' is defined as:
 The algorithm ''NonceAgg(pubnonce<sub>1..u</sub>)'' is defined as:
 * For ''i = 1 .. 2'':
 ** For ''j = 1 .. u'':
-*** Let ''R<sub>i,j</sub> = pointc(pubnonce<sub>j</sub>[i*33:i*33+33])''; fail if that fails
+*** Let ''R<sub>i,j</sub> = pointc(pubnonce<sub>j</sub>[(i-1)*33:i*33])''; fail if that fails
 ** Let ''R'<sub>i</sub> = R<sub>i,1</sub> + R<sub>i,2</sub> + ... + R<sub>i,u</sub>''
 ** Let ''R<sub>i</sub> = R'<sub>i</sub>'' if not ''is_infinite(R'<sub>i</sub>)'', otherwise let R<sub>i</sub> = G''
 * Return ''aggnonce = cbytes(R<sub>1</sub>) || cbytes(R<sub>2</sub>)''
@@ -148,7 +148,7 @@ Input:
 The algorithm ''Sign(secnonce, sk, aggnonce, pk<sub>1..u</sub>, m)'' is defined as:
 * Let ''R<sub>1</sub> = pointc(aggnonce[0:33]), R<sub>2</sub> = pointc(aggnonce[33:66])''; fail if that fails
 * Let ''Q = KeyAgg(pk<sub>1..u</sub>)''; fail if that fails
-* Let ''b = int(hash<sub>MuSig/noncecoef</sub>(aggnonce,bytes(Q),m)) mod n''
+* Let ''b = int(hash<sub>MuSig/noncecoef</sub>(aggnonce || bytes(Q) || m)) mod n''
 * Let ''R = R<sub>1</sub> + b⋅R<sub>2</sub>''
 * Fail if ''is_infinite(R)''
 * Let ''k'<sub>1</sub> = int(secnonce[0:32]), k'<sub>2</sub> = int(secnonce[32:64])''
@@ -180,7 +180,7 @@ The algorithm ''PartialSigVerify(psig, pubnonce<sub>1..u</sub>, pk<sub>1..u</sub
 * Let ''aggnonce = NonceAgg(pubnonce<sub>1..u</sub>)''; fail if that fails
 * Let ''R<sub>1</sub> = pointc(aggnonce[0:33]), R<sub>2</sub> = pointc(aggnonce[33:66])''; fail if that fails
 * Let ''Q = KeyAgg(pk<sub>1..u</sub>)''; fail if that fails
-* Let ''b = int(hash<sub>MuSig/noncecoef</sub>(aggnonce,bytes(Q),m)) mod n''
+* Let ''b = int(hash<sub>MuSig/noncecoef</sub>(aggnonce || bytes(Q) || m)) mod n''
 * Let ''R = R<sub>1</sub> + b⋅R<sub>2</sub>''
 * Let ''R<sup>*</sup><sub>1</sub> = pointc(pubnonce<sub>i</sub>[0:33]), R<sup>*</sup><sub>2</sub> = pointc(pubnonce<sub>i</sub>[33:66])''
 * Let ''R<sup>*</sup>' = R<sup>*</sup><sub>1</sub> + b⋅R<sup>*</sup><sub>2</sub>''
