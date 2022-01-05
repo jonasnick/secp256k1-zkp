@@ -162,7 +162,7 @@ The algorithm ''Sign(secnonce, sk, aggnonce, pk<sub>1..u</sub>, m)'' is defined 
 * Let ''mu = KeyAggCoeff(pk<sub>1..u</sub>, bytes(P))''
 * Let ''s = (k<sub>1</sub> + b⋅k<sub>2</sub> + e⋅mu⋅d) mod n''
 * Let ''psig = bytes(s)''
-* Let ''pubnonce = cbytes(cbytes(k'<sub>1</sub>⋅G) || cbytes(k'<sub>1</sub>⋅G))''
+* Let ''pubnonce = cbytes(k'<sub>1</sub>⋅G) || cbytes(k'<sub>1</sub>⋅G)''
 * If ''PartialSigVerifyInternal(psig, pubnonce, aggnonce, pk<sub>1..u</sub>, bytes(P), m)'' (see below) returns failure, abort<ref>Verifying the signature before leaving the signer prevents random or attacker provoked computation errors. This prevents publishing invalid signatures which may leak information about the secret key. It is recommended, but can be omitted if the computation cost is prohibitive.</ref>.
 * Return partial signature ''psig
 
@@ -180,6 +180,8 @@ The algorithm ''PartialSigVerify(psig, pubnonce<sub>1..u</sub>, pk<sub>1..u</sub
 * Let ''aggnonce = NonceAgg(pubnonce<sub>1..u</sub>)''; fail if that fails
 * Ren ''PartialSigVerifyInternal(psig, pubnonce<sub>i</sub>, aggnonce, pk<sub>1..u</sub>, pk<sub>i</sub>, m)''
 * Return success iff no failure occurred before reaching this point.
+
+===== PartialSigVerifyInternal =====
 
 Input:
 * The partial signature ''psig'': a 32-byte array
