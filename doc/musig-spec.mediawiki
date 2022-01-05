@@ -157,7 +157,7 @@ The algorithm ''Sign(secnonce, sk, aggnonce, pk<sub>1..u</sub>, m)'' is defined 
 * Let ''d' = int(sk)''
 * Fail if ''d' = 0'' or ''d' &ge; n''
 * Let ''P = d'⋅G''
-* Let ''d = d' '' if ''has_even_y(P) `XOR` has_even_y(Q)'', otherwise let ''d = n - d' ''
+* Let ''d = n - d' '' if ''has_even_y(P) `XOR` has_even_y(Q)'', otherwise let ''d = d' ''
 * Let ''e = int(hash<sub>BIP0340/challenge</sub>(bytes(R) || bytes(Q) || m)) mod n''
 * Let ''mu = KeyAggCoeff(pk<sub>1..u</sub>, bytes(P))''
 * Let ''s = (k<sub>1</sub> + b⋅k<sub>2</sub> + e⋅mu⋅d) mod n''
