@@ -546,15 +546,22 @@ static void test_rangeproof(void) {
         CHECK(!secp256k1_rangeproof_verify(ctx, &minv, &maxv, &commit2, proof, len, NULL, 0, secp256k1_generator_h));
     }
     {
-        /* Large values for value and minimum value should make signing fail */
+        /* Some large values for value and minimum value make signing fail */
         v = (uint64_t)INT64_MAX+1;
         vmin = 1;
         CHECK(secp256k1_pedersen_commit(ctx, &commit, blind, v, secp256k1_generator_h));
         CHECK(secp256k1_rangeproof_sign(ctx, proof, &len, vmin, &commit, blind, commit.data, 0, 0, v, NULL, 0, NULL, 0, secp256k1_generator_h) == 0);
+
         vmin = INT64_MAX;
         v = vmin;
         CHECK(secp256k1_pedersen_commit(ctx, &commit, blind, v, secp256k1_generator_h));
-        CHECK(secp256k1_rangeproof_sign(ctx, proof, &len, vmin, &commit, blind, commit.data, 0, 0, v, NULL, 0, NULL, 0, secp256k1_generator_h) == 0);
+        CHECK(secp256k1_rangeproof_sign(ctx, proof, &len, vmin, &commit, blind, commit.data, 0, 0, v, NULL, 0, NULL, 0, secp256k1_generator_h) == 1);
+        CHECK(secp256k1_rangeproof_verify(ctx, &minv, &maxv, &commit, proof, len, NULL, 0, secp256k1_generator_h));
+        CHECK(minv == vmin);
+        CHECK(maxv >= v);
+        CHECK(secp256k1_rangeproof_rewind(ctx, blindout, &vout, message, &mlen, commit.data, &minv, &maxv, &commit, proof, len, NULL, 0, secp256k1_generator_h));
+        CHECK(memcmp(blindout, blind, 32) == 0);
+        CHECK(vout == v);
     }
 }
 
