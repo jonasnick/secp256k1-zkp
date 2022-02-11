@@ -18,6 +18,7 @@ typedef struct {
     secp256k1_ge pk;
     secp256k1_fe second_pk_x;
     unsigned char pk_hash[32];
+    /* tweak is identical to value t in the in the specification. */
     secp256k1_scalar tweak;
     /* parity_factor is identical to g in the specification and therefore either
      * 1 or -1. */

@@ -292,9 +292,37 @@ static int secp256k1_musig_pubkey_tweak_add_internal(const secp256k1_context* ct
         return 0;
     }
     internal_parity = secp256k1_fe_is_odd(&cache_i.pk.y);
-    /* Negate internal key as per the definition of x-only tweaking. */
-    if (xonly && secp256k1_extrakeys_ge_even_y(&cache_i.pk)) {
-        secp256k1_scalar_negate(&cache_i.tweak, &cache_i.tweak);
+    if (internal_parity) {
+        if (xonly) {
+            /* Negate internal key as per the definition of x-only tweaking. */
+            secp256k1_fe_negate(&cache_i.pk.y, &cache_i.pk.y, 1);
+        } else {
+            /* To explain how cache_i.tweak is updated, let us refer to the
+             * number of tweaks that have happened before this call by v. The
+             * variable cache_i.tweak is equal to value t of the specification
+             * when calling KeyAgg with v tweaks. We want to set cache_i.tweak
+             * to a new value t' that is equal to the t value of KeyAgg with v+1
+             * tweaks. It holds that
+             *   t  = g[1]*...*g[v]*t[1] + ... + g[v]*t[v].
+             *   t' = g'[1]*...*g'[v]*g'[v+1]*t[1] + ... + g'[v]*g'[v+1]*t[v] + g'[v+1]*t[v+1]
+             *      = g'[v+1]*(t'' + t[v+1]).
+             * where
+             *   t'' = g'[1]*...*g'[v]*t[1] + ... + g'[v]*t[v]
+             * This code block sets cache_i.tweak to t''.
+             *
+             * According to the specification, we have
+             *     g'[i] = g[i] for 0 <= i <= v-1
+             * and therefore
+             *   t'' = g'[v](g'[1]*...*g'[v-1]*t[1] + ... + *t[v])
+             *       = g'[v]/g[v]*t.
+             * Moreover, the specification says that
+             *     g[v] = par_to_fac((Q[v].y & 1))
+             *     g'[v] = par_to_fac(xonly && (Q[v].y & 1))
+             * which implies t'' = -t if not xonly and variable internal_parity
+             * (= Q[v].y & 1) is 1. Otherwise, t'' = t.
+             */
+            secp256k1_scalar_negate(&cache_i.tweak, &cache_i.tweak);
+        }
     }
     secp256k1_scalar_add(&cache_i.tweak, &cache_i.tweak, &tweak);
     if (!secp256k1_eckey_pubkey_tweak_add(&cache_i.pk, &tweak)) {
@@ -326,6 +354,12 @@ static int secp256k1_musig_pubkey_tweak_add_internal(const secp256k1_context* ct
      */
     output_parfac = par_to_fac(secp256k1_fe_is_odd(&cache_i.pk.y));
     cache_i.parity_factor *= par_to_fac(!xonly && internal_parity) * output_parfac;
+    /* At this point, cache_i.tweak is equal to t'' + t[v+1] as defined above.
+     * Therefore, in order to set it to t', we multiply by g'[v+1].
+     */
+    if (output_parfac < 0) {
+        secp256k1_scalar_negate(&cache_i.tweak, &cache_i.tweak);
+    }
     secp256k1_keyagg_cache_save(keyagg_cache, &cache_i);
     if (output_pubkey != NULL) {
         secp256k1_pubkey_save(output_pubkey, &cache_i.pk);

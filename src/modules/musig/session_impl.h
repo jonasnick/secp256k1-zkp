@@ -461,9 +461,6 @@ int secp256k1_musig_nonce_process(const secp256k1_context* ctx, secp256k1_musig_
     if (!secp256k1_scalar_is_zero(&cache_i.tweak)) {
         secp256k1_scalar e_tmp;
         secp256k1_scalar_mul(&e_tmp, &session_i.challenge, &cache_i.tweak);
-        if (secp256k1_fe_is_odd(&cache_i.pk.y)) {
-            secp256k1_scalar_negate(&e_tmp, &e_tmp);
-        }
         secp256k1_scalar_add(&session_i.s_part, &session_i.s_part, &e_tmp);
     }
     memcpy(session_i.fin_nonce, fin_nonce, sizeof(session_i.fin_nonce));
