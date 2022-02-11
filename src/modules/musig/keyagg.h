@@ -19,7 +19,9 @@ typedef struct {
     secp256k1_fe second_pk_x;
     unsigned char pk_hash[32];
     secp256k1_scalar tweak;
-    int internal_key_parity;
+    /* parity_factor is identical to g in the specification and therefore either
+     * 1 or -1. */
+    int parity_factor;
 } secp256k1_keyagg_cache_internal;
 
 /* Requires that the saved point is not infinity */

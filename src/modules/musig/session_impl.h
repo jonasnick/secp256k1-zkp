@@ -513,21 +513,14 @@ int secp256k1_musig_partial_sign(const secp256k1_context* ctx, secp256k1_musig_p
         return 0;
     }
     secp256k1_fe_normalize_var(&pk.y);
-    /* The specification requires that the secret key is multiplied by
-     * g*gp = g[0]*...g[v]*gp.
-     * Since all factors are 1 or -1, the key is negated if and only if
-     *   (P[i] has odd y) XOR (is_xonly_t[1] and Q[0] has odd y)
-     *     XOR (is_xonly_t[2] and Q[1] has odd y)
-     *     XOR ... XOR (is_xonly_t[v] and Q[v-1] has odd y)
-     *     XOR (Q[v] has odd y)
-     * which is equivalent to
-     *   secp256k1_fe_is_odd(&pk.y)
-     *     XOR cache_i.internal_key_parity
-     *     XOR secp256k1_fe_is_odd(&cache_i.pk.y)).
+    /* The specification requires that the secret key is multiplied by g*gp. The
+     * value g is equal to parity_factor and gp is -1 if
+     * secp256k1_fe_is_odd(&pk.y) and 1 otherwise. Therefore, multiplying by
+     * g*gp is equivalent to negating if
+     *     secp256k1_fe_is_odd(&pk.y) XOR (cache_i.parity_acc == -1).
      */
-    if ((secp256k1_fe_is_odd(&pk.y)
-         != secp256k1_fe_is_odd(&cache_i.pk.y))
-         != cache_i.internal_key_parity) {
+    if (secp256k1_fe_is_odd(&pk.y)
+          != (cache_i.parity_factor == -1)) {
         secp256k1_scalar_negate(&sk, &sk);
     }
 
@@ -600,13 +593,11 @@ int secp256k1_musig_partial_sig_verify(const secp256k1_context* ctx, const secp2
     secp256k1_scalar_mul(&e, &session_i.challenge, &mu);
 
     /* The specification requires that the public key is multiplied by g which
-     * is negative if and only if fe_is_odd(&cache_i.pk.y) XOR
-     * internal_key_parity. Instead of multiplying g with the public key, we
-     * negate e which will have the same end result, since e and the public key
-     * are multiplied later anyway.
+     * is equal to the parity_factor. Instead of multiplying g with the public
+     * key, we negate e which will have the same end result, since e and the
+     * public key are multiplied later anyway.
      */
-    if (secp256k1_fe_is_odd(&cache_i.pk.y)
-            != cache_i.internal_key_parity) {
+    if (cache_i.parity_factor < 0) {
         secp256k1_scalar_negate(&e, &e);
     }
 

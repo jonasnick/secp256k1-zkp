@@ -47,6 +47,16 @@ static void secp256k1_point_load(secp256k1_ge *ge, const unsigned char *data) {
     }
 }
 
+/* Turns a public key parity, which is 0 or 1, to 1 and -1 respectively. */
+SECP256K1_INLINE static int par_to_fac(int parity) {
+    return -2 * parity + 1;
+}
+
+/* Inverse of par_to_fac */
+SECP256K1_INLINE static int fac_to_par(int fac) {
+    return (fac * -1) > 0;
+}
+
 static const unsigned char secp256k1_musig_keyagg_cache_magic[4] = { 0xf4, 0xad, 0xbb, 0xdf };
 
 /* A keyagg cache consists of
@@ -55,7 +65,7 @@ static const unsigned char secp256k1_musig_keyagg_cache_magic[4] = { 0xf4, 0xad,
  * - 64 byte aggregate (and potentially tweaked) public key
  * - 32 byte X-coordinate of "second" public key (0 if not present)
  * - 32 byte hash of all public keys
- * - 1 byte the parity of the internal key (if tweaked, otherwise 0)
+ * - 1 byte parity_factor turned into a parity via fac_to_par
  * - 32 byte tweak
  */
 /* Requires that cache_i->pk is not infinity and cache_i->second_pk_x to be normalized. */
@@ -69,7 +79,7 @@ static void secp256k1_keyagg_cache_save(secp256k1_musig_keyagg_cache *cache, sec
     ptr += 32;
     memcpy(ptr, cache_i->pk_hash, 32);
     ptr += 32;
-    *ptr = cache_i->internal_key_parity;
+    *ptr = fac_to_par(cache_i->parity_factor);
     ptr += 1;
     secp256k1_scalar_get_b32(ptr, &cache_i->tweak);
 }
@@ -84,7 +94,7 @@ static int secp256k1_keyagg_cache_load(const secp256k1_context* ctx, secp256k1_k
     ptr += 32;
     memcpy(cache_i->pk_hash, ptr, 32);
     ptr += 32;
-    cache_i->internal_key_parity = *ptr & 1;
+    cache_i->parity_factor = par_to_fac(*ptr & 1);
     ptr += 1;
     secp256k1_scalar_set_b32(&cache_i->tweak, ptr, NULL);
     return 1;
@@ -233,6 +243,9 @@ int secp256k1_musig_pubkey_agg(const secp256k1_context* ctx, secp256k1_scratch_s
         secp256k1_keyagg_cache_internal cache_i = { 0 };
         cache_i.pk = pkp;
         cache_i.second_pk_x = ecmult_data.second_pk_x;
+        /* Make parity_factor equal to value g[v] in the spec for v = 0
+         * tweaks. */
+        cache_i.parity_factor = par_to_fac(secp256k1_fe_is_odd(&pkp.y));
         memcpy(cache_i.pk_hash, ecmult_data.pk_hash, sizeof(cache_i.pk_hash));
         secp256k1_keyagg_cache_save(keyagg_cache, &cache_i);
     }
@@ -262,6 +275,7 @@ static int secp256k1_musig_pubkey_tweak_add_internal(const secp256k1_context* ct
     secp256k1_keyagg_cache_internal cache_i;
     int overflow = 0;
     secp256k1_scalar tweak;
+    int internal_parity, output_parfac;
 
     VERIFY_CHECK(ctx != NULL);
     if (output_pubkey != NULL) {
@@ -277,8 +291,9 @@ static int secp256k1_musig_pubkey_tweak_add_internal(const secp256k1_context* ct
     if (overflow) {
         return 0;
     }
+    internal_parity = secp256k1_fe_is_odd(&cache_i.pk.y);
+    /* Negate internal key as per the definition of x-only tweaking. */
     if (xonly && secp256k1_extrakeys_ge_even_y(&cache_i.pk)) {
-        cache_i.internal_key_parity ^= 1;
         secp256k1_scalar_negate(&cache_i.tweak, &cache_i.tweak);
     }
     secp256k1_scalar_add(&cache_i.tweak, &cache_i.tweak, &tweak);
@@ -287,6 +302,30 @@ static int secp256k1_musig_pubkey_tweak_add_internal(const secp256k1_context* ct
     }
     /* eckey_pubkey_tweak_add fails if cache_i.pk is infinity */
     VERIFY_CHECK(!secp256k1_ge_is_infinity(&cache_i.pk));
+    secp256k1_fe_normalize_var(&cache_i.pk.y);
+
+    /* To explain how parity_factor is updated, let us refer to the number of
+     * tweaks that have happened before this call by v. The The parity_factor is
+     * equal to g, which is g[0]*...*g[v] after v tweaks according to the
+     * specification. After v+1 tweaks we have a new parity_factor' =
+     * g'[0]*...*g'[v]*g'[v+1]. Our goal is to find a factor f such that
+     * parity_factor' = f*parity_factor.
+     *
+     * As per the specification, we have
+     *     g'[i] = g[i] for 0 <= i <= v-1.
+     *     g'[v] = par_to_fac(xonly && (Q[v].y & 1))
+     *     g'[v+1] = par_to_fac(Q[v+1].y & 1)
+     * where Q[i] is defined as in the Tweak algorithm of the specification.
+     * Moreover, it holds that
+     *     g[v] * par_to_fac(!xonly && (Q[v].y & 1))
+     *       = par_to_fac((Q[v].y & 1) XOR (!xonly && (Q[v].y & 1)))
+     *       = par_to_fac(xonly && (Q[v].y & 1))
+     *       = g'[v].
+     * With output_parfac := g'[v+1] = par_to_fac(Q[v+1].y & 1), we have
+     *     f = par_to_fac(!xonly && (Q[v].y & 1)) * output_parfac.
+     */
+    output_parfac = par_to_fac(secp256k1_fe_is_odd(&cache_i.pk.y));
+    cache_i.parity_factor *= par_to_fac(!xonly && internal_parity) * output_parfac;
     secp256k1_keyagg_cache_save(keyagg_cache, &cache_i);
     if (output_pubkey != NULL) {
         secp256k1_pubkey_save(output_pubkey, &cache_i.pk);
