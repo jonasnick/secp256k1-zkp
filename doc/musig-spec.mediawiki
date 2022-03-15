@@ -225,19 +225,20 @@ The algorithm ''KeyAggCoeff(pk<sub>1..u</sub>, pk')'' is defined as:
 
 The algorithm ''Tweak(Q, tweak<sub>1..v</sub>, is_xonly_t<sub>1..v</sub>)'' is defined as:
 * Let ''Q<sub>0</sub> = Q''
+* Let ''g<sub>0</sub> = not has_even_y(Q)''
+* Let ''t<sub>0</sub> = 0''
 * For ''i = 1 .. v'':
-** If ''is_xonly_t<sub>i</sub>'' and ''not has_even_y(Q<sub>i-1</sub>)'':
-*** Let ''g<sub>i-1</sub> = -1''
-** Else: let ''g<sub>i-1</sub> = 1''
-** Let ''t<sub>i</sub> = int(tweak<sub>i</sub>)''; fail if ''t &ge; n''
-** Let ''Q<sub>i</sub> = g<sub>i-1</sub>⋅Q<sub>i-1</sub> + t<sub>i</sub>⋅G
-** Fail if ''is_infinite(Q<sub>i</sub>)''
-* Let ''g<sub>v</sub> = 1'' if ''has_even_y(Q<sub>v</sub>)'', otherwise let ''g<sub>v</sub> = -1''
-* Let ''g = g<sub>0</sub>⋅...⋅g<sub>v</sub>''
-* If ''v > 0'':
-** Let ''t = sum<sub>i=1</sub><sup>v</sup> t<sub>i</sub>⋅(prod<sub>j=i</sub><sup>v</sup> g<sub>j</sub> ) mod n''
-* Else: let ''t = 0''
-* Return ''Q<sub>v</sub>, g, t''
+** Let ''t'<sub>i</sub> = int(tweak<sub>i</sub>)''; fail if ''t<sub>i</sub> &ge; n''
+** Let ''Q'<sub>i</sub> = -Q<sub>i-1</sub> if ''is_xonly_t<sub>i</sub>'' and ''not has_even_y(Q<sub>i-1</sub>)'' otherwise let ''Q'<sub>i</sub> = Q<sub>i-1</sub>
+** Let ''Q<sub>i</sub> = Q'<sub>i</sub> + t'<sub>i</sub>⋅G''
+** If ''is_xonly_t<sub>i</sub>'' or ''not has_even_y(Q<sub>i-1</sub>)'':
+*** Let ''t"<sub>i</sub> = t<sub>i-1</sub> + t'<sub>i</sub> mod n''
+*** Let ''g'<sub>i</sub> = g<sub>i-1</sub>''
+** Else:
+*** Let ''t"<sub>i</sub> = n - t<sub>i-1</sub> + t'<sub>i</sub> mod n''
+*** Let ''g'<sub>i</sub> = not g<sub>i-1</sub>''
+** Let ''(t<sub>i</sub>, g<sub>i</sub>) = (t"<sub>i</sub>, g'<sub>i</sub>)'' if ''has_even_y(Q<sub>i</sub>)'' otherwise let ''(t<sub>i</sub>, g<sub>i</sub>) = (n - t"<sub>i</sub>, not g'<sub>i</sub>)''
+* Return ''Q<sub>v</sub>, g<sub>v</sub>, t<sub>v</sub>''
 
 ==== Nonce Generation ====
 
