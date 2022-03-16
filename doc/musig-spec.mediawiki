@@ -99,7 +99,7 @@ The goal is to produce a partial signature corresponding to the output of ''KeyA
 We define ''gp<sub>i</sub>'' for ''1 &le; i &le; u'' to be ''gp '' as computed in the ''Sign'' algorithm of the ''i''-th signer. It holds that
     ''P<sub>i</sub> = gp<sub>i</sub>⋅d'<sub>i</sub>⋅G''.
 
-For ''0 &le; i &le; v-1'', the ''Tweak'' algorithm sets ''g<sub>i</sub>'' to ''-1'' if and only if ''is_xonly_t<sub>i+1</sub>'' is true and ''Q<sub>i</sub>'' has an odd Y coordinate. Therefore, we have
+For ''0 &le; i &le; v-1'', the ''Sign'' and ''PartialSigVerify'' algorithm set ''g<sub>i</sub>'' to ''-1'' if and only if ''is_xonly_t<sub>i+1</sub>'' is true and ''Q<sub>i</sub>'' has an odd Y coordinate. Therefore, we have
     ''f(i) = g<sub>i</sub>⋅Q<sub>i</sub>'' for ''0 &le; i &le; v - 1''.
 
 Furthermore, the ''Tweak'' algorithm sets ''g<sub>v</sub>'' such that
