@@ -1,5 +1,5 @@
 <pre>
-  Title: MuSig Key Aggregation
+  Title: MuSig
   Author:
   Status: Draft
   License: BSD-2-Clause
@@ -10,7 +10,7 @@
 
 === Abstract ===
 
-This document describes MuSig Key Aggregation in libsecp256k1-zkp.
+This document proposes a standard for the MuSig2 protocol that supports ''tweaking''.
 
 === Copyright ===
 
