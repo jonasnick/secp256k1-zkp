@@ -85,11 +85,11 @@ Input:
 * The tweaks ''tweak<sub>1..v</sub>'': ''v'' 32-byte arrays
 * The tweak methods ''is_xonly_t<sub>1..v</sub>'' : ''v'' booleans
 
-The algorithm ''KeyAgg(pk<sub>1..u</sub>, tweak<sub>1..v</sub>, is_xonly_t<sub>1..v</sub>)'' is defined as:
+The algorithm '''''KeyAgg(pk<sub>1..u</sub>, tweak<sub>1..v</sub>, is_xonly_t<sub>1..v</sub>)''''' is defined as:
 * Let ''(Q,_,_) = KeyAggInternal(pk<sub>1..u</sub>, tweak<sub>1..v</sub>, is_xonly_t<sub>1..v</sub>)''; fail if that fails.
 * Return ''bytes(Q)''.
 
-The algorithm ''KeyAggInternal(pk<sub>1..u</sub>, tweak<sub>1..v</sub>, is_xonly_t<sub>1..v</sub>)'' is defined as:
+The algorithm '''''KeyAggInternal(pk<sub>1..u</sub>, tweak<sub>1..v</sub>, is_xonly_t<sub>1..v</sub>)''''' is defined as:
 * For ''i = 1 .. u'':
 ** Let ''a<sub>i</sub> = KeyAggCoeff(pk<sub>1..u</sub>, pk<sub>i</sub>)''.
 ** Let ''P<sub>i</sub> = point(pk<sub>i</sub>)''; fail if that fails.
@@ -101,22 +101,22 @@ The algorithm ''KeyAggInternal(pk<sub>1..u</sub>, tweak<sub>1..v</sub>, is_xonly
 ** Let ''(Q<sub>i</sub>, gacc<sub>i</sub>, tacc<sub>i</sub>) = Tweak(Q<sub>i-1</sub>, gacc<sub>i-1</sub>, tweak<sub>i</sub>, tacc<sub>i-1</sub>, is_xonly_t<sub>i</sub>)''; fail if that fails
 * Return ''(Q<sub>v</sub>, gacc<sub>v</sub>, tacc<sub>v</sub>)''.
 
-The algorithm ''HashKeys(pk<sub>1..u</sub>)'' is defined as:
+The algorithm '''''HashKeys(pk<sub>1..u</sub>)''''' is defined as:
 * Return ''hash<sub>KeyAgg list</sub>(pk<sub>1</sub> || pk<sub>2</sub> || ... || pk<sub>u</sub>)''
 
-The algorithm ''IsSecond(pk<sub>1..u</sub>, pk')'' is defined as:
+The algorithm '''''IsSecond(pk<sub>1..u</sub>, pk')''''' is defined as:
 * For ''j = 1 .. u'':
 ** If ''pk<sub>j</sub> &ne; pk<sub>1</sub>'':
 *** Return ''true'' if ''pk<sub>j</sub> = pk' '', otherwise return ''false''.
 * Return ''false''
 
-The algorithm ''KeyAggCoeff(pk<sub>1..u</sub>, pk')'' is defined as:
+The algorithm '''''KeyAggCoeff(pk<sub>1..u</sub>, pk')''''' is defined as:
 * Let ''L = HashKeys(pk<sub>1..u</sub>)''.
 * If ''IsSecond(pk<sub>1..u</sub>, pk')'':
 ** Return 1
 * Return ''int(hash<sub>KeyAgg coefficient</sub>(L || pk')) mod n''
 
-The algorithm ''Tweak(Q<sub>i-1</sub>, gacc<sub>i-1</sub>, tweak<sub>i</sub>, tacc<sub>i-1</sub>, is_xonly_t<sub>i</sub>)'' is defined as:
+The algorithm '''''Tweak(Q<sub>i-1</sub>, gacc<sub>i-1</sub>, tweak<sub>i</sub>, tacc<sub>i-1</sub>, is_xonly_t<sub>i</sub>)''''' is defined as:
 * If ''is_xonly_t<sub>i</sub>'' and ''not has_even_y(Q<sub>i-1</sub>)'':
 ** Let ''g<sub>i-1</sub> = -1 mod n''
 * Else: let ''g<sub>i-1</sub> = 1''
