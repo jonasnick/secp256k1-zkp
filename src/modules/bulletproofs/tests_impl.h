@@ -7,6 +7,11 @@
 #ifndef _SECP256K1_MODULE_BULLETPROOFS_TEST_
 #define _SECP256K1_MODULE_BULLETPROOFS_TEST_
 
+#include <stdint.h>
+
+#include "include/secp256k1_bulletproofs.h"
+#include "bulletproofs_util.h"
+
 static void test_bulletproofs_generators_api(void) {
     /* The BP generator API requires no precomp */
     secp256k1_context *none = secp256k1_context_create(SECP256K1_CONTEXT_NONE);
@@ -112,7 +117,23 @@ static void test_bulletproofs_generators_fixed(void) {
     secp256k1_bulletproofs_generators_destroy(ctx, gens);
 }
 
+void test_log_exp(void) {
+    CHECK(secp256k1_check_power_of_two(0) == 0);
+    CHECK(secp256k1_check_power_of_two(1) == 1);
+    CHECK(secp256k1_check_power_of_two(2) == 1);
+    CHECK(secp256k1_check_power_of_two(64) == 1);
+    CHECK(secp256k1_check_power_of_two(63) == 0);
+    CHECK(secp256k1_check_power_of_two(256) == 1);
+
+    CHECK(secp256k1_bulletproofs_pp_log2(1) == 0);
+    CHECK(secp256k1_bulletproofs_pp_log2(2) == 1);
+    CHECK(secp256k1_bulletproofs_pp_log2(255) == 7);
+    CHECK(secp256k1_bulletproofs_pp_log2(256) == 8);
+    CHECK(secp256k1_bulletproofs_pp_log2(257) == 8);
+}
+
 void run_bulletproofs_tests(void) {
+    test_log_exp();
     test_bulletproofs_generators_api();
     test_bulletproofs_generators_fixed();
 }
