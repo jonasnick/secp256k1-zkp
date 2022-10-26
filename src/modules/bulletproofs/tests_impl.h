@@ -170,11 +170,60 @@ void test_norm_util_helpers(void) {
     secp256k1_scalar_set_int(&res, 256); CHECK(secp256k1_scalar_eq(&res, &r_pows[3]));
 }
 
+void norm_arg_test(unsigned int n, unsigned int m) {
+    secp256k1_scalar n_vec[64], l_vec[64], c_vec[64];
+    secp256k1_scalar r, q;
+    secp256k1_ge commit;
+    size_t i, plen;
+    int res;
+    secp256k1_bulletproofs_generators *gs = secp256k1_bulletproofs_generators_create(ctx, n + m);
+    secp256k1_scratch *scratch = secp256k1_scratch_space_create(ctx, 1000*1000); /* shouldn't need much */
+    unsigned char proof[1000], transcript32[32];
+    plen = 1000;
+    for (i = 0; i < 32; i++) {
+        transcript32[i] = i;
+    }
+    random_scalar_order(&r);
+    secp256k1_scalar_sqr(&q, &r);
+
+    for (i = 0; i < n; i++) {
+        random_scalar_order(&n_vec[i]);
+    }
+
+    for (i = 0; i < m; i++) {
+        random_scalar_order(&l_vec[i]);
+        random_scalar_order(&c_vec[i]);
+    }
+
+    res = secp256k1_bulletproofs_commit(ctx, scratch, &commit, gs, n_vec, n, l_vec, m, c_vec, m, &q);
+    CHECK(res == 1);
+    res = secp256k1_bulletproofs_pp_rangeproof_norm_product_prove(ctx, scratch, proof, &plen, transcript32, &r, gs, n_vec, n, l_vec, m, c_vec, m, &commit);
+    CHECK(res == 1);
+
+    for (i = 0; i < 32; i++) {
+        transcript32[i] = i;
+    }
+
+    res = secp256k1_bulletproofs_pp_rangeproof_norm_product_verify(ctx, scratch, proof, plen, transcript32, &r, gs, n, c_vec, m, &commit);
+    CHECK(res == 1);
+
+    secp256k1_scratch_space_destroy(ctx, scratch);
+    secp256k1_bulletproofs_generators_destroy(ctx, gs);
+}
+
 void run_bulletproofs_tests(void) {
     test_log_exp();
     test_norm_util_helpers();
     test_bulletproofs_generators_api();
     test_bulletproofs_generators_fixed();
+
+    norm_arg_test(1, 1);
+    norm_arg_test(1, 64);
+    norm_arg_test(64, 1);
+    norm_arg_test(32, 32);
+    norm_arg_test(32, 64);
+    norm_arg_test(64, 32);
+    norm_arg_test(64, 64);
 }
 
 #endif
