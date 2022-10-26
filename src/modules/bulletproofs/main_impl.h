@@ -11,11 +11,14 @@
 struct secp256k1_bulletproofs_generators {
     size_t n;
     /* n total generators; includes both G_i and H_i */
+    /* For BP++, the generators are G_i from [0..(n - 8)] and the last 8 values
+    are generators are for H_i */
     secp256k1_ge* gens;
 };
 
 #include "include/secp256k1_bulletproofs.h"
 #include "include/secp256k1_generator.h"
+#include "modules/bulletproofs/bulletproofs_pp_norm_product_impl.h"
 #include "modules/generator/main_impl.h" /* for generator_{load, save} */
 #include "hash.h"
 #include "util.h"
