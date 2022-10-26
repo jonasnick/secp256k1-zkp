@@ -388,4 +388,202 @@ int secp256k1_bulletproofs_pp_rangeproof_norm_product_prove(
     secp256k1_scratch_apply_checkpoint(&ctx->error_callback, scratch, scratch_checkpoint);
     return 1;
 }
+
+typedef struct ec_mult_verify_cb_data1 {
+    const unsigned char *proof;
+    const secp256k1_ge *commit;
+    const secp256k1_scalar *challenges;
+} ec_mult_verify_cb_data1;
+
+static int ec_mult_verify_cb1(secp256k1_scalar *sc, secp256k1_ge *pt, size_t idx, void *cbdata) {
+    ec_mult_verify_cb_data1 *data = (ec_mult_verify_cb_data1*) cbdata;
+    if (idx == 0) {
+        *pt = *data->commit;
+        secp256k1_scalar_set_int(sc, 1);
+        return 1;
+    }
+    idx -= 1;
+    if (idx % 2 == 0) {
+        unsigned char pk_buf[33];
+        idx /= 2;
+        *sc = data->challenges[idx];
+        pk_buf[0] = 2 | (data->proof[65*idx] >> 1);
+        memcpy(&pk_buf[1], &data->proof[65*idx + 1], 32);
+        if (!secp256k1_eckey_pubkey_parse(pt, pk_buf, sizeof(pk_buf))) {
+            return 0;
+        }
+    } else {
+        unsigned char pk_buf[33];
+        secp256k1_scalar neg_one;
+        idx /= 2;
+        secp256k1_scalar_set_int(&neg_one, 1);
+        secp256k1_scalar_negate(&neg_one, &neg_one);
+        *sc = data->challenges[idx];
+        secp256k1_scalar_sqr(sc, sc);
+        secp256k1_scalar_add(sc, sc, &neg_one); /* Ignore overflow */
+        pk_buf[0] = 2 | data->proof[65*idx];
+        memcpy(&pk_buf[1], &data->proof[65*idx + 33], 32);
+        if (!secp256k1_eckey_pubkey_parse(pt, pk_buf, sizeof(pk_buf))) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+typedef struct ec_mult_verify_cb_data2 {
+    const secp256k1_scalar *s_g;
+    const secp256k1_scalar *s_h;
+    const secp256k1_ge *g_vec;
+    size_t g_vec_len;
+} ec_mult_verify_cb_data2;
+
+static int ec_mult_verify_cb2(secp256k1_scalar *sc, secp256k1_ge *pt, size_t idx, void *cbdata) {
+    ec_mult_verify_cb_data2 *data = (ec_mult_verify_cb_data2*) cbdata;
+    if (idx < data->g_vec_len) {
+        *sc = data->s_g[idx];
+    } else {
+        *sc = data->s_h[idx - data->g_vec_len];
+    }
+    *pt = data->g_vec[idx];
+    return 1;
+}
+
+/* Verify the proof */
+int secp256k1_bulletproofs_pp_rangeproof_norm_product_verify(
+    const secp256k1_context* ctx,
+    secp256k1_scratch_space* scratch,
+    unsigned char* proof,
+    size_t proof_len,
+    unsigned char *transcript_hash32,
+    const secp256k1_scalar* r_ch,
+    secp256k1_bulletproofs_generators* g_vec,
+    size_t g_len,
+    secp256k1_scalar* c_vec,
+    size_t c_vec_len,
+    const secp256k1_ge* commit
+) {
+    secp256k1_scalar q, r, v, n, l, r_inv, h_c;
+    secp256k1_scalar *es, *s_g, *s_h, *r_inv_pows;
+    secp256k1_gej res1, res2;
+    size_t i = 0, scratch_checkpoint;
+    int overflow;
+    secp256k1_sha256 sha256;
+    unsigned char ser_commit[33];
+    size_t log_n = secp256k1_bulletproofs_pp_log2(g_len), log_m = secp256k1_bulletproofs_pp_log2(c_vec_len);
+    size_t n_rounds = log_n > log_m ? log_n : log_m;
+    size_t h_len = c_vec_len;
+    secp256k1_ge comm = *commit;
+
+    if (g_vec->n != (h_len + g_len) || (proof_len != 65 * n_rounds + 64)) {
+        return 0;
+    }
+
+    if (!secp256k1_check_power_of_two(g_len) ||  !secp256k1_check_power_of_two(h_len)) {
+        return 0;
+    }
+
+    secp256k1_scalar_set_b32(&n, &proof[n_rounds*65], &overflow); /* n */
+    if (overflow) return 0;
+    secp256k1_scalar_set_b32(&l, &proof[n_rounds*65 + 32], &overflow); /* l */
+    if (overflow) return 0;
+    if (secp256k1_scalar_is_zero(r_ch)) return 0;
+
+    /* Compute powers of q_inv. Later used in g_factor computations*/
+    r = *r_ch;
+    secp256k1_scalar_inverse_var(&r_inv, &r);
+    scratch_checkpoint = secp256k1_scratch_checkpoint(&ctx->error_callback, scratch);
+
+    r_inv_pows = (secp256k1_scalar*)secp256k1_scratch_alloc(&ctx->error_callback, scratch, log_n * sizeof(secp256k1_scalar));
+    secp256k1_bulletproofs_powers_of_r(r_inv_pows, &r_inv, log_n);
+
+    secp256k1_sha256_initialize(&sha256);
+    secp256k1_sha256_write(&sha256, transcript_hash32, 32);
+    secp256k1_fe_normalize_var(&comm.x);
+    secp256k1_fe_normalize_var(&comm.y);
+    ser_commit[0] = 0x02 | secp256k1_fe_is_odd(&comm.y);
+    secp256k1_fe_get_b32(&ser_commit[1], &comm.x);
+    secp256k1_sha256_write(&sha256, ser_commit, 33);
+    secp256k1_sha256_finalize(&sha256, transcript_hash32);
+
+    for (i = 0; i < log_n; i++) {
+        secp256k1_scalar_sqr(&r, &r);
+    }
+
+    /* Collect the challenges in a new vector */
+    es = (secp256k1_scalar*)secp256k1_scratch_alloc(&ctx->error_callback, scratch, n_rounds * sizeof(secp256k1_scalar));
+    s_g = (secp256k1_scalar*)secp256k1_scratch_alloc(&ctx->error_callback, scratch, g_len * sizeof(secp256k1_scalar));
+    s_h = (secp256k1_scalar*)secp256k1_scratch_alloc(&ctx->error_callback, scratch, h_len * sizeof(secp256k1_scalar));
+    if (es == NULL || s_g == NULL || s_h == NULL) {
+        secp256k1_scratch_apply_checkpoint(&ctx->error_callback, scratch, scratch_checkpoint);
+    return 0;
+    }
+
+    for (i = 0; i < n_rounds; i++) {
+        secp256k1_scalar e;
+        secp256k1_sha256_initialize(&sha256);
+        secp256k1_sha256_write(&sha256, transcript_hash32, 32);
+        secp256k1_sha256_write(&sha256, &proof[i * 65], 65);
+        secp256k1_sha256_finalize(&sha256, transcript_hash32);
+        /* Ignore overflow, output of an hash function will fall in curve order with high probability*/
+        secp256k1_scalar_set_b32(&e, transcript_hash32, &overflow);
+        es[i] = e;
+    }
+    /* s_g[0] = n * r^(n - 1) = n * (r)^n * r_inv = n * q * r_inv */
+    secp256k1_scalar_mul(&s_g[0], &n, &r);
+    secp256k1_scalar_mul(&s_g[0], &s_g[0], &r_inv);
+    for (i = 1; i < g_len; i++) {
+        size_t log_i = secp256k1_bulletproofs_pp_log2(i);
+        size_t nearest_pow_of_two = (size_t)1 << log_i;
+        secp256k1_scalar_mul(&s_g[i], &s_g[i - nearest_pow_of_two], &es[log_i]);
+        secp256k1_scalar_mul(&s_g[i], &s_g[i], &r_inv_pows[log_i]);
+    }
+    s_h[0] = l;
+    secp256k1_scalar_set_int(&h_c, 0);
+    for (i = 1; i < h_len; i++) {
+        size_t log_i = secp256k1_bulletproofs_pp_log2(i);
+        size_t nearest_pow_of_two = (size_t)1 << log_i;
+        secp256k1_scalar_mul(&s_h[i], &s_h[i - nearest_pow_of_two], &es[log_i]);
+    }
+    secp256k1_scalar_inner_product(&h_c, c_vec, 0 /* a_offset */ , s_h, 0 /* b_offset */, 1 /* step */, h_len);
+    /* Compute v = n*n*q + l*h_c*/
+    secp256k1_scalar_sqr(&q, &r);
+    secp256k1_scalar_mul(&v, &n, &n);
+    secp256k1_scalar_mul(&v, &v, &q);
+    secp256k1_scalar_add(&v, &v, &h_c);
+
+    {
+        ec_mult_verify_cb_data1 data;
+        secp256k1_gej temp1, temp2;
+        secp256k1_scalar one;
+        data.proof = proof;
+        data.commit = commit;
+        data.challenges = es;
+
+        secp256k1_gej_set_ge(&temp2, commit);
+        secp256k1_scalar_set_int(&one, 1);
+        secp256k1_ecmult(&temp1, &temp2, &one, NULL);
+
+        if (!secp256k1_ecmult_multi_var(&ctx->error_callback, scratch, &res1, NULL, ec_mult_verify_cb1, &data, 2*n_rounds + 1)) {
+            return 0;
+        }
+    }
+    {
+        ec_mult_verify_cb_data2 data;
+        data.g_vec = g_vec->gens;
+        data.g_vec_len = g_len;
+        data.s_g = s_g;
+        data.s_h = s_h;
+
+        if (!secp256k1_ecmult_multi_var(&ctx->error_callback, scratch, &res2, &v, ec_mult_verify_cb2, &data, g_len + h_len)) {
+            return 0;
+        }
+    }
+
+    secp256k1_scratch_apply_checkpoint(&ctx->error_callback, scratch, scratch_checkpoint);
+
+    /* res1 and res2 should be equal. Could not find a simpler way to compare them */
+    secp256k1_gej_neg(&res1, &res1);
+    secp256k1_gej_add_var(&res1, &res1, &res2, NULL);
+    return secp256k1_gej_is_infinity(&res1);
+}
 #endif
