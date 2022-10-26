@@ -11,11 +11,13 @@
 struct secp256k1_bulletproofs_generators {
     size_t n;
     /* n total generators; set n = 2*k to get G_i and H_i values for i in [1..k] */
+    /* For BP++, the generators are G_i from [1..(n - 6)]* and the last values are generators for H */
     secp256k1_ge* gens;
 };
 
 #include "include/secp256k1_bulletproofs.h"
 #include "include/secp256k1_generator.h"
+#include "modules/bulletproofs/bulletproofs_pp_norm_product_impl.h"
 #include "modules/generator/main_impl.h" /* for generator_{load, save} */
 #include "hash.h"
 #include "util.h"
