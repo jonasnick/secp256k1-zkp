@@ -325,11 +325,13 @@ int secp256k1_bulletproofs_pp_rangeproof_norm_product_prove(
         }
 
         secp256k1_ge_set_gej_var(&ge, &xj);
+        printf("X inf: %d\n", secp256k1_ge_is_infinity(&ge));
         secp256k1_fe_normalize_var(&ge.x);
         secp256k1_fe_normalize_var(&ge.y);
         proof[start_idx] = secp256k1_fe_is_odd(&ge.y) << 1;
         secp256k1_fe_get_b32(&proof[start_idx + 1], &ge.x);
         secp256k1_ge_set_gej_var(&ge, &rj);
+        printf("R inf: %d\n", secp256k1_ge_is_infinity(&ge));
         secp256k1_fe_normalize_var(&ge.x);
         secp256k1_fe_normalize_var(&ge.y);
         proof[start_idx] |= secp256k1_fe_is_odd(&ge.y);
@@ -563,7 +565,7 @@ int secp256k1_bulletproofs_pp_rangeproof_norm_product_verify(
         secp256k1_scalar_set_int(&one, 1);
         secp256k1_ecmult(&temp1, &temp2, &one, NULL);
 
-        if (!secp256k1_ecmult_multi_var(&ctx->error_callback, scratch, &res1, NULL, ec_mult_verify_cb1, &data, 2*n_rounds + 1)) {
+        if (!secp256k2*n_rounds + 1)) {
             return 0;
         }
     }
