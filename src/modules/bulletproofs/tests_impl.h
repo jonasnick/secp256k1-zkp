@@ -325,6 +325,57 @@ static int secp256k1_norm_arg_verify(
     return res;
 }
 
+void norm_arg_zero(void) {
+    secp256k1_scalar n_vec[64], l_vec[64], c_vec[64];
+    secp256k1_scalar r, q;
+    secp256k1_ge commit;
+    size_t i;
+    secp256k1_scratch *scratch = secp256k1_scratch_space_create(ctx, 1000*10); /* shouldn't need much */
+    unsigned char proof[1000];
+
+    random_scalar_order(&r);
+    secp256k1_scalar_sqr(&q, &r);
+
+    /* l and n are the zero vector */
+    {
+        unsigned int n_vec_len = 1;
+        unsigned int c_vec_len = 1;
+        secp256k1_bulletproofs_generators *gs = secp256k1_bulletproofs_generators_create(ctx, n_vec_len + c_vec_len);
+        size_t plen = sizeof(proof);
+        for (i = 0; i < n_vec_len; i++) {
+            secp256k1_scalar_set_int(&n_vec[i], 0);
+        }
+        for (i = 0; i < c_vec_len; i++) {
+            secp256k1_scalar_set_int(&l_vec[i], 0);
+            random_scalar_order(&c_vec[i]);
+        }
+        CHECK(secp256k1_bulletproofs_commit(ctx, scratch, &commit, gs, n_vec, n_vec_len, l_vec, c_vec_len, c_vec, c_vec_len, &q));
+        CHECK(secp256k1_norm_arg_prove(scratch, proof, &plen, &r, gs, n_vec, n_vec_len, l_vec, c_vec_len, c_vec, c_vec_len, &commit));
+        CHECK(secp256k1_norm_arg_verify(scratch, proof, plen, &r, gs, n_vec_len, c_vec, c_vec_len, &commit));
+        secp256k1_bulletproofs_generators_destroy(ctx, gs);
+    }
+
+    /* l is the zero vector and longer than n. This results in one of the
+     * internal commitments X or R to be the point at infinity. */
+    {
+        unsigned int n_vec_len = 1;
+        unsigned int c_vec_len = 2;
+        secp256k1_bulletproofs_generators *gs = secp256k1_bulletproofs_generators_create(ctx, n_vec_len + c_vec_len);
+        size_t plen = sizeof(proof);
+        for (i = 0; i < n_vec_len; i++) {
+            random_scalar_order(&n_vec[i]);
+        }
+        for (i = 0; i < c_vec_len; i++) {
+            secp256k1_scalar_set_int(&l_vec[i], 0);
+            random_scalar_order(&c_vec[i]);
+        }
+        CHECK(!secp256k1_norm_arg_prove(scratch, proof, &plen, &r, gs, n_vec, n_vec_len, l_vec, c_vec_len, c_vec, c_vec_len, &commit));
+        secp256k1_bulletproofs_generators_destroy(ctx, gs);
+    }
+
+    secp256k1_scratch_space_destroy(ctx, scratch);
+}
+
 void norm_arg_test(unsigned int n, unsigned int m) {
     secp256k1_scalar n_vec[64], l_vec[64], c_vec[64];
     secp256k1_scalar r, q;
@@ -374,6 +425,7 @@ void run_bulletproofs_tests(void) {
     test_bulletproofs_generators_fixed();
     test_bulletproofs_pp_tagged_hash();
 
+    norm_arg_zero();
     norm_arg_test(1, 1);
     norm_arg_test(1, 64);
     norm_arg_test(64, 1);
