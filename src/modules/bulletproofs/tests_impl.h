@@ -486,9 +486,12 @@ int norm_arg_verify_vectors_helper(secp256k1_scratch *scratch, const unsigned ch
     int i;
     int ret;
 
+    secp256k1_sha256_initialize(&transcript);
+
     CHECK(gs != NULL);
     secp256k1_scalar_set_b32(&r, r32, &overflow);
     CHECK(!overflow);
+
     for (i = 0; i < (int)c_vec_len; i++) {
         secp256k1_scalar_set_b32(&c_vec[i], c_vec32[i], &overflow);
         CHECK(!overflow);
@@ -508,6 +511,7 @@ void norm_arg_verify_vectors(void) {
     CHECK(IDX_TO_TEST(0));
     CHECK(IDX_TO_TEST(1));
     CHECK(IDX_TO_TEST(2));
+    CHECK(IDX_TO_TEST(3));
 
     CHECK(alloc == scratch->alloc_size);
     secp256k1_scratch_space_destroy(ctx, scratch);
