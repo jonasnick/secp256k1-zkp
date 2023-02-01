@@ -512,6 +512,11 @@ void norm_arg_verify_vectors(void) {
     CHECK(IDX_TO_TEST(1));
     CHECK(IDX_TO_TEST(2));
     CHECK(IDX_TO_TEST(3));
+    CHECK(IDX_TO_TEST(4));
+    CHECK(IDX_TO_TEST(5));
+    CHECK(IDX_TO_TEST(6));
+    CHECK(IDX_TO_TEST(7));
+    CHECK(IDX_TO_TEST(8));
 
     CHECK(alloc == scratch->alloc_size);
     secp256k1_scratch_space_destroy(ctx, scratch);
