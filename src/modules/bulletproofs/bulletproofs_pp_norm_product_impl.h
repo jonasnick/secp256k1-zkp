@@ -13,6 +13,7 @@
 #include "ecmult_gen.h"
 #include "hash.h"
 
+#include "modules/bulletproofs/main.h"
 #include "modules/bulletproofs/bulletproofs_util.h"
 #include "modules/bulletproofs/bulletproofs_pp_transcript_impl.h"
 
