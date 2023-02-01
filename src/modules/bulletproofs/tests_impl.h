@@ -476,19 +476,18 @@ secp256k1_bulletproofs_generators* bulletproofs_generators_parse_regular(const u
     return ret;
 }
 
-int norm_arg_verify_vectors_helper(secp256k1_scratch *scratch, const unsigned char *gens, size_t gens_len, const unsigned char *proof, size_t plen, const unsigned char *r32, const unsigned char c_vec32[][32], secp256k1_scalar *c_vec, size_t c_vec_len, const unsigned char *commit33) {
+int norm_arg_verify_vectors_helper(secp256k1_scratch *scratch, const unsigned char *gens, const unsigned char *proof, size_t plen, const unsigned char *r32, size_t n_vec_len, const unsigned char c_vec32[][32], secp256k1_scalar *c_vec, size_t c_vec_len, const unsigned char *commit33) {
     secp256k1_sha256 transcript;
-    secp256k1_bulletproofs_generators *gs = bulletproofs_generators_parse_regular(gens, gens_len);
-    size_t n = gs->n - c_vec_len;
+    secp256k1_bulletproofs_generators *gs = bulletproofs_generators_parse_regular(gens, 33*(n_vec_len + c_vec_len));
     secp256k1_scalar r;
     secp256k1_ge commit;
     int overflow;
     int i;
     int ret;
 
+    CHECK(gs != NULL);
     secp256k1_sha256_initialize(&transcript);
 
-    CHECK(gs != NULL);
     secp256k1_scalar_set_b32(&r, r32, &overflow);
     CHECK(!overflow);
 
@@ -497,13 +496,14 @@ int norm_arg_verify_vectors_helper(secp256k1_scratch *scratch, const unsigned ch
         CHECK(!overflow);
     }
     CHECK(secp256k1_eckey_pubkey_parse(&commit, commit33, 33));
-    ret = secp256k1_bulletproofs_pp_rangeproof_norm_product_verify(ctx, scratch, proof, plen, &transcript, &r, gs, n, c_vec, c_vec_len, &commit);
+    ret = secp256k1_bulletproofs_pp_rangeproof_norm_product_verify(ctx, scratch, proof, plen, &transcript, &r, gs, n_vec_len, c_vec, c_vec_len, &commit);
 
     secp256k1_bulletproofs_generators_destroy(ctx, gs);
     return ret;
 }
 
-#define IDX_TO_TEST(i) (norm_arg_verify_vectors_helper(scratch, verify_vector_##i##_gens, sizeof(verify_vector_##i##_gens), verify_vector_##i##_proof, sizeof(verify_vector_##i##_proof), verify_vector_##i##_r32, verify_vector_##i##_c_vec32, verify_vector_##i##_c_vec, sizeof(verify_vector_##i##_c_vec)/sizeof(secp256k1_scalar), verify_vector_##i##_commit33) == verify_vector_##i##_result)
+#define IDX_TO_TEST(i) (norm_arg_verify_vectors_helper(scratch, verify_vector_gens, verify_vector_##i##_proof, sizeof(verify_vector_##i##_proof), verify_vector_##i##_r32, verify_vector_##i##_n_vec_len, verify_vector_##i##_c_vec32, verify_vector_##i##_c_vec, sizeof(verify_vector_##i##_c_vec)/sizeof(secp256k1_scalar), verify_vector_##i##_commit33) == verify_vector_##i##_result)
+
 void norm_arg_verify_vectors(void) {
     secp256k1_scratch *scratch = secp256k1_scratch_space_create(ctx, 1000*1000); /* shouldn't need much */
     size_t alloc = scratch->alloc_size;
