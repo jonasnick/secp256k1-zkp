@@ -13,7 +13,7 @@
 /* Initializes SHA256 with fixed midstate. This midstate was computed by applying
  * SHA256 to SHA256("Bulletproofs_pp/v0/commitment")||SHA256("Bulletproofs_pp/v0/commitment").
  */
-static void secp256k1_bulletproofs_pp_sha256_tagged_commitment_init(secp256k1_sha256 *sha) {
+static void secp256k1_bppp_sha256_tagged_commitment_init(secp256k1_sha256 *sha) {
     secp256k1_sha256_initialize(sha);
     sha->s[0] = 0x52fc8185ul;
     sha->s[1] = 0x0e7debf0ul;

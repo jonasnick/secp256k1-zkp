@@ -49,7 +49,7 @@ static int secp256k1_is_power_of_two(size_t n) {
  * `k` such that 2^k <= n. Assumes n < 2^64. In Bulletproofs, this is bounded
  * by len of input vectors which can be safely assumed to be less than 2^64.
 */
-static size_t secp256k1_bulletproofs_pp_log2(size_t n) {
+static size_t secp256k1_bppp_log2(size_t n) {
     return 64 - 1 - secp256k1_clz64_var((uint64_t)n);
 }
 

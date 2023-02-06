@@ -10,9 +10,9 @@
 #include <stdint.h>
 
 #include "include/secp256k1_bulletproofs.h"
-#include "bulletproofs_pp_norm_product_impl.h"
+#include "bppp_norm_product_impl.h"
 #include "bulletproofs_util.h"
-#include "bulletproofs_pp_transcript_impl.h"
+#include "bppp_transcript_impl.h"
 #include "test_vectors/verify.h"
 
 static void test_bulletproofs_generators_api(void) {
@@ -122,7 +122,7 @@ static void test_bulletproofs_generators_fixed(void) {
     secp256k1_bulletproofs_generators_destroy(ctx, gens);
 }
 
-static void test_bulletproofs_pp_tagged_hash(void) {
+static void test_bppp_tagged_hash(void) {
     unsigned char tag_data[29] = "Bulletproofs_pp/v0/commitment";
     secp256k1_sha256 sha;
     secp256k1_sha256 sha_cached;
@@ -131,7 +131,7 @@ static void test_bulletproofs_pp_tagged_hash(void) {
     secp256k1_scalar s;
 
     secp256k1_sha256_initialize_tagged(&sha, tag_data, sizeof(tag_data));
-    secp256k1_bulletproofs_pp_sha256_tagged_commitment_init(&sha_cached);
+    secp256k1_bppp_sha256_tagged_commitment_init(&sha_cached);
     secp256k1_sha256_finalize(&sha, output);
     secp256k1_sha256_finalize(&sha_cached, output_cached);
     CHECK(secp256k1_memcmp_var(output, output_cached, 32) == 0);
@@ -141,7 +141,7 @@ static void test_bulletproofs_pp_tagged_hash(void) {
                                        0xF6, 0x91, 0x15, 0xEE, 0x74, 0xF5, 0x12, 0x67,
                                        0x8A, 0x41, 0xC6, 0x85, 0x1A, 0x79, 0x14, 0xFC,
                                        0x48, 0x15, 0xC7, 0x2D, 0xF8, 0x63, 0x8F, 0x1B };
-        secp256k1_bulletproofs_pp_sha256_tagged_commitment_init(&sha);
+        secp256k1_bppp_sha256_tagged_commitment_init(&sha);
         secp256k1_bulletproofs_challenge_scalar(&s, &sha, 0);
         secp256k1_scalar_get_b32(output, &s);
         CHECK(memcmp(output, expected, sizeof(output)) == 0);
@@ -168,11 +168,11 @@ void test_log_exp(void) {
     CHECK(secp256k1_is_power_of_two(63) == 0);
     CHECK(secp256k1_is_power_of_two(256) == 1);
 
-    CHECK(secp256k1_bulletproofs_pp_log2(1) == 0);
-    CHECK(secp256k1_bulletproofs_pp_log2(2) == 1);
-    CHECK(secp256k1_bulletproofs_pp_log2(255) == 7);
-    CHECK(secp256k1_bulletproofs_pp_log2(256) == 8);
-    CHECK(secp256k1_bulletproofs_pp_log2(257) == 8);
+    CHECK(secp256k1_bppp_log2(1) == 0);
+    CHECK(secp256k1_bppp_log2(2) == 1);
+    CHECK(secp256k1_bppp_log2(255) == 7);
+    CHECK(secp256k1_bppp_log2(256) == 8);
+    CHECK(secp256k1_bppp_log2(257) == 8);
 }
 
 void test_norm_util_helpers(void) {
@@ -225,7 +225,7 @@ static void secp256k1_norm_arg_commit_initial_data(
     unsigned char ser_commit[33], ser_scalar[32], ser_le64[8];
     size_t i;
     secp256k1_ge comm = *commit;
-    secp256k1_bulletproofs_pp_sha256_tagged_commitment_init(transcript);
+    secp256k1_bppp_sha256_tagged_commitment_init(transcript);
     secp256k1_fe_normalize(&comm.x);
     secp256k1_fe_normalize(&comm.y);
     CHECK(secp256k1_ge_is_infinity(&comm) == 0);
@@ -251,9 +251,9 @@ static void secp256k1_norm_arg_commit_initial_data(
     }
 }
 
-/* A complete norm argument. In contrast to secp256k1_bulletproofs_pp_rangeproof_norm_product_prove, this is meant
+/* A complete norm argument. In contrast to secp256k1_bppp_rangeproof_norm_product_prove, this is meant
    to be used as a standalone norm argument.
-   This is a simple wrapper around secp256k1_bulletproofs_pp_rangeproof_norm_product_prove
+   This is a simple wrapper around secp256k1_bppp_rangeproof_norm_product_prove
    that also commits to the initial public values used in the protocol. In this case, these public
    values are commitment.
 */
@@ -295,7 +295,7 @@ static int secp256k1_norm_arg_prove(
     /* Commit to the initial public values */
     secp256k1_norm_arg_commit_initial_data(&transcript, &r, gens_vec, g_len, c_vec, c_vec_len, &comm);
 
-    res = secp256k1_bulletproofs_pp_rangeproof_norm_product_prove(
+    res = secp256k1_bppp_rangeproof_norm_product_prove(
         ctx,
         scratch,
         proof,
@@ -335,7 +335,7 @@ static int secp256k1_norm_arg_verify(
     /* Commit to the initial public values */
     secp256k1_norm_arg_commit_initial_data(&transcript, &r, gens_vec, g_len, c_vec, c_vec_len, &comm);
 
-    res = secp256k1_bulletproofs_pp_rangeproof_norm_product_verify(
+    res = secp256k1_bppp_rangeproof_norm_product_verify(
         ctx,
         scratch,
         proof,
@@ -497,7 +497,7 @@ int norm_arg_verify_vectors_helper(secp256k1_scratch *scratch, const unsigned ch
         CHECK(!overflow);
     }
     CHECK(secp256k1_eckey_pubkey_parse(&commit, commit33, 33));
-    ret = secp256k1_bulletproofs_pp_rangeproof_norm_product_verify(ctx, scratch, proof, plen, &transcript, &r, gs, n_vec_len, c_vec, c_vec_len, &commit);
+    ret = secp256k1_bppp_rangeproof_norm_product_verify(ctx, scratch, proof, plen, &transcript, &r, gs, n_vec_len, c_vec, c_vec_len, &commit);
 
     secp256k1_bulletproofs_generators_destroy(ctx, gs);
     return ret;
@@ -529,7 +529,7 @@ void run_bulletproofs_tests(void) {
     test_norm_util_helpers();
     test_bulletproofs_generators_api();
     test_bulletproofs_generators_fixed();
-    test_bulletproofs_pp_tagged_hash();
+    test_bppp_tagged_hash();
 
     norm_arg_zero();
     norm_arg_test(1, 1);

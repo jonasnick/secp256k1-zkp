@@ -15,7 +15,7 @@
 
 #include "modules/bulletproofs/main.h"
 #include "modules/bulletproofs/bulletproofs_util.h"
-#include "modules/bulletproofs/bulletproofs_pp_transcript_impl.h"
+#include "modules/bulletproofs/bppp_transcript_impl.h"
 
 /* Computes the inner product of two vectors of scalars
  * with elements starting from offset a and offset b
@@ -216,7 +216,7 @@ static int ecmult_r_cb(secp256k1_scalar *sc, secp256k1_ge *pt, size_t idx, void 
  * some parent protocol. To use this norm protocol in a standalone manner, the user
  * should add the commitment, generators and initial public data to the transcript hash.
 */
-static int secp256k1_bulletproofs_pp_rangeproof_norm_product_prove(
+static int secp256k1_bppp_rangeproof_norm_product_prove(
     const secp256k1_context* ctx,
     secp256k1_scratch_space* scratch,
     unsigned char* proof,
@@ -238,7 +238,7 @@ static int secp256k1_bulletproofs_pp_rangeproof_norm_product_prove(
     ecmult_r_cb_data r_cb_data;
     size_t g_len = n_vec_len, h_len = l_vec_len;
     const size_t G_GENS_LEN = g_len;
-    size_t log_n = secp256k1_bulletproofs_pp_log2(g_len), log_m = secp256k1_bulletproofs_pp_log2(h_len);
+    size_t log_n = secp256k1_bppp_log2(g_len), log_m = secp256k1_bppp_log2(h_len);
     size_t num_rounds = log_n > log_m ? log_n : log_m;
 
     /* Check proof sizes.*/
@@ -422,7 +422,7 @@ static int ec_mult_verify_cb2(secp256k1_scalar *sc, secp256k1_ge *pt, size_t idx
 /* Verify the proof. This function modifies the generators, c_vec and the challenge r. The
    caller should make sure to back them up if they need to be reused.
 */
-int secp256k1_bulletproofs_pp_rangeproof_norm_product_verify(
+int secp256k1_bppp_rangeproof_norm_product_verify(
     const secp256k1_context* ctx,
     secp256k1_scratch_space* scratch,
     const unsigned char* proof,
@@ -440,7 +440,7 @@ int secp256k1_bulletproofs_pp_rangeproof_norm_product_verify(
     secp256k1_gej res1, res2;
     size_t i = 0, scratch_checkpoint;
     int overflow;
-    size_t log_n = secp256k1_bulletproofs_pp_log2(g_len), log_m = secp256k1_bulletproofs_pp_log2(c_vec_len);
+    size_t log_n = secp256k1_bppp_log2(g_len), log_m = secp256k1_bppp_log2(c_vec_len);
     size_t n_rounds = log_n > log_m ? log_n : log_m;
     size_t h_len = c_vec_len;
 
@@ -488,7 +488,7 @@ int secp256k1_bulletproofs_pp_rangeproof_norm_product_verify(
     secp256k1_scalar_mul(&s_g[0], &n, r);
     secp256k1_scalar_mul(&s_g[0], &s_g[0], &r_inv);
     for (i = 1; i < g_len; i++) {
-        size_t log_i = secp256k1_bulletproofs_pp_log2(i);
+        size_t log_i = secp256k1_bppp_log2(i);
         size_t nearest_pow_of_two = (size_t)1 << log_i;
         /* This combines the two multiplications of challenges and r_invs in a single loop.
         s_g[i] = s_g[i - nearest_pow_of_two] * e[log_i] * r_inv_pows^i
@@ -499,7 +499,7 @@ int secp256k1_bulletproofs_pp_rangeproof_norm_product_verify(
     s_h[0] = l;
     secp256k1_scalar_set_int(&h_c, 0);
     for (i = 1; i < h_len; i++) {
-        size_t log_i = secp256k1_bulletproofs_pp_log2(i);
+        size_t log_i = secp256k1_bppp_log2(i);
         size_t nearest_pow_of_two = (size_t)1 << log_i;
         secp256k1_scalar_mul(&s_h[i], &s_h[i - nearest_pow_of_two], &es[log_i]);
     }

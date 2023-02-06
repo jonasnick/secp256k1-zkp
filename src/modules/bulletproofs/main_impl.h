@@ -13,7 +13,7 @@
 #include "hash.h"
 #include "util.h"
 #include "modules/bulletproofs/main.h"
-#include "modules/bulletproofs/bulletproofs_pp_norm_product_impl.h"
+#include "modules/bulletproofs/bppp_norm_product_impl.h"
 
 secp256k1_bulletproofs_generators *secp256k1_bulletproofs_generators_create(const secp256k1_context *ctx, size_t n) {
     secp256k1_bulletproofs_generators *ret;
