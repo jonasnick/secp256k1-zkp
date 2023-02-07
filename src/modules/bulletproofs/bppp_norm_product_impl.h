@@ -238,8 +238,8 @@ static int secp256k1_bppp_rangeproof_norm_product_prove(
     ecmult_r_cb_data r_cb_data;
     size_t g_len = n_vec_len, h_len = l_vec_len;
     const size_t G_GENS_LEN = g_len;
-    size_t log_n = secp256k1_bppp_log2(g_len), log_m = secp256k1_bppp_log2(h_len);
-    size_t num_rounds = log_n > log_m ? log_n : log_m;
+    size_t log_g_len = secp256k1_bppp_log2(g_len), log_h_len = secp256k1_bppp_log2(h_len);
+    size_t num_rounds = log_g_len > log_h_len ? log_g_len : log_h_len;
 
     /* Check proof sizes.*/
     VERIFY_CHECK(*proof_len >= 65 * num_rounds + 64);
@@ -428,20 +428,20 @@ int secp256k1_bppp_rangeproof_norm_product_verify(
     const unsigned char* proof,
     size_t proof_len,
     secp256k1_sha256* transcript,
-    secp256k1_scalar* r,
+    const secp256k1_scalar* r,
     const secp256k1_bulletproofs_generators* g_vec,
     size_t g_len,
     const secp256k1_scalar* c_vec,
     size_t c_vec_len,
     const secp256k1_ge* commit
 ) {
-    secp256k1_scalar q, v, n, l, r_inv, h_c;
+    secp256k1_scalar r_f, q_f, v, n, l, r_inv, h_c;
     secp256k1_scalar *es, *s_g, *s_h, *r_inv_pows;
     secp256k1_gej res1, res2;
     size_t i = 0, scratch_checkpoint;
     int overflow;
-    size_t log_n = secp256k1_bppp_log2(g_len), log_m = secp256k1_bppp_log2(c_vec_len);
-    size_t n_rounds = log_n > log_m ? log_n : log_m;
+    size_t log_g_len = secp256k1_bppp_log2(g_len), log_h_len = secp256k1_bppp_log2(c_vec_len);
+    size_t n_rounds = log_g_len > log_h_len ? log_g_len : log_h_len;
     size_t h_len = c_vec_len;
 
     if (g_vec->n != (h_len + g_len) || (proof_len != 65 * n_rounds + 64)) {
@@ -458,24 +458,25 @@ int secp256k1_bppp_rangeproof_norm_product_verify(
     if (overflow) return 0;
     if (secp256k1_scalar_is_zero(r)) return 0;
 
-    /* Compute powers of q_inv. Later used in g_factor computations*/
-    secp256k1_scalar_inverse_var(&r_inv, r);
-    scratch_checkpoint = secp256k1_scratch_checkpoint(&ctx->error_callback, scratch);
-
     /* Collect the challenges in a new vector */
-    r_inv_pows = (secp256k1_scalar*)secp256k1_scratch_alloc(&ctx->error_callback, scratch, log_n * sizeof(secp256k1_scalar));
+    scratch_checkpoint = secp256k1_scratch_checkpoint(&ctx->error_callback, scratch);
     es = (secp256k1_scalar*)secp256k1_scratch_alloc(&ctx->error_callback, scratch, n_rounds * sizeof(secp256k1_scalar));
     s_g = (secp256k1_scalar*)secp256k1_scratch_alloc(&ctx->error_callback, scratch, g_len * sizeof(secp256k1_scalar));
     s_h = (secp256k1_scalar*)secp256k1_scratch_alloc(&ctx->error_callback, scratch, h_len * sizeof(secp256k1_scalar));
-    if (r_inv_pows == NULL || es == NULL || s_g == NULL || s_h == NULL) {
+    r_inv_pows = (secp256k1_scalar*)secp256k1_scratch_alloc(&ctx->error_callback, scratch, log_g_len * sizeof(secp256k1_scalar));
+    if (es == NULL || s_g == NULL || s_h == NULL || r_inv_pows == NULL) {
         secp256k1_scratch_apply_checkpoint(&ctx->error_callback, scratch, scratch_checkpoint);
         return 0;
     }
 
-    secp256k1_bulletproofs_powers_of_r(r_inv_pows, &r_inv, log_n);
+    /* Compute powers of r_inv. Later used in g_factor computations*/
+    secp256k1_scalar_inverse_var(&r_inv, r);
+    secp256k1_bulletproofs_powers_of_r(r_inv_pows, &r_inv, log_g_len);
 
-    for (i = 0; i < log_n; i++) {
-        secp256k1_scalar_sqr(r, r);
+    /* Compute r_f = r^(2^log_g_len) */
+    r_f = *r;
+    for (i = 0; i < log_g_len; i++) {
+        secp256k1_scalar_sqr(&r_f, &r_f);
     }
 
     for (i = 0; i < n_rounds; i++) {
@@ -484,15 +485,18 @@ int secp256k1_bppp_rangeproof_norm_product_verify(
         secp256k1_bulletproofs_challenge_scalar(&e, transcript, 0);
         es[i] = e;
     }
-    /* s_g[0] = n * r^(n - 1) = n * (r)^n * r_inv = n * q * r_inv */
-    secp256k1_scalar_mul(&s_g[0], &n, r);
+    /* s_g[0] = n * \prod_{j=0}^{log_g_len - 1} r^(2^j)
+     *        = n * r^(2^log_g_len - 1)
+     *        = n * r_f * r_inv */
+    secp256k1_scalar_mul(&s_g[0], &n, &r_f);
     secp256k1_scalar_mul(&s_g[0], &s_g[0], &r_inv);
     for (i = 1; i < g_len; i++) {
         size_t log_i = secp256k1_bppp_log2(i);
         size_t nearest_pow_of_two = (size_t)1 << log_i;
-        /* This combines the two multiplications of challenges and r_invs in a single loop.
-        s_g[i] = s_g[i - nearest_pow_of_two] * e[log_i] * r_inv_pows^i
-        */
+        /* This combines the two multiplications of challenges and r_invs in a
+         * single loop.
+         * s_g[i] = s_g[i - nearest_pow_of_two]
+         *            * e[log_i] * r_inv^(2^log_i) */
         secp256k1_scalar_mul(&s_g[i], &s_g[i - nearest_pow_of_two], &es[log_i]);
         secp256k1_scalar_mul(&s_g[i], &s_g[i], &r_inv_pows[log_i]);
     }
@@ -504,10 +508,10 @@ int secp256k1_bppp_rangeproof_norm_product_verify(
         secp256k1_scalar_mul(&s_h[i], &s_h[i - nearest_pow_of_two], &es[log_i]);
     }
     secp256k1_scalar_inner_product(&h_c, c_vec, 0 /* a_offset */ , s_h, 0 /* b_offset */, 1 /* step */, h_len);
-    /* Compute v = n*n*q + l*h_c*/
-    secp256k1_scalar_sqr(&q, r);
+    /* Compute v = n*n*q_f + l*h_c where q_f = r_f^2 */
+    secp256k1_scalar_sqr(&q_f, &r_f);
     secp256k1_scalar_mul(&v, &n, &n);
-    secp256k1_scalar_mul(&v, &v, &q);
+    secp256k1_scalar_mul(&v, &v, &q_f);
     secp256k1_scalar_add(&v, &v, &h_c);
 
     {

@@ -320,7 +320,7 @@ static int secp256k1_norm_arg_verify(
     secp256k1_scratch_space* scratch,
     const unsigned char* proof,
     size_t proof_len,
-    const secp256k1_scalar* r_ch,
+    const secp256k1_scalar* r,
     const secp256k1_bulletproofs_generators* gens_vec,
     size_t g_len,
     const secp256k1_scalar* c_vec,
@@ -330,10 +330,9 @@ static int secp256k1_norm_arg_verify(
     secp256k1_ge comm = *commit;
     int res;
     secp256k1_sha256 transcript;
-    secp256k1_scalar r = *r_ch;
 
     /* Commit to the initial public values */
-    secp256k1_norm_arg_commit_initial_data(&transcript, &r, gens_vec, g_len, c_vec, c_vec_len, &comm);
+    secp256k1_norm_arg_commit_initial_data(&transcript, r, gens_vec, g_len, c_vec, c_vec_len, &comm);
 
     res = secp256k1_bppp_rangeproof_norm_product_verify(
         ctx,
@@ -341,7 +340,7 @@ static int secp256k1_norm_arg_verify(
         proof,
         proof_len,
         &transcript,
-        &r,
+        r,
         gens_vec,
         g_len,
         c_vec,
