@@ -7401,6 +7401,16 @@ int main(int argc, char **argv) {
         CHECK(secp256k1_context_randomize(ctx, secp256k1_testrand_bits(1) ? rand32 : NULL));
     }
 
+#ifdef ENABLE_MODULE_BULLETPROOFS
+    run_bulletproofs_tests();
+    return 0;
+#endif
+
+#ifdef ENABLE_MODULE_BPPP
+    run_bppp_tests();
+    return 0;
+#endif
+
     run_rand_bits();
     run_rand_int();
     run_util_tests();
