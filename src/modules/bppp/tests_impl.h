@@ -395,7 +395,7 @@ void norm_arg_zero(void) {
             secp256k1_scalar_set_int(&l_vec[i], 0);
             random_scalar_order(&c_vec[i]);
         }
-        CHECK(secp256k1_bulletproofs_commit(ctx, scratch, &commit, gs, n_vec, n_vec_len, l_vec, c_vec_len, c_vec, c_vec_len, &q));
+        CHECK(secp256k1_bppp_commit(ctx, scratch, &commit, gs, n_vec, n_vec_len, l_vec, c_vec_len, c_vec, c_vec_len, &q));
         CHECK(!secp256k1_norm_arg_prove(scratch, proof, &plen, &r, gs, n_vec, n_vec_len, l_vec, c_vec_len, c_vec, c_vec_len, &commit));
         secp256k1_bppp_generators_destroy(ctx, gs);
     }
