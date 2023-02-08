@@ -342,7 +342,6 @@ void norm_arg_zero(void) {
         unsigned int n_vec_len = 1;
         unsigned int c_vec_len = 1;
         secp256k1_bulletproofs_generators *gs = secp256k1_bulletproofs_generators_create(ctx, n_vec_len + c_vec_len);
-        size_t plen = sizeof(proof);
         for (i = 0; i < n_vec_len; i++) {
             secp256k1_scalar_set_int(&n_vec[i], 0);
         }
@@ -371,6 +370,7 @@ void norm_arg_zero(void) {
             secp256k1_scalar_set_int(&l_vec[i], 0);
             random_scalar_order(&c_vec[i]);
         }
+        CHECK(secp256k1_bulletproofs_commit(ctx, scratch, &commit, gs, n_vec, n_vec_len, l_vec, c_vec_len, c_vec, c_vec_len, &q));
         CHECK(!secp256k1_norm_arg_prove(scratch, proof, &plen, &r, gs, n_vec, n_vec_len, l_vec, c_vec_len, c_vec, c_vec_len, &commit));
         secp256k1_bulletproofs_generators_destroy(ctx, gs);
     }
