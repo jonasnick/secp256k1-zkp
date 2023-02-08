@@ -143,7 +143,7 @@ static int secp256k1_bppp_commit(
         }
         secp256k1_ge_set_gej_var(commit, &commitj);
     }
-    return secp256k1_ge_is_infinity(commit) == 0;
+    return 1;
 }
 
 typedef struct ecmult_x_cb_data {

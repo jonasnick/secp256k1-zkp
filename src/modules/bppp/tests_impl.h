@@ -251,6 +251,28 @@ static void secp256k1_norm_arg_commit_initial_data(
     }
 }
 
+static void copy_vectors_into_scratch(secp256k1_scratch_space* scratch,
+                                      secp256k1_scalar **ns,
+                                      secp256k1_scalar **ls,
+                                      secp256k1_scalar **cs,
+                                      secp256k1_ge **gs,
+                                      const secp256k1_scalar *n_vec,
+                                      const secp256k1_scalar *l_vec,
+                                      const secp256k1_scalar *c_vec,
+                                      const secp256k1_ge *gens_vec,
+                                      size_t g_len,
+                                      size_t h_len) {
+    *ns = (secp256k1_scalar*)secp256k1_scratch_alloc(&ctx->error_callback, scratch, g_len * sizeof(secp256k1_scalar));
+    *ls = (secp256k1_scalar*)secp256k1_scratch_alloc(&ctx->error_callback, scratch, h_len * sizeof(secp256k1_scalar));
+    *cs = (secp256k1_scalar*)secp256k1_scratch_alloc(&ctx->error_callback, scratch, h_len * sizeof(secp256k1_scalar));
+    *gs = (secp256k1_ge*)secp256k1_scratch_alloc(&ctx->error_callback, scratch, (g_len + h_len) * sizeof(secp256k1_ge));
+    CHECK(ns != NULL && ls != NULL && cs != NULL && gs != NULL);
+    memcpy(*ns, n_vec, g_len * sizeof(secp256k1_scalar));
+    memcpy(*ls, l_vec, h_len * sizeof(secp256k1_scalar));
+    memcpy(*cs, c_vec, h_len * sizeof(secp256k1_scalar));
+    memcpy(*gs, gens_vec, (g_len + h_len) * sizeof(secp256k1_ge));
+}
+
 /* A complete norm argument. In contrast to secp256k1_bppp_rangeproof_norm_product_prove, this is meant
    to be used as a standalone norm argument.
    This is a simple wrapper around secp256k1_bppp_rangeproof_norm_product_prove
@@ -279,22 +301,11 @@ static int secp256k1_norm_arg_prove(
     secp256k1_sha256 transcript;
 
     scratch_checkpoint = secp256k1_scratch_checkpoint(&ctx->error_callback, scratch);
-    ns = (secp256k1_scalar*)secp256k1_scratch_alloc(&ctx->error_callback, scratch, g_len * sizeof(secp256k1_scalar));
-    ls = (secp256k1_scalar*)secp256k1_scratch_alloc(&ctx->error_callback, scratch, h_len * sizeof(secp256k1_scalar));
-    cs = (secp256k1_scalar*)secp256k1_scratch_alloc(&ctx->error_callback, scratch, h_len * sizeof(secp256k1_scalar));
-    gs = (secp256k1_ge*)secp256k1_scratch_alloc(&ctx->error_callback, scratch, (g_len + h_len) * sizeof(secp256k1_ge));
-    if (ns == NULL || ls == NULL || cs == NULL || gs == NULL) {
-        secp256k1_scratch_apply_checkpoint(&ctx->error_callback, scratch, scratch_checkpoint);
-        return 0;
-    }
-    memcpy(ns, n_vec, g_len * sizeof(secp256k1_scalar));
-    memcpy(ls, l_vec, h_len * sizeof(secp256k1_scalar));
-    memcpy(cs, c_vec, h_len * sizeof(secp256k1_scalar));
-    memcpy(gs, gens_vec->gens, (g_len + h_len) * sizeof(secp256k1_ge));
 
     /* Commit to the initial public values */
     secp256k1_norm_arg_commit_initial_data(&transcript, r, gens_vec, g_len, c_vec, c_vec_len, &comm);
 
+    copy_vectors_into_scratch(scratch, &ns, &ls, &cs, &gs, n_vec, l_vec, c_vec, gens_vec->gens, g_len, h_len);
     res = secp256k1_bppp_rangeproof_norm_product_prove(
         ctx,
         scratch,
@@ -357,28 +368,34 @@ void norm_arg_zero(void) {
     size_t i;
     secp256k1_scratch *scratch = secp256k1_scratch_space_create(ctx, 1000*10); /* shouldn't need much */
     unsigned char proof[1000];
+    secp256k1_sha256 transcript;
 
     random_scalar_order(&r);
     secp256k1_scalar_sqr(&q, &r);
 
-    /* l is zero vector and n is zero vectors of length 1 each.
-    */
+    /* l is zero vector and n is zero vectors of length 1 each. */
     {
+        size_t plen = sizeof(proof);
         unsigned int n_vec_len = 1;
         unsigned int c_vec_len = 1;
-        secp256k1_bppp_generators *gs = secp256k1_bppp_generators_create(ctx, n_vec_len + c_vec_len);
-        for (i = 0; i < n_vec_len; i++) {
-            secp256k1_scalar_set_int(&n_vec[i], 0);
+        secp256k1_bppp_generators *gens = secp256k1_bppp_generators_create(ctx, n_vec_len + c_vec_len);
+
+        secp256k1_scalar_set_int(&n_vec[0], 0);
+        secp256k1_scalar_set_int(&l_vec[0], 0);
+        random_scalar_order(&c_vec[0]);
+
+        CHECK(secp256k1_bppp_commit(ctx, scratch, &commit, gens, n_vec, n_vec_len, l_vec, c_vec_len, c_vec, c_vec_len, &q));
+        {
+            secp256k1_scalar *ns, *ls, *cs;
+            secp256k1_ge *gs;
+            size_t scratch_checkpoint = secp256k1_scratch_checkpoint(&ctx->error_callback, scratch);
+            copy_vectors_into_scratch(scratch, &ns, &ls, &cs, &gs, n_vec, l_vec, c_vec, gens->gens, n_vec_len, c_vec_len);
+            CHECK(secp256k1_bppp_rangeproof_norm_product_prove(ctx, scratch, proof, &plen, &transcript, &r, gs, gens->n, ns, n_vec_len, ls, c_vec_len, cs, c_vec_len));
+            secp256k1_scratch_apply_checkpoint(&ctx->error_callback, scratch, scratch_checkpoint);
         }
-        for (i = 0; i < c_vec_len; i++) {
-            secp256k1_scalar_set_int(&l_vec[i], 0);
-            random_scalar_order(&c_vec[i]);
-        }
-        /* Creating a commit fails because the commitment is point at infinity which we
-        cannot serialize.
-        */
-        CHECK(!secp256k1_bppp_commit(ctx, scratch, &commit, gs, n_vec, n_vec_len, l_vec, c_vec_len, c_vec, c_vec_len, &q));
-        secp256k1_bppp_generators_destroy(ctx, gs);
+        CHECK(secp256k1_bppp_rangeproof_norm_product_verify(ctx, scratch, proof, plen, &transcript, &r, gens, c_vec_len, c_vec, c_vec_len, &commit));
+
+        secp256k1_bppp_generators_destroy(ctx, gens);
     }
 
     /* l is the zero vector and longer than n. This results in one of the
