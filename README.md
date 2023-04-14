@@ -1,9 +1,14 @@
-=========
-Bulletproofs++ Benchmark building instructions:
+libsecp256k1-zkp with Bulletproofs++ Rangeproofs
+============
+This is a fork of the secp256k1-zkp library that includes a Bulletproofs++ range proof module.
+It can be found in `include/secp256k1_bppp.h` and `src/modules/bppp/`.
+Bulletproofs++ benchmark building instructions:
 
 1. Configure the library with `./configure --enable-dev-mode`
 2. Build the library with `make -j{num_cores}`
 3. Run the benchmark with `./bench_bppp`
+
+Normal README follows:
 
 libsecp256k1
 ============
