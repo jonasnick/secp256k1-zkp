@@ -9,6 +9,5 @@
 
 #include "keyagg_impl.h"
 #include "session_impl.h"
-#include "adaptor_impl.h"
 
 #endif

@@ -484,7 +484,7 @@ static int secp256k1_musig_nonce_process_internal(int *fin_nonce_parity, unsigne
     return 1;
 }
 
-int secp256k1_musig_nonce_process(const secp256k1_context* ctx, secp256k1_musig_session *session, const secp256k1_musig_aggnonce  *aggnonce, const unsigned char *msg32, const secp256k1_musig_keyagg_cache *keyagg_cache, const secp256k1_pubkey *adaptor) {
+int secp256k1_musig_nonce_process(const secp256k1_context* ctx, secp256k1_musig_session *session, const secp256k1_musig_aggnonce  *aggnonce, const unsigned char *msg32, const secp256k1_musig_keyagg_cache *keyagg_cache) {
     secp256k1_keyagg_cache_internal cache_i;
     secp256k1_ge aggnonce_pt[2];
     secp256k1_gej aggnonce_ptj[2];
@@ -508,14 +508,7 @@ int secp256k1_musig_nonce_process(const secp256k1_context* ctx, secp256k1_musig_
     }
     secp256k1_gej_set_ge(&aggnonce_ptj[0], &aggnonce_pt[0]);
     secp256k1_gej_set_ge(&aggnonce_ptj[1], &aggnonce_pt[1]);
-    /* Add public adaptor to nonce */
-    if (adaptor != NULL) {
-        secp256k1_ge adaptorp;
-        if (!secp256k1_pubkey_load(ctx, &adaptorp, adaptor)) {
-            return 0;
-        }
-        secp256k1_gej_add_ge_var(&aggnonce_ptj[0], &aggnonce_ptj[0], &adaptorp, NULL);
-    }
+
     if (!secp256k1_musig_nonce_process_internal(&session_i.fin_nonce_parity, fin_nonce, &session_i.noncecoef, aggnonce_ptj, agg_pk32, msg32)) {
         return 0;
     }
