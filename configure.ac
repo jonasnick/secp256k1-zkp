@@ -178,7 +178,7 @@ AC_ARG_ENABLE(module_ecdh,
     [SECP_SET_DEFAULT([enable_module_ecdh], [yes], [yes])])
 
 AC_ARG_ENABLE(module_musig,
-    AS_HELP_STRING([--enable-module-musig],[enable MuSig module (experimental)]),
+    AS_HELP_STRING([--enable-module-musig],[enable MuSig module]),
     [],
     [SECP_SET_DEFAULT([enable_module_musig], [no], [yes])])
 
@@ -544,9 +544,6 @@ else
   fi
   if test x"$enable_module_generator" = x"yes"; then
     AC_MSG_ERROR([NUMS generator module is experimental. Use --enable-experimental to allow.])
-  fi
-  if test x"$enable_module_musig" = x"yes"; then
-    AC_MSG_ERROR([MuSig module is experimental. Use --enable-experimental to allow.])
   fi
   if test x"$enable_module_ecdsa_s2c" = x"yes"; then
     AC_MSG_ERROR([ECDSA sign-to-contract module module is experimental. Use --enable-experimental to allow.])
