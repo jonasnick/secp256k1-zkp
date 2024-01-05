@@ -219,12 +219,11 @@ static int secp256k1_musig_pubkey_agg_callback(secp256k1_scalar *sc, secp256k1_g
     return 1;
 }
 
-int secp256k1_musig_pubkey_agg(const secp256k1_context* ctx, secp256k1_scratch_space *scratch, secp256k1_xonly_pubkey *agg_pk, secp256k1_musig_keyagg_cache *keyagg_cache, const secp256k1_pubkey * const* pubkeys, size_t n_pubkeys) {
+int secp256k1_musig_pubkey_agg(const secp256k1_context* ctx, secp256k1_xonly_pubkey *agg_pk, secp256k1_musig_keyagg_cache *keyagg_cache, const secp256k1_pubkey * const* pubkeys, size_t n_pubkeys) {
     secp256k1_musig_pubkey_agg_ecmult_data ecmult_data;
     secp256k1_gej pkj;
     secp256k1_ge pkp;
     size_t i;
-    (void) scratch;
 
     VERIFY_CHECK(ctx != NULL);
     if (agg_pk != NULL) {

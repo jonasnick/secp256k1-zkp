@@ -17,7 +17,6 @@
 #include "session.h"
 #include "keyagg.h"
 #include "../../scalar.h"
-#include "../../scratch.h"
 #include "../../field.h"
 #include "../../group.h"
 #include "../../hash.h"
@@ -38,7 +37,7 @@ static int create_keypair_and_pk(secp256k1_keypair *keypair, secp256k1_pubkey *p
 
 /* Just a simple (non-adaptor, non-tweaked) 2-of-2 MuSig aggregate, sign, verify
  * test. */
-static void musig_simple_test(secp256k1_scratch_space *scratch) {
+static void musig_simple_test(void) {
     unsigned char sk[2][32];
     secp256k1_keypair keypair[2];
     secp256k1_musig_pubnonce pubnonce[2];
@@ -69,7 +68,7 @@ static void musig_simple_test(secp256k1_scratch_space *scratch) {
         CHECK(secp256k1_musig_nonce_gen(CTX, &secnonce[i], &pubnonce[i], session_id[i], sk[i], &pk[i], NULL, NULL, NULL) == 1);
     }
 
-    CHECK(secp256k1_musig_pubkey_agg(CTX, scratch, &agg_pk, &keyagg_cache, pk_ptr, 2) == 1);
+    CHECK(secp256k1_musig_pubkey_agg(CTX, &agg_pk, &keyagg_cache, pk_ptr, 2) == 1);
     CHECK(secp256k1_musig_nonce_agg(CTX, &aggnonce, pubnonce_ptr, 2) == 1);
     CHECK(secp256k1_musig_nonce_process(CTX, &session, &aggnonce, msg, &keyagg_cache, NULL) == 1);
 
@@ -113,8 +112,7 @@ int memcmp_and_randomize(unsigned char *value, const unsigned char *expected, si
     return ret;
 }
 
-static void musig_api_tests(secp256k1_scratch_space *scratch) {
-    secp256k1_scratch_space *scratch_small;
+static void musig_api_tests(void) {
     secp256k1_musig_partial_sig partial_sig[2];
     const secp256k1_musig_partial_sig *partial_sig_ptr[2];
     secp256k1_musig_partial_sig invalid_partial_sig;
@@ -199,27 +197,21 @@ static void musig_api_tests(secp256k1_scratch_space *scratch) {
     /** main test body **/
 
     /** Key aggregation **/
-    CHECK(secp256k1_musig_pubkey_agg(CTX, scratch, &agg_pk, &keyagg_cache, pk_ptr, 2) == 1);
-    /* pubkey_agg does not require a scratch space */
-    CHECK(secp256k1_musig_pubkey_agg(CTX, NULL, &agg_pk, &keyagg_cache, pk_ptr, 2) == 1);
-    /* A small scratch space works too, but will result in using an ineffecient algorithm */
-    scratch_small = secp256k1_scratch_space_create(CTX, 1);
-    CHECK(secp256k1_musig_pubkey_agg(CTX, scratch_small, &agg_pk, &keyagg_cache, pk_ptr, 2) == 1);
-    secp256k1_scratch_space_destroy(CTX, scratch_small);
-    CHECK(secp256k1_musig_pubkey_agg(CTX, scratch, NULL, &keyagg_cache, pk_ptr, 2) == 1);
-    CHECK(secp256k1_musig_pubkey_agg(CTX, scratch, &agg_pk, NULL, pk_ptr, 2) == 1);
-    CHECK_ILLEGAL(CTX, secp256k1_musig_pubkey_agg(CTX, scratch, &agg_pk, &keyagg_cache, NULL, 2));
+    CHECK(secp256k1_musig_pubkey_agg(CTX, &agg_pk, &keyagg_cache, pk_ptr, 2) == 1);
+    CHECK(secp256k1_musig_pubkey_agg(CTX, NULL, &keyagg_cache, pk_ptr, 2) == 1);
+    CHECK(secp256k1_musig_pubkey_agg(CTX, &agg_pk, NULL, pk_ptr, 2) == 1);
+    CHECK_ILLEGAL(CTX, secp256k1_musig_pubkey_agg(CTX, &agg_pk, &keyagg_cache, NULL, 2));
     CHECK(memcmp_and_randomize(agg_pk.data, zeros132, sizeof(agg_pk.data)) == 0);
-    CHECK_ILLEGAL(CTX, secp256k1_musig_pubkey_agg(CTX, scratch, &agg_pk, &keyagg_cache, invalid_pk_ptr2, 2));
+    CHECK_ILLEGAL(CTX, secp256k1_musig_pubkey_agg(CTX, &agg_pk, &keyagg_cache, invalid_pk_ptr2, 2));
     CHECK(memcmp_and_randomize(agg_pk.data, zeros132, sizeof(agg_pk.data)) == 0);
-    CHECK_ILLEGAL(CTX, secp256k1_musig_pubkey_agg(CTX, scratch, &agg_pk, &keyagg_cache, invalid_pk_ptr3, 3));
+    CHECK_ILLEGAL(CTX, secp256k1_musig_pubkey_agg(CTX, &agg_pk, &keyagg_cache, invalid_pk_ptr3, 3));
     CHECK(memcmp_and_randomize(agg_pk.data, zeros132, sizeof(agg_pk.data)) == 0);
-    CHECK_ILLEGAL(CTX, secp256k1_musig_pubkey_agg(CTX, scratch, &agg_pk, &keyagg_cache, pk_ptr, 0));
+    CHECK_ILLEGAL(CTX, secp256k1_musig_pubkey_agg(CTX, &agg_pk, &keyagg_cache, pk_ptr, 0));
     CHECK(memcmp_and_randomize(agg_pk.data, zeros132, sizeof(agg_pk.data)) == 0);
-    CHECK_ILLEGAL(CTX, secp256k1_musig_pubkey_agg(CTX, scratch, &agg_pk, &keyagg_cache, NULL, 0));
+    CHECK_ILLEGAL(CTX, secp256k1_musig_pubkey_agg(CTX, &agg_pk, &keyagg_cache, NULL, 0));
     CHECK(memcmp_and_randomize(agg_pk.data, zeros132, sizeof(agg_pk.data)) == 0);
 
-    CHECK(secp256k1_musig_pubkey_agg(CTX, scratch, &agg_pk, &keyagg_cache, pk_ptr, 2) == 1);
+    CHECK(secp256k1_musig_pubkey_agg(CTX, &agg_pk, &keyagg_cache, pk_ptr, 2) == 1);
 
     /* pubkey_get */
     CHECK(secp256k1_musig_pubkey_get(CTX, &full_agg_pk, &keyagg_cache) == 1);
@@ -538,7 +530,7 @@ static void musig_nonce_test(void) {
     }
 }
 
-static void scriptless_atomic_swap(secp256k1_scratch_space *scratch) {
+static void scriptless_atomic_swap(void) {
     /* Throughout this test "a" and "b" refer to two hypothetical blockchains,
      * while the indices 0 and 1 refer to the two signers. Here signer 0 is
      * sending a-coins to signer 1, while signer 1 is sending b-coins to signer
@@ -600,8 +592,8 @@ static void scriptless_atomic_swap(secp256k1_scratch_space *scratch) {
     secp256k1_testrand256(sec_adaptor);
     CHECK(secp256k1_ec_pubkey_create(CTX, &pub_adaptor, sec_adaptor) == 1);
 
-    CHECK(secp256k1_musig_pubkey_agg(CTX, scratch, &agg_pk_a, &keyagg_cache_a, pk_a_ptr, 2) == 1);
-    CHECK(secp256k1_musig_pubkey_agg(CTX, scratch, &agg_pk_b, &keyagg_cache_b, pk_b_ptr, 2) == 1);
+    CHECK(secp256k1_musig_pubkey_agg(CTX, &agg_pk_a, &keyagg_cache_a, pk_a_ptr, 2) == 1);
+    CHECK(secp256k1_musig_pubkey_agg(CTX, &agg_pk_b, &keyagg_cache_b, pk_b_ptr, 2) == 1);
 
     CHECK(secp256k1_musig_nonce_gen(CTX, &secnonce_a[0], &pubnonce_a[0], seed_a[0], sk_a[0], &pk_a[0], NULL, NULL, NULL) == 1);
     CHECK(secp256k1_musig_nonce_gen(CTX, &secnonce_a[1], &pubnonce_a[1], seed_a[1], sk_a[1], &pk_a[1], NULL, NULL, NULL) == 1);
@@ -732,7 +724,7 @@ static void musig_tweak_test_helper(const secp256k1_xonly_pubkey* agg_pk, const 
 
 /* Create aggregate public key P[0], tweak multiple times (using xonly and
  * plain tweaking) and test signing. */
-static void musig_tweak_test(secp256k1_scratch_space *scratch) {
+static void musig_tweak_test(void) {
     unsigned char sk[2][32];
     secp256k1_pubkey pk[2];
     const secp256k1_pubkey *pk_ptr[2];
@@ -749,7 +741,7 @@ static void musig_tweak_test(secp256k1_scratch_space *scratch) {
         CHECK(create_keypair_and_pk(NULL, &pk[i], sk[i]) == 1);
     }
     /* Compute P0 = keyagg(pk0, pk1) and test signing for it */
-    CHECK(secp256k1_musig_pubkey_agg(CTX, scratch, &P_xonly[0], &keyagg_cache, pk_ptr, 2) == 1);
+    CHECK(secp256k1_musig_pubkey_agg(CTX, &P_xonly[0], &keyagg_cache, pk_ptr, 2) == 1);
     musig_tweak_test_helper(&P_xonly[0], sk[0], sk[1], &keyagg_cache);
     CHECK(secp256k1_musig_pubkey_get(CTX, &P[0], &keyagg_cache));
 
@@ -808,7 +800,7 @@ int musig_vectors_keyagg_and_tweak(enum MUSIG_ERROR *error,
         }
         pk_ptr[i] = &pubkeys[i];
     }
-    if (!secp256k1_musig_pubkey_agg(CTX, NULL, NULL, keyagg_cache, pk_ptr, key_indices_len)) {
+    if (!secp256k1_musig_pubkey_agg(CTX, NULL, keyagg_cache, pk_ptr, key_indices_len)) {
         *error = MUSIG_OTHER;
         return 0;
     }
@@ -1167,18 +1159,17 @@ static void musig_test_vectors_sigagg(void) {
 
 static void run_musig_tests(void) {
     int i;
-    secp256k1_scratch_space *scratch = secp256k1_scratch_space_create(CTX, 1024 * 1024);
 
     for (i = 0; i < COUNT; i++) {
-        musig_simple_test(scratch);
+        musig_simple_test();
     }
-    musig_api_tests(scratch);
+    musig_api_tests();
     musig_nonce_test();
     for (i = 0; i < COUNT; i++) {
         /* Run multiple times to ensure that pk and nonce have different y
          * parities */
-        scriptless_atomic_swap(scratch);
-        musig_tweak_test(scratch);
+        scriptless_atomic_swap();
+        musig_tweak_test();
     }
     sha256_tag_test();
     musig_test_vectors_keyagg();
@@ -1187,8 +1178,6 @@ static void run_musig_tests(void) {
     musig_test_vectors_signverify();
     musig_test_vectors_tweak();
     musig_test_vectors_sigagg();
-
-    secp256k1_scratch_space_destroy(CTX, scratch);
 }
 
 #endif

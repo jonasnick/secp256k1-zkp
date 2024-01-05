@@ -315,7 +315,7 @@ static void run_tests(secp256k1_context *ctx, unsigned char *key) {
 
         CHECK(secp256k1_keypair_create(ctx, &keypair, key));
         CHECK(secp256k1_keypair_pub(ctx, &pk, &keypair));
-        CHECK(secp256k1_musig_pubkey_agg(ctx, NULL, &agg_pk, &cache, pk_ptr, 1));
+        CHECK(secp256k1_musig_pubkey_agg(ctx, &agg_pk, &cache, pk_ptr, 1));
         CHECK(secp256k1_ec_pubkey_create(ctx, &adaptor, sec_adaptor));
         SECP256K1_CHECKMEM_UNDEFINE(key, 32);
         SECP256K1_CHECKMEM_UNDEFINE(session_id, sizeof(session_id));
