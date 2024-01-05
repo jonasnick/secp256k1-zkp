@@ -18,7 +18,7 @@ extern "C" {
  * The module also supports BIP-341 ("Taproot") public key tweaking.
  *
  * It is recommended to read the documentation in this include file carefully.
- * Further notes on API usage can be found in src/modules/musig/musig.md
+ * Further notes on API usage can be found in doc/musig.md
  *
  * Since the first version of MuSig is essentially replaced by MuSig2, we use
  * MuSig, musig and MuSig2 synonymously unless noted otherwise.
