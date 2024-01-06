@@ -27,11 +27,11 @@ typedef struct {
     int parity_acc;
 } secp256k1_keyagg_cache_internal;
 
-/* point_save_ext and point_load_ext are identical to point_save and point_load
+/* musig_ge_to_bytes_ext and musig_ge_from_bytes_ext are identical to ge_save and ge_load
  * except that they allow saving and loading the point at infinity */
-static void secp256k1_point_save_ext(unsigned char *data, secp256k1_ge *ge);
+static void secp256k1_musig_ge_to_bytes_ext(unsigned char *data, secp256k1_ge *ge);
 
-static void secp256k1_point_load_ext(secp256k1_ge *ge, const unsigned char *data);
+static void secp256k1_musig_ge_from_bytes_ext(secp256k1_ge *ge, const unsigned char *data);
 
 static int secp256k1_keyagg_cache_load(const secp256k1_context* ctx, secp256k1_keyagg_cache_internal *cache_i, const secp256k1_musig_keyagg_cache *cache);
 
