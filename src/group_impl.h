@@ -939,4 +939,39 @@ static int secp256k1_ge_x_frac_on_curve_var(const secp256k1_fe *xn, const secp25
      return secp256k1_fe_is_square_var(&r);
 }
 
+static void secp256k1_ge_to_bytes(unsigned char *buf, secp256k1_ge *ge) {
+    if (sizeof(secp256k1_ge_storage) == 64) {
+        secp256k1_ge_storage s;
+        secp256k1_ge_to_storage(&s, ge);
+        memcpy(&buf[0], &s, sizeof(s));
+    } else {
+        VERIFY_CHECK(!secp256k1_ge_is_infinity(ge));
+        secp256k1_fe_normalize_var(&ge->x);
+        secp256k1_fe_normalize_var(&ge->y);
+        secp256k1_fe_get_b32(buf, &ge->x);
+        secp256k1_fe_get_b32(buf + 32, &ge->y);
+    }
+}
+
+static void secp256k1_ge_from_bytes(secp256k1_ge *ge, const unsigned char *buf) {
+    if (sizeof(secp256k1_ge_storage) == 64) {
+        /* When the secp256k1_ge_storage type is exactly 64 byte, use its
+         * representation inside secp256k1_pubkey, as conversion is very fast.
+         * Note that secp256k1_pubkey_save must use the same representation. */
+        secp256k1_ge_storage s;
+        memcpy(&s, &buf[0], sizeof(s));
+        secp256k1_ge_from_storage(ge, &s);
+    } else {
+        /* Otherwise, fall back to 32-byte big endian for X and Y. */
+        secp256k1_fe x, y;
+        int ret = 1;
+
+        ret &= secp256k1_fe_set_b32_limit(&x, buf);
+        ret &= secp256k1_fe_set_b32_limit(&y, buf + 32);
+        VERIFY_CHECK(ret);
+        secp256k1_ge_set_xy(ge, &x, &y);
+    }
+}
+
+
 #endif /* SECP256K1_GROUP_IMPL_H */
