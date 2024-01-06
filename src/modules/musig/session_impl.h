@@ -20,6 +20,36 @@
 #include "../../scalar.h"
 #include "../../util.h"
 
+/* Outputs 33 zero bytes if the given group element is the point at infinity and
+ * otherwise outputs the compressed serialization */
+static void secp256k1_musig_ge_serialize_ext(unsigned char *out33, secp256k1_ge* ge) {
+    if (secp256k1_ge_is_infinity(ge)) {
+        memset(out33, 0, 33);
+    } else {
+        int ret;
+        size_t size = 33;
+        ret = secp256k1_eckey_pubkey_serialize(ge, out33, &size, 1);
+#ifdef VERIFY
+        /* Serialize must succeed because the point is not at infinity */
+        VERIFY_CHECK(ret && size == 33);
+#else
+        (void) ret;
+#endif
+    }
+}
+
+/* Outputs the point at infinity if the given byte array is all zero, otherwise
+ * attempts to parse compressed point serialization. */
+static int secp256k1_musig_ge_parse_ext(secp256k1_ge* ge, const unsigned char *in33) {
+    unsigned char zeros[33] = { 0 };
+
+    if (secp256k1_memcmp_var(in33, zeros, sizeof(zeros)) == 0) {
+        secp256k1_ge_set_infinity(ge);
+        return 1;
+    }
+    return secp256k1_eckey_pubkey_parse(ge, in33, 33);
+}
+
 static const unsigned char secp256k1_musig_secnonce_magic[4] = { 0x22, 0x0e, 0xdc, 0xf1 };
 
 static void secp256k1_musig_secnonce_save(secp256k1_musig_secnonce *secnonce, const secp256k1_scalar *k, secp256k1_ge *pk) {
@@ -217,7 +247,7 @@ int secp256k1_musig_aggnonce_serialize(const secp256k1_context* ctx, unsigned ch
         return 0;
     }
     for (i = 0; i < 2; i++) {
-        secp256k1_ge_serialize_ext(&out66[33*i], &ge[i]);
+        secp256k1_musig_ge_serialize_ext(&out66[33*i], &ge[i]);
     }
     return 1;
 }
@@ -231,7 +261,7 @@ int secp256k1_musig_aggnonce_parse(const secp256k1_context* ctx, secp256k1_musig
     ARG_CHECK(in66 != NULL);
 
     for (i = 0; i < 2; i++) {
-        if (!secp256k1_ge_parse_ext(&ge[i], &in66[33*i])) {
+        if (!secp256k1_musig_ge_parse_ext(&ge[i], &in66[33*i])) {
             return 0;
         }
     }
@@ -443,7 +473,7 @@ static int secp256k1_musig_compute_noncehash(unsigned char *noncehash, secp256k1
 
     secp256k1_sha256_initialize_tagged(&sha, (unsigned char*)"MuSig/noncecoef", sizeof("MuSig/noncecoef") - 1);
     for (i = 0; i < 2; i++) {
-        secp256k1_ge_serialize_ext(buf, &aggnonce[i]);
+        secp256k1_musig_ge_serialize_ext(buf, &aggnonce[i]);
         secp256k1_sha256_write(&sha, buf, sizeof(buf));
     }
     secp256k1_sha256_write(&sha, agg_pk32, 32);
