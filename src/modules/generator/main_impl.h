@@ -98,7 +98,7 @@ static void shallue_van_de_woestijne(secp256k1_ge* ge, const secp256k1_fe* t) {
      *    Latincrypt 2012
      */
 
-    /* Basic algorithm:
+    /* Basic algorithm (assuming t != 0):
 
        c = sqrt(-3)
        d = (c - 1)/2
@@ -121,6 +121,8 @@ static void shallue_van_de_woestijne(secp256k1_ge* ge, const secp256k1_fe* t) {
        The joint denominator j = wd * c^2 * t^2, and
        1 / x1d = 1/j * c^2 * t^2
        1 / x2d = x3d = 1/j * wd
+
+       If t == 0, this function returns the arbitrary point (d, f(d)).
     */
 
     static const secp256k1_fe c = SECP256K1_FE_CONST(0x0a2d2ba9, 0x3507f1df, 0x233770c2, 0xa797962c, 0xc61f6d15, 0xda14ecd4, 0x7d8d27ae, 0x1cd5f852);
