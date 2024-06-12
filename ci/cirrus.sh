@@ -85,6 +85,7 @@ esac
     --enable-module-rangeproof="$RANGEPROOF" --enable-module-whitelist="$WHITELIST" --enable-module-generator="$GENERATOR" \
     --enable-module-schnorrsig="$SCHNORRSIG"  --enable-module-musig="$MUSIG" --enable-module-ecdsa-adaptor="$ECDSAADAPTOR" \
     --enable-module-schnorrsig="$SCHNORRSIG" \
+    --enable-module-frost="$FROST" \
     --enable-examples="$EXAMPLES" \
     --enable-ctime-tests="$CTIMETESTS" \
     --with-valgrind="$WITH_VALGRIND" \

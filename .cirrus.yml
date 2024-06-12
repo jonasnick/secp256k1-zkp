@@ -28,6 +28,7 @@ env:
   WHITELIST: no
   MUSIG: no
   ECDSAADAPTOR: no
+  FROST: no
   BPPP: no
   ### test options
   SECP256K1_TEST_ITERS:
@@ -76,14 +77,14 @@ task:
   << : *LINUX_CONTAINER
   matrix:
     - env: {WIDEMUL:  int64,  RECOVERY: yes}
-    - env: {WIDEMUL:  int64,                 ECDH: yes, SCHNORRSIG: yes, ELLSWIFT: yes, EXPERIMENTAL: yes, ECDSA_S2C: yes,  RANGEPROOF: yes, WHITELIST: yes, GENERATOR: yes, MUSIG: yes, ECDSAADAPTOR: yes, BPPP: yes}
+    - env: {WIDEMUL:  int64,                 ECDH: yes, SCHNORRSIG: yes, ELLSWIFT: yes, EXPERIMENTAL: yes, ECDSA_S2C: yes,  RANGEPROOF: yes, WHITELIST: yes, GENERATOR: yes, MUSIG: yes, ECDSAADAPTOR: yes, BPPP: yes, FROST: yes}
     - env: {WIDEMUL: int128}
     - env: {WIDEMUL: int128_struct}
     - env: {WIDEMUL: int128,  RECOVERY: yes,            SCHNORRSIG: yes, ELLSWIFT: yes}
-    - env: {WIDEMUL: int128,                 ECDH: yes, SCHNORRSIG: yes, EXPERIMENTAL: yes, ECDSA_S2C: yes, RANGEPROOF: yes, WHITELIST: yes, GENERATOR: yes, MUSIG: yes, ECDSAADAPTOR: yes, BPPP: yes}
+    - env: {WIDEMUL: int128,                 ECDH: yes, SCHNORRSIG: yes, EXPERIMENTAL: yes, ECDSA_S2C: yes, RANGEPROOF: yes, WHITELIST: yes, GENERATOR: yes, MUSIG: yes, ECDSAADAPTOR: yes, BPPP: yes, FROST: yes}
     - env: {WIDEMUL: int128,  ASM: x86_64                              , ELLSWIFT: yes}
-    - env: {                  RECOVERY: yes,            SCHNORRSIG: yes, EXPERIMENTAL: yes, ECDSA_S2C: yes, RANGEPROOF: yes, WHITELIST: yes, GENERATOR: yes, MUSIG: yes, ECDSAADAPTOR: yes, BPPP: yes}
-    - env: {CTIMETESTS: no,    RECOVERY: yes, ECDH: yes, SCHNORRSIG: yes, EXPERIMENTAL: yes, ECDSA_S2C: yes, RANGEPROOF: yes, WHITELIST: yes, GENERATOR: yes, MUSIG: yes, ECDSAADAPTOR: yes, BPPP: yes, CPPFLAGS: -DVERIFY}
+    - env: {                  RECOVERY: yes,            SCHNORRSIG: yes, EXPERIMENTAL: yes, ECDSA_S2C: yes, RANGEPROOF: yes, WHITELIST: yes, GENERATOR: yes, MUSIG: yes, ECDSAADAPTOR: yes, BPPP: yes, FROST: yes}
+    - env: {CTIMETESTS: no,    RECOVERY: yes, ECDH: yes, SCHNORRSIG: yes, EXPERIMENTAL: yes, ECDSA_S2C: yes, RANGEPROOF: yes, WHITELIST: yes, GENERATOR: yes, MUSIG: yes, ECDSAADAPTOR: yes, BPPP: yes, FROST: yes, CPPFLAGS: -DVERIFY}
     - env: {BUILD: distcheck, WITH_VALGRIND: no, CTIMETESTS: no, BENCH: no}
     - env: {CPPFLAGS: -DDETERMINISTIC}
     - env: {CFLAGS: -O0, CTIMETESTS: no}
@@ -118,6 +119,7 @@ task:
     GENERATOR: yes
     MUSIG: yes
     ECDSAADAPTOR: yes
+    FROST: yes
     BPPP: yes
   matrix:
     - env:
@@ -179,6 +181,7 @@ task:
     GENERATOR: yes
     MUSIG: yes
     ECDSAADAPTOR: yes
+    FROST: yes
     BPPP: yes
     CTIMETESTS: no
   test_script:
@@ -326,6 +329,7 @@ task:
     GENERATOR: yes
     MUSIG: yes
     ECDSAADAPTOR: yes
+    FROST: yes
     BPPP: yes
     CTIMETESTS: no
   matrix:
